@@ -1,0 +1,63 @@
+name: "🙋 その他・相談（人間への確認依頼）"
+description: "実装方針や仕様判断に迷ったとき、AIエージェント/実装者がチームの人間に相談する"
+title: "[Consult] "
+labels: ["question", "needs-human-decision"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **AIエージェントへ**：設計書やIssueに書かれていないことを、自分で仮定して実装を進めないでください。判断がつかない時点でこのテンプレートを使って相談し、人間の回答を待ってから実装を進めてください。
+
+  - type: textarea
+    id: topic
+    attributes:
+      label: 相談したいこと
+      description: 何を決めてほしいか、一文で
+    validations:
+      required: true
+
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景・経緯
+      description: どの作業（Issue/PR番号）をしている中で発生したか
+      placeholder: "#12 の実装中、フォロー機能のAPI設計を詰めていたところ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: 検討した選択肢
+      description: 必ず2つ以上の案と、それぞれの利点・欠点を書いてください（1案だけの提示はNG）
+      placeholder: |
+        - 案A: ...（利点/欠点）
+        - 案B: ...（利点/欠点）
+    validations:
+      required: true
+
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: 相談者としての推奨案
+      description: 自分ならどちらを選ぶか、理由も添えて（任意だが記入を推奨）
+    validations:
+      required: false
+
+  - type: dropdown
+    id: blocking
+    attributes:
+      label: これはブロッキングですか？
+      options:
+        - ブロッキング（回答が来るまで作業を進められない）
+        - 非ブロッキング（他の作業を先に進められる）
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 確認事項
+      options:
+        - label: docs/design_doc.md を確認した上で、それでも判断がつかないことである
+          required: true

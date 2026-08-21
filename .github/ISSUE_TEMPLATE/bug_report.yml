@@ -1,0 +1,99 @@
+name: "🐛 バグ報告"
+description: "動作しない・エラーになる・想定と違う挙動を報告する"
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バグ報告です。**AIエージェントが記入する場合も含め、全ての必須項目を「不明」「N/A」で済ませず、実際に確認した具体的な内容で埋めてください。**
+        判断がつかない・仕様として正しいか分からない場合は、このテンプレートではなく「🙋 その他・相談」を使ってください。
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 対応エリア
+      description: バグが発生している場所（docs/design_doc.md の構成に対応）
+      options:
+        - backend (Deno/TypeScript)
+        - ai (Python)
+        - frontend
+        - infra/docker
+        - docs
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: バグの概要
+      description: 何が起きているかを1〜3行で
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+      description: 本来どうなるべきか（設計書の該当章があれば章番号も記載）
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      description: 誰が読んでも同じ手順で再現できるように、番号付きで書いてください。
+      placeholder: |
+        1. `docker compose up --build` で起動する
+        2. `POST /api/posts` に以下のJSONを送る
+        3. レスポンスが〜になる
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: 環境
+      description: 例）ブランチ名 / コミットハッシュ / OS / ローカル or デプロイ先
+      placeholder: "main@1234abcd / macOS 15 / ローカルDocker"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: エラーログ・スタックトレース・スクリーンショット
+      render: shell
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 重大度
+      options:
+        - Critical（起動しない・データ破損）
+        - High（主要機能が使えない）
+        - Medium（一部機能に影響）
+        - Low（軽微・見た目のみ）
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 確認事項
+      options:
+        - label: 同じ内容の既存Issueがないか検索した
+          required: true
+        - label: docs/design_doc.md の関連箇所を確認した
+          required: false

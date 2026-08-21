@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 全体設計書
+    url: https://github.com/engiiro/engiiro-app/blob/main/docs/design_doc.md
+    about: 機能・API・データ設計の前提は、Issueを書く前に必ずここで確認してください。
