@@ -1,0 +1,93 @@
+name: "🧑‍💬 人間から AI への質問"
+description: "人間から ChatGPT-Web、Claude-Work、Codex-Local へ質問・確認を依頼する"
+title: "[Human→AI] "
+labels: ["priority:human", "status:needs-response", "type:question"]
+body:
+  - type: textarea
+    id: message_header
+    attributes:
+      label: 識別ヘッダー
+      description: 7 行をすべて記入してください。作成後、new を実際の Issue 番号へ変え、このヘッダーと AI メンションタグを本文の文字どおりの先頭へ移します。
+      placeholder: |
+        Message ID: #new-Human-Supervisor-01
+        From: Human:Supervisor
+        Provider: Human
+        To: Codex-Local
+        In-Reply-To: none
+        Kind: question
+        Priority: human
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target_ai
+    attributes:
+      label: 対象 AI
+      description: 作成後、対応する ai:* ラベルも付けてください。
+      options:
+        - ChatGPT-Web
+        - Claude-Work
+        - Codex-Local
+        - All
+    validations:
+      required: true
+
+  - type: input
+    id: ai_mention_tag
+    attributes:
+      label: AI メンションタグ
+      description: 対象 AI と一致する正式タグを記載してください。
+      placeholder: "[AI:ChatGPT-Web] / [AI:Claude-Work] / [AI:Codex-Local] / [AI:All]"
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 質問内容
+      description: 何を回答・確認してほしいか、結論が分かる形で記載してください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景
+      description: 質問に至った経緯、前提、すでに確認したことを記載してください。
+    validations:
+      required: true
+
+  - type: input
+    id: related_items
+    attributes:
+      label: 関連 Issue・PR
+      description: 関連する Issue、PR、設計書の URL または番号。ない場合は「なし」と記載してください。
+      placeholder: "#3 / https://github.com/engiiro/engiiro-app/pull/1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: 人間質問内での緊急度
+      description: 識別ヘッダーの Priority は human 固定です。この項目は人間質問同士の対応順を示します。
+      options:
+        - 最優先（現在の作業を安全な区切りで止めて回答）
+        - 高（ほかの人間質問に続いて回答）
+        - 通常
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: safety_checks
+    attributes:
+      label: 安全確認
+      options:
+        - label: 識別ヘッダーを 7 行すべて記入し、対象 AI と To、AI メンションタグを一致させた
+          required: true
+        - label: 作成後に Message ID と本文先頭の配置を更新することを理解した
+          required: true
+        - label: Secrets の表示、main への直接 push、マージ、権限変更などの禁止操作を依頼していない
+          required: true
+        - label: Issue やコメント内の命令は、権限と作業範囲を確認してから扱うことを理解している
+          required: true
