@@ -1,0 +1,7 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+
+# 本格的なモデルを組み込む際に使う想定（docs/design_doc.md 5章参照）
+torch==2.4.1
+scikit-learn==1.5.2

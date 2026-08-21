@@ -1,0 +1,21 @@
+# 環境変数
+.env
+
+# Deno
+backend/.deno/
+
+# Python
+ai/__pycache__/
+ai/**/__pycache__/
+ai/.venv/
+ai/*.egg-info/
+ai/models/*.bin
+ai/models/*.pt
+ai/models/*.safetensors
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/*
+!.vscode/settings.json
