@@ -1,10 +1,10 @@
-# AI API 仕様書 Draft v0.1
+# AI API 仕様書 Draft v0.2
 
 ## 文書冒頭
 
 | 項目 | 内容 |
 |---|---|
-| **文書名と版** | AI API 仕様書 Draft v0.1 |
+| **文書名と版** | AI API 仕様書 Draft v0.2 |
 | **対象** | AI 文章評価・文章変換・モデレーション連携 |
 | **読者** | フロントエンド担当、Denoバックエンド担当、Python/AI担当、レビュー担当、人間監督 |
 | **全体設計書との関係** | 本仕様書は、`docs/design_doc.md` の 7 章「API設計」を詳細化したもの。Deno公開APIと Python推論サービスの責務境界、入出力、モデレーション、認証、エラー処理を定義。 |
@@ -23,7 +23,7 @@ Deno公開API、Python推論サービス、フロントエンドの3者が同じ
 
 ### 1.2 スコープ（対象）
 
-以下の3エンドポイントと責務境界：
+以下の2エンドポイントと責務境界：
 
 - **`POST /api/ai/evaluate`** … 文章の「赤ちゃん度／お母さん度」を年齢値で評価する
 - **`POST /api/ai/transform`** … 文章を赤ちゃん言葉・お母さん言葉に変換してモデレーション結果を返す
@@ -109,13 +109,10 @@ Python / Hugging Face
 ### 4.4 成功例
 
 ```json
-// Example 1: baby
-// Request
 {
   "body": "あああ今日つかれた。ねむい。",
   "personaType": "baby"
 }
-// Response
 {
   "estimatedAge": 2.0
 }
@@ -157,25 +154,22 @@ Python / Hugging Face
 ### 5.4 成功例（3パターン）
 
 ```json
-// Example 1: allow
 {
   "action": "allow",
   "transformedText": "きょうのこーどれびゅー、つかれちゃった。",
   "reasonCodes": []
 }
 
-// Example 2: rewrite_required
 {
   "action": "rewrite_required",
   "transformedText": "お仕事大変だったんだね。ゆっくり休んでね。",
-  "reasonCodes": ["harsh_language_toward_others"]
+  "reasonCodes": ["harsh_language_toward_others（仮）"]
 }
 
-// Example 3: block
 {
   "action": "block",
   "transformedText": null,
-  "reasonCodes": ["hate_speech"]
+  "reasonCodes": ["hate_speech（仮）"]
 }
 ```
 
