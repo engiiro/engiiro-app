@@ -12,26 +12,13 @@ body:
     id: message_header
     attributes:
       label: 識別ヘッダー
-      description: 7 行をすべて記入してください。ChatGPT-Web / Codex-Local の Provider は OpenAI、Claude-Work は Anthropic です。作成後、new を実際の Issue 番号へ変え、このヘッダーと宛先タグを本文の文字どおりの先頭へ移します。
+      description: 5 行をすべて記入してください。送信者はメッセージID内に記載します。作成後、new を実際の Issue 番号へ変え、このヘッダーと宛先タグを本文の文字どおりの先頭へ移します。
       placeholder: |
-        Message ID: #new-Codex-Local-01
-        From: Codex-Local
-        Provider: OpenAI
-        To: Human:Supervisor
-        In-Reply-To: none
-        Kind: decision-request
-        Priority: normal
-    validations:
-      required: true
-
-  - type: dropdown
-    id: sender
-    attributes:
-      label: 送信者 AI
-      options:
-        - ChatGPT-Web
-        - Claude-Work
-        - Codex-Local
+        メッセージID: #new-Codex-Local-01
+        宛先: Human:Supervisor
+        返信先: なし
+        種別: 判断依頼
+        優先度: 通常
     validations:
       required: true
 
@@ -59,17 +46,25 @@ body:
       required: true
 
   - type: textarea
-    id: topic
+    id: purpose
     attributes:
-      label: 論点・相談内容
-      description: 何を議論または判断してほしいか、一文で要約してから詳しく記載してください。
+      label: 目的
+      description: この議論・相談で解決したいことを簡潔に記載してください。
     validations:
       required: true
 
   - type: textarea
-    id: background
+    id: conclusion
     attributes:
-      label: 背景・関連 Issue / PR
+      label: 結論・求める判断
+      description: 現時点の結論・推奨案、または最終的に答えてほしいこと・決めてほしいことを先に記載してください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: 詳細・背景
       description: 作業の経緯、関連する Issue / PR、設計書の箇所、すでに確認した内容を記載してください。
     validations:
       required: true
@@ -94,14 +89,6 @@ body:
         - 案 B: ...
           - 利点: ...
           - 欠点: ...
-    validations:
-      required: true
-
-  - type: textarea
-    id: recommendation
-    attributes:
-      label: 推奨案
-      description: 推奨する案と、その理由を記載してください。
     validations:
       required: true
 
@@ -131,11 +118,11 @@ body:
     attributes:
       label: 確認事項
       options:
-        - label: 識別ヘッダーを 7 行すべて記入し、送信者と Provider、宛先と宛先タグを一致させた
+        - label: 識別ヘッダーを 5 行すべて記入し、メッセージID内の送信者、宛先、宛先タグを一致させた
           required: true
-        - label: 作成後に Message ID と本文先頭の配置を更新することを理解した
+        - label: 作成後にメッセージIDと本文先頭の配置を更新することを理解した
           required: true
         - label: docs/design_doc.md と関連 Issue / PR を確認しても判断できず、未承認の仮定で実装を進めていない
           required: true
-        - label: 選択肢を 2 案以上示し、利点・欠点と推奨理由を記載した
+        - label: 選択肢を 2 案以上示し、利点・欠点と、結論・求める判断に推奨理由を記載した
           required: true
