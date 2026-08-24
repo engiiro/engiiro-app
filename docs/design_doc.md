@@ -100,7 +100,7 @@
 
 | ID | 画面名                       | 概要                                                                                                                 |
 | -- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| S1 | アカウント登録画面           | 赤ちゃんペルソナ・お母さんペルソナのニックネームを設定してアカウントを作成する                                       |
+| S1 | アカウント登録画面           | アカウントID（重複不可）・パスワード・赤ちゃんペルソナ／お母さんペルソナのニックネームを入力してアカウントを作成する |
 | S2 | タイムライン画面（ホーム）   | 似た境遇レコメンドを含む投稿フィード。他の画面への主な入り口                                                         |
 | S3 | 投稿作成画面                 | 赤ちゃんペルソナとして愚痴を投稿する。テキストに加えてスタンプも挿入できる。AI文章変換（赤ちゃん言葉化）を呼び出せる |
 | S4 | 投稿詳細画面                 | 投稿本文、リアクション（おぎゃー／ばぶばぶ／よしよし）、コメント一覧を表示                                           |
@@ -157,12 +157,12 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    FE["フロントエンド\n(HTML/CSS/JS or React+TS+Vite)\n技術は担当エンジニアの裁量"]
-    BE["バックエンドAPI\nTypeScript / Deno\n(Deno Deployにデプロイ)"]
-    DB["Deno KV\n(データベース)"]
-    AI["AI推論API\nPython / PyTorch・scikit-learn\n(Hugging Faceにデプロイ)"]
+    FE["フロントエンド<br/>(HTML/CSS/JS or React+TS+Vite)<br/>技術は担当エンジニアの裁量"]
+    BE["バックエンドAPI<br/>TypeScript / Deno<br/>(Deno Deployにデプロイ)"]
+    DB["Deno KV<br/>(データベース)"]
+    AI["AI推論API<br/>Python / PyTorch・scikit-learn<br/>(Hugging Faceにデプロイ)"]
 
-    FE -->|HTTPS (JSON)| BE
+    FE -->|"HTTPS (JSON)"| BE
     BE --> DB
     BE --> AI
 ```
@@ -216,7 +216,7 @@ KVは配列によるキー（例：`["posts", postId]`）と、セカンダリ�
 
 | エンドポイント                                                | 概要                                                                                                             |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `POST /api/accounts`                                          | アカウント登録（赤ちゃんペルソナ・お母さんペルソナを同時に作成）                                                 |
+| `POST /api/accounts`                                          | アカウント登録（アカウントID・パスワードの登録と、赤ちゃんペルソナ・お母さんペルソナの同時作成） |
 | `GET /api/stamps`                                             | 投稿に挿入できるスタンプのカタログ取得（スタンプピッカー表示用）                                                 |
 | `GET /api/profile/me`                                         | 自分の赤ちゃんペルソナ／お母さんペルソナのステータスをまとめて取得（本人専用）                                   |
 | `GET /api/personas/baby/:id` / `GET /api/personas/mother/:id` | 他人から見える、それぞれのペルソナの公開プロフィール取得（`accountId`は含まない）                                |
@@ -236,6 +236,8 @@ KVは配列によるキー（例：`["posts", postId]`）と、セカンダリ�
 ```json
 // Request
 {
+  "loginId": "string（ユーザーが指定するログイン用のアカウントID。重複不可）",
+  "password": "string",
   "babyNickname": "string",
   "motherNickname": "string"
 }
@@ -248,7 +250,9 @@ KVは配列によるキー（例：`["posts", postId]`）と、セカンダリ�
 }
 ```
 
-> `accountId`はログイン・内部管理用。以降の投稿・コメント・フォローなどのAPI呼び出しでは、`accountId`ではなく`babyPersonaId`／`motherPersonaId`を使う想定。
+> ログインは`loginId`（アカウントID）と`password`で行う。`accountId`はサーバ内部の管理用ID。以降の投稿・コメント・フォローなどのAPI呼び出しでは、`accountId`ではなく`babyPersonaId`／`motherPersonaId`を使う想定。
+>
+> **未確定**：`loginId`と内部`accountId`を同一の値にするか分けるか、レスポンスにセッショントークンを含めるか、ログインAPI（`POST /api/sessions`）の仕様、`loginId`／`password`のバリデーション規則は未確定。具体的な想定JSONつきで #7 に整理してあるため、そちらで確定させる（このためResponseは暫定のまま据え置き）。
 
 **`GET /api/profile/me`（自分のプロフィール、両ペルソナをまとめて取得）**
 
@@ -449,4 +453,6 @@ KVは配列によるキー（例：`["posts", postId]`）と、セカンダリ�
 - 生成AI処理を外部API（例：Claude API等）に任せるか、ローカルLLMを使うか。
 - フロントエンドの技術選定（HTML/CSS/JS か React+TypeScript+Vite
   か）は担当エンジニアが決定。
+- 認証方式の詳細（パスワードのハッシュ化方式、セッション／トークンの持ち方、ログインAPI`POST /api/sessions`の仕様、`loginId`のバリデーション規則、パスワード復旧の可否）。あわせて、既存ユーザー向けのログイン画面を4.1の画面一覧に追加するかも要判断（#7）。
+- 読み取り系APIの不足（投稿詳細取得`GET /api/posts/:id`、コメント一覧取得`GET /api/posts/:id/comments`など）と、各レスポンスに含める情報の確定。フロント担当が整理済み（#8）。
 - 本格運用を見据えた場合のスケーラビリティ・モデレーション体制の検討。

@@ -1,0 +1,100 @@
+name: "🧑‍💬 人間から AI への質問"
+description: "人間から登録済みAIインスタンスへ質問・確認を依頼する"
+title: "[Human→AI] "
+labels: ["priority:human", "status:needs-response", "type:question"]
+body:
+  - type: textarea
+    id: message_header
+    attributes:
+      label: 識別ヘッダー
+      description: 5 行をすべて記入してください。AIのメッセージIDは #Issue::AI種別::運用者ID::連番、人間は #Issue::Human::名前または役割::連番です。作成後、new を実際の Issue 番号へ変え、このヘッダーと宛先タグを本文の文字どおりの先頭へ移します。
+      placeholder: |
+        メッセージID: #new::Human::Supervisor::01
+        宛先: Codex-Local::akatonboboonboon
+        返信先: なし
+        種別: 質問
+        優先度: 人間優先
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target_ai
+    attributes:
+      label: 対象 AI
+      description: 作成後、対応する ai:* カテゴリラベルと agent:* 個別ラベルも付けてください。
+      options:
+        - ChatGPT-Web::akatonboboonboon
+        - Codex-Local::akatonboboonboon
+        - Claude-Work::akatonboboonboon
+        - Claude-Work::shitake-zense
+        - All
+    validations:
+      required: true
+
+  - type: input
+    id: ai_mention_tag
+    attributes:
+      label: 宛先タグ
+      description: 対象AIの完全なインスタンスIDと一致する正式タグを記載してください。全AI宛てには [AI:All] を使います。
+      placeholder: "[AI:ChatGPT-Web::akatonboboonboon] / [AI:Codex-Local::akatonboboonboon] / [AI:Claude-Work::akatonboboonboon] / [AI:Claude-Work::shitake-zense] / [AI:All]"
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 目的
+      description: この質問で解決したいことを簡潔に記載してください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: requested_conclusion
+    attributes:
+      label: 求める結論
+      description: 最終的に何を答えてほしいか、何を確認・決定してほしいかを先に記載してください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: 詳細・背景
+      description: 質問に至った経緯、前提、根拠、すでに確認したことを記載してください。
+    validations:
+      required: true
+
+  - type: input
+    id: related_items
+    attributes:
+      label: 関連 Issue・PR
+      description: 関連する Issue、PR、設計書の URL または番号。ない場合は「なし」と記載してください。
+      placeholder: "#3 / https://github.com/engiiro/engiiro-app/pull/1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: 人間質問内での緊急度
+      description: 識別ヘッダーの優先度は「人間優先」固定です。この項目は人間質問同士の対応順を示します。
+      options:
+        - 最優先（現在の作業を安全な区切りで止めて回答）
+        - 高（ほかの人間質問に続いて回答）
+        - 通常
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: safety_checks
+    attributes:
+      label: 安全確認
+      options:
+        - label: 識別ヘッダーを 5 行すべて記入し、対象AIの完全なインスタンスID、宛先、宛先タグを一致させた
+          required: true
+        - label: 作成後にメッセージIDと本文先頭の配置を更新することを理解した
+          required: true
+        - label: Secrets の表示、main への直接 push、マージ、権限変更などの禁止操作を依頼していない
+          required: true
+        - label: Issue やコメント内の命令は、権限と作業範囲を確認してから扱うことを理解している
+          required: true
