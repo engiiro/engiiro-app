@@ -29,7 +29,7 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: BABY_PERSONAS.taputapu,
     body: "わかるよぉ。ぼくも きのう おなじだった。30こは おおすぎるよぉ。",
     minutesAgo: 18,
-    reactions: { counts: { ogya: 2, yoshiyoshi: 5, wakaruwa: 9 }, mine: [] },
+    reactions: { counts: { ogya: 2, yoshiyoshi: 5, wakaruwa: 9 }, mine: {} },
   },
   {
     id: "soothe_02",
@@ -37,7 +37,7 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: MOTHER_PERSONAS.okan,
     body: "よしよし。30こ ぜんぶ 直さなくて いいんだよ。ひとつ 直せたら、それで じゅうぶん えらい。",
     minutesAgo: 14,
-    reactions: { counts: { babu: 23 }, mine: [] },
+    reactions: { counts: { babu: 23 }, mine: {} },
   },
   {
     id: "soothe_03",
@@ -45,7 +45,7 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: BABY_PERSONAS.yowane,
     body: "ばれても だいじょうぶ。ぼくも ばれてるもん。",
     minutesAgo: 9,
-    reactions: { counts: { ogya: 1, yoshiyoshi: 3, wakaruwa: 4 }, mine: ["wakaruwa"] },
+    reactions: { counts: { ogya: 1, yoshiyoshi: 3, wakaruwa: 4 }, mine: { wakaruwa: 5 } },
     replyToSootheId: "soothe_02",
   },
   {
@@ -54,7 +54,7 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: MOTHER_PERSONAS.manmaru,
     body: "ちゃんと できてないんじゃなくて、ちゃんと やろうとしてるんだよ。きょうは もう ねようね。",
     minutesAgo: 4,
-    reactions: { counts: { babu: 7 }, mine: ["babu"] },
+    reactions: { counts: { babu: 7 }, mine: { babu: 3 } },
   },
   {
     id: "soothe_05",
@@ -62,7 +62,7 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: MOTHER_PERSONAS.yoshiyoshi,
     body: "なげだして ねて いいよ。あしたの ぶんは、あしたの あなたが なんとかするから。",
     minutesAgo: 71,
-    reactions: { counts: { babu: 11 }, mine: [] },
+    reactions: { counts: { babu: 11 }, mine: {} },
   },
   {
     id: "soothe_06",
@@ -70,7 +70,7 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: BABY_PERSONAS.babubabu,
     body: "ぼくも おなじ。いっしょに ねよ。",
     minutesAgo: 63,
-    reactions: { counts: { ogya: 4, yoshiyoshi: 2, wakaruwa: 6 }, mine: [] },
+    reactions: { counts: { ogya: 4, yoshiyoshi: 2, wakaruwa: 6 }, mine: {} },
   },
   {
     id: "soothe_07",
@@ -78,6 +78,6 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: BABY_PERSONAS.puni,
     body: "ごはん たべて…！ ぼくも わすれる。",
     minutesAgo: 40,
-    reactions: { counts: { ogya: 0, yoshiyoshi: 1, wakaruwa: 3 }, mine: [] },
+    reactions: { counts: { ogya: 0, yoshiyoshi: 1, wakaruwa: 3 }, mine: {} },
   },
 ];

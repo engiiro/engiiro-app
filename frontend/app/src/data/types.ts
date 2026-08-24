@@ -27,13 +27,18 @@ export type ReactionTargetKind = "bubble" | "babySoothe" | "motherSoothe";
 
 /**
  * リアクションの状態。
+ *
  * リアクションにペルソナの要素は無い（人間の決定、2026-08-24）。
  * 誰が押したかも持たない。持てば、それ自体が非連結を崩す材料になる。
+ *
+ * 1種類につき同じ人が 5 回まで押せる（人間の決定、2026-08-25）。
+ * `mine` は「押したかどうか」ではなく「何回押したか（0〜5）」。
  */
 export type ReactionState = {
+  /** 全員ぶんの合計 */
   readonly counts: Readonly<Partial<Record<ReactionType, number>>>;
-  /** 閲覧者自身が押したもの */
-  readonly mine: readonly ReactionType[];
+  /** 閲覧者自身が押した回数（0〜REACTION_MAX_PER_USER） */
+  readonly mine: Readonly<Partial<Record<ReactionType, number>>>;
 };
 
 /** バブル＝赤ちゃんペルソナとして投稿する本文。お母さんでは投稿できない（FR-POST-003） */
@@ -80,6 +85,12 @@ export type BubbleDetail = {
 export type Me = {
   readonly baby: PublicPersona;
   readonly mother: PublicPersona;
+};
+
+/** バブル本文に挿入できるスタンプ（FR-POST-005 / FR-STAMP-001） */
+export type Stamp = {
+  readonly id: string;
+  readonly name: string;
 };
 
 export type CreateBubbleInput = {

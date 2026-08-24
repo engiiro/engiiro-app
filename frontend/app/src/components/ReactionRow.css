@@ -3,8 +3,11 @@
 .eg-reactions {
   display: flex;
   flex-wrap: wrap;
-  /* 1種のときも引き伸ばさず左寄せ。3種の行と同じリズムを保つ */
-  justify-content: flex-start;
+  /*
+   * 右寄せ（人間の決定、2026-08-25）。PC では押しやすい側に寄せる。
+   * 1種のときも引き伸ばさないので、3種の行と右端が揃う。
+   */
+  justify-content: flex-end;
   gap: var(--space-xs);
 }
 
@@ -13,12 +16,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-xxs);
-  /*
-   * 高さは縦 padding と .eg-touch の min-height で 44px を確保する（DESIGN.md §8.2）。
-   * 横は xs。375px のカード内幅（313px）に3種が1行で収まる値がここまで。
-   * 横を sm にすると3つ目が折り返して、行のリズムとカードの密度が崩れる。
-   */
-  padding: var(--space-sm) var(--space-xs);
+  /* 高さは縦 padding と .eg-touch の min-height で 44px を確保する（DESIGN.md §8.2） */
+  padding: var(--space-xs) var(--space-sm);
   border: var(--border-width) solid var(--hairline);
   border-radius: var(--radius-control);
   background: var(--surface);
@@ -31,25 +30,14 @@
 }
 
 .eg-reactions--compact .eg-reaction {
-  padding: var(--space-xs);
+  padding: var(--space-xxs) var(--space-xs);
 }
 
-.eg-reaction:active:not(.eg-reaction--readonly) {
+.eg-reaction:not(:disabled):active {
   transform: scale(var(--press-scale-strong));
 }
 
-/* 自分のものに付いたリアクション。押せる形にしない */
-.eg-reaction--readonly {
-  background: var(--card);
-  border-style: dashed;
-  cursor: default;
-}
-
-.eg-reactions__none {
-  color: var(--muted);
-}
-
-/* 押下済。色だけでなく太さでも区別する（DESIGN.md §2.5） */
+/* 1回でも押していたら活性。色と文字の太さで二重化する（DESIGN.md §2.5） */
 .eg-reaction.is-mine {
   border-color: var(--accent-line);
   background: var(--accent-soft);
@@ -58,6 +46,12 @@
 
 .eg-reaction.is-mine .eg-reaction__label {
   font-weight: 700;
+}
+
+/* 5回ぜんぶ押した状態。これ以上は押せない */
+.eg-reaction.is-maxed {
+  cursor: default;
+  border-color: var(--accent-fill);
 }
 
 .eg-reaction__icon {
@@ -69,16 +63,86 @@
   text-align: right;
 }
 
-/* 数が動いたときだけ立ち上げる */
-.eg-reaction[data-pop="true"] {
+/* ── 5回ぶんの点メーター ───────────────────────────────────────── */
+
+.eg-reaction__meter {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--space-xxs) / 2);
+  flex: none;
+}
+
+/*
+ * 残りの点は「輪」、押した点は「塗り」。
+ * 4px の点では色の違いが読めないので、形で分ける（DESIGN.md §2.5 の二重化）。
+ */
+.eg-dot {
+  box-sizing: border-box;
+  width: var(--space-xxs);
+  height: var(--space-xxs);
+  border-radius: var(--rounded-pill);
+  background: transparent;
+  box-shadow: inset 0 0 0 var(--border-width) var(--muted);
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    box-shadow var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-quick) var(--ease-bounce);
+}
+
+.eg-dot.is-on {
+  background: var(--accent-line);
+  box-shadow: inset 0 0 0 var(--border-width) var(--accent-line);
+}
+
+/* 灯った瞬間だけ点が跳ねる */
+.eg-reaction[data-step] .eg-dot.is-on:last-of-type {
+  transform: scale(1.4);
+}
+
+/* ── 押した瞬間の演出。回数が増えるほど強くする ───────────────── */
+
+.eg-reaction[data-step] {
   animation: eg-like-pop var(--duration-very-slow) var(--ease-bounce);
 }
 
-.eg-reaction[data-pop="true"] .eg-reaction__count {
+.eg-reaction[data-step="1"] {
+  --pop-scale: 1.08;
+}
+
+.eg-reaction[data-step="2"] {
+  --pop-scale: 1.11;
+}
+
+.eg-reaction[data-step="3"] {
+  --pop-scale: 1.14;
+}
+
+.eg-reaction[data-step="4"] {
+  --pop-scale: 1.18;
+}
+
+/* 5回目だけ一段強い。到達したことが体で分かるように */
+.eg-reaction[data-step="5"] {
+  --pop-scale: 1.26;
+}
+
+.eg-reaction[data-step] .eg-reaction__count {
   animation: eg-number-pop-in var(--duration-quick) var(--ease-smooth-out);
 }
 
-/* 粒子。押した瞬間だけ外へ散る */
+/* 5回目に一度だけ広がる波紋 */
+.eg-reaction[data-step="5"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: var(--border-width) solid var(--accent-line);
+  animation: eg-ring-out var(--duration-very-slow) var(--ease-smooth-out);
+  pointer-events: none;
+}
+
+/* ── 粒子 ─────────────────────────────────────────────────────── */
+
 .eg-burst {
   position: absolute;
   inset: 0;
@@ -96,26 +160,46 @@
   opacity: 0;
 }
 
-.eg-reaction[data-pop="true"] .eg-burst span {
+.eg-reaction[data-step] .eg-burst span {
   animation: eg-burst var(--duration-very-slow) var(--ease-smooth-out);
 }
 
-.eg-burst span:nth-child(1) {
-  --burst-x: calc(var(--distance-medium) * -1);
-  --burst-y: calc(var(--distance-medium) * -1);
+/*
+ * 出す粒子の数を回数で絞る。1回目でも4個は出るので、しょぼくならない。
+ * 16個ぶんの向きはあらかじめ配ってある（下の nth-child）。
+ */
+.eg-reaction[data-step="1"] .eg-burst span:nth-child(n + 5),
+.eg-reaction[data-step="2"] .eg-burst span:nth-child(n + 7),
+.eg-reaction[data-step="3"] .eg-burst span:nth-child(n + 9),
+.eg-reaction[data-step="4"] .eg-burst span:nth-child(n + 13) {
+  display: none;
 }
 
-.eg-burst span:nth-child(2) {
-  --burst-x: var(--distance-medium);
-  --burst-y: calc(var(--distance-medium) * -1);
+.eg-burst span:nth-child(1)  { --burst-x: calc(var(--distance-medium) * -1); --burst-y: calc(var(--distance-medium) * -1); }
+.eg-burst span:nth-child(2)  { --burst-x: var(--distance-medium);            --burst-y: calc(var(--distance-medium) * -1); }
+.eg-burst span:nth-child(3)  { --burst-x: calc(var(--distance-base) * -1);   --burst-y: var(--distance-medium); }
+.eg-burst span:nth-child(4)  { --burst-x: var(--distance-base);              --burst-y: var(--distance-medium); }
+.eg-burst span:nth-child(5)  { --burst-x: 0px;                               --burst-y: calc(var(--distance-medium) * -1.4); }
+.eg-burst span:nth-child(6)  { --burst-x: 0px;                               --burst-y: var(--distance-medium); }
+.eg-burst span:nth-child(7)  { --burst-x: calc(var(--distance-medium) * -1.4); --burst-y: 0px; }
+.eg-burst span:nth-child(8)  { --burst-x: calc(var(--distance-medium) * 1.4);  --burst-y: 0px; }
+.eg-burst span:nth-child(9)  { --burst-x: calc(var(--distance-medium) * -1.2); --burst-y: calc(var(--distance-base) * 1.2); }
+.eg-burst span:nth-child(10) { --burst-x: calc(var(--distance-medium) * 1.2);  --burst-y: calc(var(--distance-base) * 1.2); }
+.eg-burst span:nth-child(11) { --burst-x: calc(var(--distance-base) * -1.6);   --burst-y: calc(var(--distance-medium) * -1.2); }
+.eg-burst span:nth-child(12) { --burst-x: calc(var(--distance-base) * 1.6);    --burst-y: calc(var(--distance-medium) * -1.2); }
+.eg-burst span:nth-child(13) { --burst-x: calc(var(--distance-medium) * -1.8); --burst-y: calc(var(--distance-medium) * -0.6); }
+.eg-burst span:nth-child(14) { --burst-x: calc(var(--distance-medium) * 1.8);  --burst-y: calc(var(--distance-medium) * -0.6); }
+.eg-burst span:nth-child(15) { --burst-x: calc(var(--distance-medium) * -0.6); --burst-y: calc(var(--distance-medium) * 1.6); }
+.eg-burst span:nth-child(16) { --burst-x: calc(var(--distance-medium) * 0.6);  --burst-y: calc(var(--distance-medium) * 1.6); }
+
+/* 自分のものに付いたリアクション。押せる形にしない */
+.eg-reaction--readonly {
+  background: var(--card);
+  border-style: dashed;
+  cursor: default;
 }
 
-.eg-burst span:nth-child(3) {
-  --burst-x: calc(var(--distance-base) * -1);
-  --burst-y: var(--distance-medium);
-}
-
-.eg-burst span:nth-child(4) {
-  --burst-x: var(--distance-base);
-  --burst-y: var(--distance-medium);
+.eg-reactions__none {
+  color: var(--muted);
+  text-align: right;
 }

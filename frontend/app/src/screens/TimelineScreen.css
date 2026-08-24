@@ -41,3 +41,8 @@
 .eg-timeline__empty {
   margin-top: var(--space-lg);
 }
+
+/* 準備中の画面 */
+.eg-placeholder {
+  padding: var(--space-lg) 0;
+}

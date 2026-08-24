@@ -7,6 +7,7 @@ import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { IconSoothe, IconTrash } from "../components/icons";
+import { BubbleBody } from "../components/BubbleBody";
 import { PersonaChip } from "../components/PersonaChip";
 import { ReactionRow } from "../components/ReactionRow";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -28,8 +29,8 @@ import "./BubbleDetailScreen.css";
 type BubbleDetailScreenProps = {
   readonly detail: BubbleDetail;
   readonly onBack: () => void;
-  readonly onToggleBubbleReaction: (bubbleId: string, reaction: ReactionType) => void;
-  readonly onToggleSootheReaction: (
+  readonly onReactToBubble: (bubbleId: string, reaction: ReactionType) => void;
+  readonly onReactToSoothe: (
     sootheId: string,
     authorKind: Soothe["author"]["kind"],
     reaction: ReactionType,
@@ -41,8 +42,8 @@ type BubbleDetailScreenProps = {
 export function BubbleDetailScreen({
   detail,
   onBack,
-  onToggleBubbleReaction,
-  onToggleSootheReaction,
+  onReactToBubble,
+  onReactToSoothe,
   onOpenSoothe,
   onDelete,
 }: BubbleDetailScreenProps) {
@@ -63,7 +64,7 @@ export function BubbleDetailScreen({
       <div className={cx("eg-column", "eg-detail")}>
         <article className="eg-detail__bubble">
           <PersonaChip persona={bubble.author} createdAt={bubble.createdAt} showRole={false} />
-          <p className={cx("eg-detail__body", "t-bubble-body", "eg-prose")}>{bubble.body}</p>
+          <BubbleBody body={bubble.body} className="eg-detail__body" />
           {bubble.tags.length > 0 ? (
             <div className="eg-detail__tags">
               {bubble.tags.map((tag) => (
@@ -77,7 +78,7 @@ export function BubbleDetailScreen({
             <ReactionRow
               targetKind="bubble"
               state={bubble.reactions}
-              onToggle={(reaction) => onToggleBubbleReaction(bubble.id, reaction)}
+              onReact={(reaction) => onReactToBubble(bubble.id, reaction)}
               readOnly={bubble.isMine}
             />
           </div>
@@ -115,8 +116,8 @@ export function BubbleDetailScreen({
                   key={soothe.id}
                   soothe={soothe}
                   replyToNickname={nicknameOf(soothe.replyToSootheId)}
-                  onToggleReaction={(sootheId, reaction) =>
-                    onToggleSootheReaction(sootheId, soothe.author.kind, reaction)
+                  onReact={(sootheId, reaction) =>
+                    onReactToSoothe(sootheId, soothe.author.kind, reaction)
                   }
                   onReply={(target) =>
                     onOpenSoothe({
@@ -135,23 +136,21 @@ export function BubbleDetailScreen({
         </section>
       </div>
 
-      <div className="eg-actionbar">
-        <div className="eg-column">
-          <Button
-            fullWidth
-            onClick={() =>
-              onOpenSoothe({
-                kind: "bubble",
-                bubbleId: bubble.id,
-                authorNickname: bubble.author.nickname,
-                bubbleIsMine: bubble.isMine,
-              })
-            }
-          >
-            <IconSoothe />
-            あやす
-          </Button>
-        </div>
+      <div className="eg-detail__action">
+        <Button
+          fullWidth
+          onClick={() =>
+            onOpenSoothe({
+              kind: "bubble",
+              bubbleId: bubble.id,
+              authorNickname: bubble.author.nickname,
+              bubbleIsMine: bubble.isMine,
+            })
+          }
+        >
+          <IconSoothe />
+          あやす
+        </Button>
       </div>
 
       {confirming ? (

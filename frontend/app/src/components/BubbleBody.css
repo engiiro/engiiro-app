@@ -1,0 +1,20 @@
+/* 本文とスタンプ。URL の自動リンク化は行わない（FR-MOD-021 / OUT-008） */
+
+.eg-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-size-sm);
+  height: var(--avatar-size-sm);
+  margin: 0 var(--space-xxs);
+  border-radius: var(--rounded-sm);
+  background: var(--baby-soft);
+  color: var(--baby);
+  vertical-align: -0.35em;
+}
+
+.eg-stamp--picker {
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  margin: 0;
+}

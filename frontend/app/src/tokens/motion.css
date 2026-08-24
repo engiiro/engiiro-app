@@ -81,6 +81,18 @@
   }
 }
 
+/* 5回目に一度だけ広がる波紋。到達したことを体で伝える */
+@keyframes eg-ring-out {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
 @keyframes eg-burst {
   from {
     opacity: 1;
@@ -135,6 +147,44 @@
   to {
     opacity: 0;
     transform: translateY(var(--distance-medium)) scale(var(--scale-modal));
+  }
+}
+
+/*
+ * 右から出て右へ帰るパネル（modal 型の使い回し）。
+ * 中央の列が左へ詰まる動きも同じ duration / easing にして、ひとつの運動として読ませる。
+ */
+@keyframes eg-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--distance-medium)) scale(var(--scale-modal));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes eg-panel-out {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(var(--distance-medium)) scale(var(--scale-modal));
+  }
+}
+
+/* 引き出しは下から。パネルの中の動きなので短く */
+@keyframes eg-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-medium));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

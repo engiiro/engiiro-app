@@ -1,9 +1,10 @@
 import { moderate } from "../lib/mockModeration";
-import { BUBBLE_MAX_LENGTH, countChars } from "./constants";
+import { BUBBLE_MAX_LENGTH, REACTION_MAX_PER_USER, countChars } from "./constants";
 import { BUBBLE_SEEDS } from "./bubbles";
 import { ME } from "./personas";
 import { isReactionAllowed } from "./reactions";
 import { SOOTHE_SEEDS } from "./soothes";
+import { STAMP_CATALOG } from "./stamps";
 import type {
   Bubble,
   BubbleDetail,
@@ -16,6 +17,7 @@ import type {
   ReactionTargetKind,
   ReactionType,
   Soothe,
+  Stamp,
 } from "./types";
 
 /*
@@ -28,7 +30,8 @@ import type {
  *   fetchBubbleDetail  → GET  /api/posts/:id（+ あやす一覧。読み取り系は Issue #8 で未確定）
  *   createBubble       → POST /api/posts
  *   createSoothe       → POST /api/posts/:id/comments
- *   toggleReaction     → POST /api/posts/:id/reactions
+ *   addReaction        → POST /api/posts/:id/reactions
+ *   fetchStamps        → GET  /api/stamps
  *   deleteBubble       → DELETE /api/posts/:id（設計書に未記載。FR-POST-006 の受け皿）
  *
  * ここで返す形は「外部向けレスポンス」と同じ制約に従う。accountId を持たせない
@@ -181,7 +184,7 @@ export async function createBubble(input: CreateBubbleInput): Promise<CreateBubb
     body,
     tags: input.tags,
     createdAt: new Date().toISOString(),
-    reactions: { counts: {}, mine: [] },
+    reactions: { counts: {}, mine: {} },
     isMine: true,
     read: true,
     affinity: 1,
@@ -226,7 +229,7 @@ export async function createSoothe(input: CreateSootheInput): Promise<CreateSoot
     author: personaOf(input.personaKind),
     body,
     createdAt: new Date().toISOString(),
-    reactions: { counts: {}, mine: [] },
+    reactions: { counts: {}, mine: {} },
     isMine: true,
     replyToSootheId: input.replyToSootheId,
   };
@@ -241,62 +244,77 @@ function personaOf(kind: PersonaKind): PublicPersona {
   return kind === "mother" ? ME.mother : ME.baby;
 }
 
-export type ToggleReactionInput = {
+/** スタンプのカタログ（FR-STAMP-001） */
+export async function fetchStamps(): Promise<readonly Stamp[]> {
+  return STAMP_CATALOG;
+}
+
+export type AddReactionInput = {
   readonly target: { readonly type: "bubble" | "soothe"; readonly id: string };
   readonly targetKind: ReactionTargetKind;
   readonly reaction: ReactionType;
 };
 
-export type ToggleReactionResult =
+export type AddReactionResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: "not_allowed" | "own_target" };
+  | { readonly ok: false; readonly reason: "not_allowed" | "own_target" | "max_reached" };
 
 /**
- * リアクションの付け外し。
+ * リアクションを1回足す。
  *
  * FR-REACT-007：許可されていない対象とリアクションの組み合わせは保存しない。
  * 画面がそもそも出さないうえで、この境界でも弾く二重化。
  *
  * 自分のバブルと自分のあやすには、自分でリアクションできない（人間の決定、2026-08-24）。
- * 画面側もボタンを出さないが、保存を止めるのはこちら。
+ * 1種類につき 5 回まで（同、2026-08-25）。上限を超える要求は保存しない。
+ * 画面側もボタンを止めるが、止めるのはこちら。
  */
-export async function toggleReaction(input: ToggleReactionInput): Promise<ToggleReactionResult> {
+export async function addReaction(input: AddReactionInput): Promise<AddReactionResult> {
   if (!isReactionAllowed(input.targetKind, input.reaction)) {
     return { ok: false, reason: "not_allowed" };
   }
   if (isOwnTarget(input.target)) {
     return { ok: false, reason: "own_target" };
   }
+  if (currentMine(input) >= REACTION_MAX_PER_USER) {
+    return { ok: false, reason: "max_reached" };
+  }
 
   if (input.target.type === "bubble") {
     bubbles = bubbles.map((bubble) =>
       bubble.id === input.target.id
-        ? { ...bubble, reactions: flip(bubble.reactions, input.reaction) }
+        ? { ...bubble, reactions: bump(bubble.reactions, input.reaction) }
         : bubble,
     );
   } else {
     soothes = soothes.map((soothe) =>
       soothe.id === input.target.id
-        ? { ...soothe, reactions: flip(soothe.reactions, input.reaction) }
+        ? { ...soothe, reactions: bump(soothe.reactions, input.reaction) }
         : soothe,
     );
   }
   return { ok: true };
 }
 
-function isOwnTarget(target: ToggleReactionInput["target"]): boolean {
+function currentMine(input: AddReactionInput): number {
+  const state =
+    input.target.type === "bubble"
+      ? bubbles.find((b) => b.id === input.target.id)?.reactions
+      : soothes.find((s) => s.id === input.target.id)?.reactions;
+  return state?.mine[input.reaction] ?? 0;
+}
+
+function isOwnTarget(target: AddReactionInput["target"]): boolean {
   if (target.type === "bubble") {
     return bubbles.find((bubble) => bubble.id === target.id)?.isMine ?? false;
   }
   return soothes.find((soothe) => soothe.id === target.id)?.isMine ?? false;
 }
 
-function flip(state: ReactionState, reaction: ReactionType): ReactionState {
-  const wasMine = state.mine.includes(reaction);
-  const current = state.counts[reaction] ?? 0;
+function bump(state: ReactionState, reaction: ReactionType): ReactionState {
   return {
-    counts: { ...state.counts, [reaction]: Math.max(0, current + (wasMine ? -1 : 1)) },
-    mine: wasMine ? state.mine.filter((item) => item !== reaction) : [...state.mine, reaction],
+    counts: { ...state.counts, [reaction]: (state.counts[reaction] ?? 0) + 1 },
+    mine: { ...state.mine, [reaction]: (state.mine[reaction] ?? 0) + 1 },
   };
 }
 

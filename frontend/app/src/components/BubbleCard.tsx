@@ -19,10 +19,10 @@ import "./BubbleCard.css";
 type BubbleCardProps = {
   readonly bubble: Bubble;
   readonly onOpen: (bubbleId: string) => void;
-  readonly onToggleReaction: (bubbleId: string, reaction: ReactionType) => void;
+  readonly onReact: (bubbleId: string, reaction: ReactionType) => void;
 };
 
-export function BubbleCard({ bubble, onOpen, onToggleReaction }: BubbleCardProps) {
+export function BubbleCard({ bubble, onOpen, onReact }: BubbleCardProps) {
   return (
     <article className={cx("eg-card", bubble.read && "is-read")}>
       <header className="eg-card__head">
@@ -61,7 +61,7 @@ export function BubbleCard({ bubble, onOpen, onToggleReaction }: BubbleCardProps
         <ReactionRow
           targetKind="bubble"
           state={bubble.reactions}
-          onToggle={(reaction) => onToggleReaction(bubble.id, reaction)}
+          onReact={(reaction) => onReact(bubble.id, reaction)}
           readOnly={bubble.isMine}
         />
       </footer>

@@ -25,7 +25,7 @@ type TimelineScreenProps = {
   readonly feed: FeedResult | null;
   readonly loading: boolean;
   readonly onOpenBubble: (bubbleId: string) => void;
-  readonly onToggleReaction: (bubbleId: string, reaction: ReactionType) => void;
+  readonly onReact: (bubbleId: string, reaction: ReactionType) => void;
   readonly onCompose: () => void;
 };
 
@@ -33,14 +33,14 @@ export function TimelineScreen({
   feed,
   loading,
   onOpenBubble,
-  onToggleReaction,
+  onReact,
   onCompose,
 }: TimelineScreenProps) {
   const isEmpty = !loading && feed !== null && feed.recommended.length + feed.rest.length === 0;
 
   return (
     <>
-      <ScreenHeader title="えんじいろ" />
+      <ScreenHeader title="ホーム" />
 
       <div className={cx("eg-column", "eg-timeline")}>
         {loading || feed === null ? <SkeletonFeed count={3} /> : null}
@@ -75,7 +75,7 @@ export function TimelineScreen({
                       key={bubble.id}
                       bubble={bubble}
                       onOpen={onOpenBubble}
-                      onToggleReaction={onToggleReaction}
+                      onReact={onReact}
                     />
                   ))}
                 </div>
@@ -93,7 +93,7 @@ export function TimelineScreen({
                       key={bubble.id}
                       bubble={bubble}
                       onOpen={onOpenBubble}
-                      onToggleReaction={onToggleReaction}
+                      onReact={onReact}
                     />
                   ))}
                 </div>

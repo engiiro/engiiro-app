@@ -27,7 +27,18 @@
   --feed-max-width: 600px;
   --gutter: 16px;
   --touch-target-min: 44px;
-  --nav-width-desktop: 220px;
+
+  /*
+   * PC 3カラム（人間の決定、2026-08-25）。
+   * 中央はフィード 600px のまま広げない（DESIGN.md §5.2）。
+   * DESIGN.md §5.2「カラムを増やさない」・§8.1「モバイルファースト」とは食い違う。
+   * 改訂案は別途出す。
+   */
+  --rail-left-width: 220px;
+  --rail-left-narrow: 72px;
+  --rail-right-width: 320px;
+  --compose-width: 440px;
+  --column-gap: 24px;
 
   /* §4 の各コンポーネント仕様に書かれている寸法 */
   --control-min-height: 48px;

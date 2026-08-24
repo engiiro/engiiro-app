@@ -1,0 +1,139 @@
+/* 左サイド。中央の列を差し替えるだけで、右サイドには触らない */
+
+.eg-rail {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  height: 100vh;
+  padding: var(--space-lg) var(--space-sm);
+  border-right: var(--border-width) solid var(--hairline);
+}
+
+.eg-rail__brand {
+  padding: 0 var(--space-sm);
+}
+
+.eg-rail__logo {
+  color: var(--accent-line);
+}
+
+.eg-rail__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.eg-rail__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-control);
+  color: var(--body);
+  text-align: start;
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-rail__item:hover {
+  background: var(--card);
+}
+
+/* 現在地は色・太さ・形の三重化で示す（DESIGN.md §2.5） */
+.eg-rail__item.is-current {
+  background: var(--accent-soft);
+  color: var(--accent-line);
+  font-weight: 700;
+}
+
+.eg-rail__item.is-current::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: calc(var(--border-width) * 2);
+  height: var(--space-lg);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-line);
+  transform: translateY(-50%);
+}
+
+.eg-rail__icon {
+  flex: none;
+}
+
+.eg-rail__label {
+  flex: 1;
+}
+
+.eg-rail__soon {
+  flex: none;
+  padding: 0 var(--space-xs);
+  border-radius: var(--rounded-pill);
+  background: var(--card);
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* 狭い幅ではアイコンだけの細い列にする */
+@media (max-width: 1199px) {
+  .eg-rail {
+    padding: var(--space-lg) var(--space-xs);
+  }
+
+  .eg-rail__brand,
+  .eg-rail__label,
+  .eg-rail__soon {
+    display: none;
+  }
+
+  .eg-rail__item {
+    justify-content: center;
+    padding: var(--space-sm);
+  }
+}
+
+/* さらに狭いと下部のバーへ畳む */
+@media (max-width: 767px) {
+  .eg-rail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 30;
+    flex-direction: row;
+    height: auto;
+    padding: 0 0 env(safe-area-inset-bottom);
+    border-right: none;
+    border-top: var(--border-width) solid var(--hairline);
+    background: var(--surface);
+  }
+
+  .eg-rail__list {
+    flex-direction: row;
+    width: 100%;
+  }
+
+  .eg-rail__list > li {
+    flex: 1;
+  }
+
+  .eg-rail__item {
+    height: calc(var(--touch-target-min) + var(--space-sm));
+    border-radius: 0;
+  }
+
+  .eg-rail__item.is-current::before {
+    top: 0;
+    left: 50%;
+    width: var(--space-lg);
+    height: calc(var(--border-width) * 2);
+    transform: translateX(-50%);
+  }
+}

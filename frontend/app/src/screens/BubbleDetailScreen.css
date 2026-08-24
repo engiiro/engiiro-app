@@ -70,3 +70,13 @@
   flex-direction: column;
   gap: var(--space-sm);
 }
+
+/* あやすボタン。中央の列の下に貼りつく（画面全体に固定しない） */
+.eg-detail__action {
+  position: sticky;
+  bottom: 0;
+  margin-top: var(--space-lg);
+  padding: var(--space-sm) 0 var(--space-lg);
+  background: var(--canvas);
+  border-top: var(--border-width) solid var(--hairline);
+}

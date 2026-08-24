@@ -59,12 +59,18 @@ export function IconWakaruwa({ className }: IconProps) {
   );
 }
 
-/** ばぶー：ちいさな ふきだし */
+/**
+ * ばぶー：おしゃぶり。
+ *
+ * 以前は吹き出しを当てていたが、吹き出しは一般に「返信」を意味するので
+ * 返信ボタンに見えてしまっていた。ばぶー はリアクションであって返信ではない。
+ */
 export function IconBabu({ className }: IconProps) {
   return (
     <svg {...BASE_PROPS} className={className}>
-      <path d="M3 4.4c0-.9.7-1.6 1.6-1.6h6.8c.9 0 1.6.7 1.6 1.6v4.4c0 .9-.7 1.6-1.6 1.6H7.4L4.4 13v-2.6h-.2A1.2 1.2 0 0 1 3 9.2z" />
-      <path d="M6.2 6.6h.01M8 6.6h.01M9.8 6.6h.01" />
+      <circle cx="8" cy="3.4" r="2" />
+      <ellipse cx="8" cy="8.2" rx="4.4" ry="2.5" />
+      <path d="M6.6 10.4c.2 1.9.7 3.2 1.4 4 .7-.8 1.2-2.1 1.4-4" />
     </svg>
   );
 }
@@ -145,6 +151,96 @@ export function IconHourglass({ className }: IconProps) {
       <path d="M4.6 2.4h6.8M4.6 13.6h6.8" />
       <path d="M5.4 2.4c0 2.6 2.6 3.6 2.6 5.6 0 2-2.6 3-2.6 5.6" />
       <path d="M10.6 2.4c0 2.6-2.6 3.6-2.6 5.6 0 2 2.6 3 2.6 5.6" />
+    </svg>
+  );
+}
+
+/** さがす */
+export function IconSearch({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <circle cx="7" cy="7" r="4.4" />
+      <path d="M10.2 10.2 13.6 13.6" />
+    </svg>
+  );
+}
+
+/** おしらせ */
+export function IconBell({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M8 2.2a3.8 3.8 0 0 0-3.8 3.8c0 3-1.2 4-1.2 4h10s-1.2-1-1.2-4A3.8 3.8 0 0 0 8 2.2Z" />
+      <path d="M6.6 12.4a1.6 1.6 0 0 0 2.8 0" />
+    </svg>
+  );
+}
+
+/** おきにいり */
+export function IconStar({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="m8 2.2 1.8 3.7 4 .6-2.9 2.8.7 4L8 11.4l-3.6 1.9.7-4L2.2 6.5l4-.6z" />
+    </svg>
+  );
+}
+
+/** じぶん */
+export function IconPerson({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <circle cx="8" cy="5.4" r="2.8" />
+      <path d="M2.9 13.6a5.1 5.1 0 0 1 10.2 0" />
+    </svg>
+  );
+}
+
+/** せってい */
+export function IconGear({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <circle cx="8" cy="8" r="2.4" />
+      <path d="M8 1.8v1.8M8 12.4v1.8M2.6 8h1.8M11.6 8h1.8M4.2 4.2l1.3 1.3M10.5 10.5l1.3 1.3M11.8 4.2l-1.3 1.3M5.5 10.5l-1.3 1.3" />
+    </svg>
+  );
+}
+
+/** スタンプ */
+export function IconStamp({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M4.6 13.4h6.8v-1.2H4.6z" />
+      <path d="M5.6 12.2v-1.6h4.8v1.6" />
+      <path d="M8 10.6V8.4m0 0a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z" />
+    </svg>
+  );
+}
+
+/** じぶんの ことばを はかる */
+export function IconGauge({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M2.4 11.4a5.6 5.6 0 1 1 11.2 0" />
+      <path d="M8 11.4 10.8 7" />
+      <path d="M2.4 11.4h1.6M12 11.4h1.6" />
+    </svg>
+  );
+}
+
+/** とじる */
+export function IconClose({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </svg>
+  );
+}
+
+/** ペルソナを いれかえる */
+export function IconSwap({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M3 6h8.4L9.2 3.8" />
+      <path d="M13 10H4.6l2.2 2.2" />
     </svg>
   );
 }

@@ -1,6 +1,7 @@
 import { reactionTargetOfSoothe } from "../data/reactions";
 import type { ReactionType, Soothe } from "../data/types";
 import { cx } from "../lib/cx";
+import { BubbleBody } from "./BubbleBody";
 import { PersonaChip } from "./PersonaChip";
 import { ReactionRow } from "./ReactionRow";
 import "./SootheItem.css";
@@ -19,14 +20,14 @@ import "./SootheItem.css";
 type SootheItemProps = {
   readonly soothe: Soothe;
   readonly replyToNickname?: string;
-  readonly onToggleReaction: (sootheId: string, reaction: ReactionType) => void;
+  readonly onReact: (sootheId: string, reaction: ReactionType) => void;
   readonly onReply: (soothe: Soothe) => void;
 };
 
 export function SootheItem({
   soothe,
   replyToNickname,
-  onToggleReaction,
+  onReact,
   onReply,
 }: SootheItemProps) {
   return (
@@ -37,13 +38,13 @@ export function SootheItem({
         <p className={cx("eg-soothe__quote", "t-caption")}>{replyToNickname} へ</p>
       ) : null}
 
-      <p className={cx("eg-soothe__body", "t-bubble-body", "eg-prose")}>{soothe.body}</p>
+      <BubbleBody body={soothe.body} className="eg-soothe__body" />
 
       <div className="eg-soothe__foot">
         <ReactionRow
           targetKind={reactionTargetOfSoothe(soothe.author.kind)}
           state={soothe.reactions}
-          onToggle={(reaction) => onToggleReaction(soothe.id, reaction)}
+          onReact={(reaction) => onReact(soothe.id, reaction)}
           compact
           readOnly={soothe.isMine}
         />
