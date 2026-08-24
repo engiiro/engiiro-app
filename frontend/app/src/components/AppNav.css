@@ -23,6 +23,7 @@
 }
 
 .eg-nav__item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -35,10 +36,33 @@
   transition: color var(--duration-quick) var(--ease-smooth-out);
 }
 
-/* 現在地は色と文字の太さの二重化で示す（DESIGN.md §2.5） */
+/* 現在地は色・太さ・形の三重化で示す。色だけに頼らない（DESIGN.md §2.5） */
 .eg-nav__item.is-current {
   color: var(--accent-line);
   font-weight: 700;
+}
+
+.eg-nav__item.is-current::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--space-lg);
+  height: calc(var(--border-width) * 2);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-line);
+  transform: translateX(-50%);
+}
+
+/* 左のレールでは印を左端の縦線にする */
+@media (min-width: 960px) {
+  .eg-nav__item.is-current::before {
+    top: 50%;
+    left: 0;
+    width: calc(var(--border-width) * 2);
+    height: var(--space-lg);
+    transform: translateY(-50%);
+  }
 }
 
 /* デスクトップでは左に固定。フィードは 600px のまま広げない */

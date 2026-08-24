@@ -39,6 +39,13 @@
    * 上 padding を 1.07 倍にする（14px → 15px。トークン値から ±2px 以内）。
    */
   --card-padding-top: 15px;
+  /*
+   * 画面見出しも同じ原則。ただし 12px 基準では 1.05〜1.08 倍の中に整数が無い
+   * （12.6〜12.96px）。整数で収まる 14 / 13 を採って 1.077 倍にする。
+   * どちらも --space-sm から ±2px 以内（DESIGN.md §5.3-1）。
+   */
+  --head-padding-top: 14px;
+  --head-padding-bottom: 13px;
   --input-padding: 12px;
   --avatar-size: 34px;
   --avatar-size-sm: 26px;

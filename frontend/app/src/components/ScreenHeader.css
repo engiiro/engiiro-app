@@ -1,4 +1,4 @@
-/* 画面の見出し。上 padding を 1.07 倍にして光学的中央に寄せる（DESIGN.md §5.3-1） */
+/* 画面の見出し。上 padding を下の 1.077 倍にして光学的中央に寄せる（DESIGN.md §5.3-1） */
 
 .eg-screen-head {
   position: sticky;
@@ -13,8 +13,9 @@
   align-items: center;
   gap: var(--space-xs);
   min-height: var(--touch-target-min);
-  padding-top: var(--space-sm);
-  padding-bottom: var(--space-sm);
+  /* 上下同値だと見出しが下寄りに見える。上を 1.077 倍にする（DESIGN.md §5.3-1） */
+  padding-top: var(--head-padding-top);
+  padding-bottom: var(--head-padding-bottom);
 }
 
 .eg-screen-head__back {

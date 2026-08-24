@@ -18,7 +18,8 @@
 .eg-timeline__band {
   margin-bottom: var(--space-sm);
   padding: var(--space-sm) var(--space-sm) var(--space-sm);
-  border-left: 2px solid var(--accent-line);
+  /* 線の太さはテーマに従う。一点物の装飾でも生の px を置かない */
+  border-left: calc(var(--border-width) * 2) solid var(--accent-line);
   border-radius: var(--rounded-xs);
   background: var(--accent-soft);
 }
