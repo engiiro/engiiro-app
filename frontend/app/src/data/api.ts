@@ -79,6 +79,7 @@ let soothes: Soothe[] = SOOTHE_SEEDS.map((seed) => ({
   body: seed.body,
   createdAt: isoMinutesAgo(seed.minutesAgo),
   reactions: seed.reactions,
+  isMine: false,
   replyToSootheId: seed.replyToSootheId,
 }));
 
@@ -226,6 +227,7 @@ export async function createSoothe(input: CreateSootheInput): Promise<CreateSoot
     body,
     createdAt: new Date().toISOString(),
     reactions: { counts: {}, mine: [] },
+    isMine: true,
     replyToSootheId: input.replyToSootheId,
   };
   soothes = [...soothes, soothe];
@@ -247,16 +249,23 @@ export type ToggleReactionInput = {
 
 export type ToggleReactionResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: "not_allowed" };
+  | { readonly ok: false; readonly reason: "not_allowed" | "own_target" };
 
 /**
  * リアクションの付け外し。
+ *
  * FR-REACT-007：許可されていない対象とリアクションの組み合わせは保存しない。
  * 画面がそもそも出さないうえで、この境界でも弾く二重化。
+ *
+ * 自分のバブルと自分のあやすには、自分でリアクションできない（人間の決定、2026-08-24）。
+ * 画面側もボタンを出さないが、保存を止めるのはこちら。
  */
 export async function toggleReaction(input: ToggleReactionInput): Promise<ToggleReactionResult> {
   if (!isReactionAllowed(input.targetKind, input.reaction)) {
     return { ok: false, reason: "not_allowed" };
+  }
+  if (isOwnTarget(input.target)) {
+    return { ok: false, reason: "own_target" };
   }
 
   if (input.target.type === "bubble") {
@@ -273,6 +282,13 @@ export async function toggleReaction(input: ToggleReactionInput): Promise<Toggle
     );
   }
   return { ok: true };
+}
+
+function isOwnTarget(target: ToggleReactionInput["target"]): boolean {
+  if (target.type === "bubble") {
+    return bubbles.find((bubble) => bubble.id === target.id)?.isMine ?? false;
+  }
+  return soothes.find((soothe) => soothe.id === target.id)?.isMine ?? false;
 }
 
 function flip(state: ReactionState, reaction: ReactionType): ReactionState {

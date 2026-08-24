@@ -16,6 +16,13 @@ import "./ReactionRow.css";
  *   お母さんとしてのあやす        → ばぶー の1種のみ（FR-REACT-005/006）
  *
  * 1種のときも横幅を引き伸ばさず左寄せにして、3種の行と同じリズムを保つ。
+ *
+ * リアクションにペルソナの要素は無い（人間の決定、2026-08-24）。
+ * 「赤ちゃんとして押す／お母さんとして押す」という区別を持たない。
+ *
+ * 自分のバブル・自分のあやすには自分でリアクションできない（同上）。
+ * その場合は readOnly で、押せるボタンを出さずに付いた数だけを見せる。
+ * disabled のボタンを3つ並べるより、読み取りの行として出したほうが誤解が少ない。
  */
 
 /** ラベルと同じく、種類ごとに1つ。「哺乳瓶」は wakaruwa の絵柄で、別のボタンにはしない */
@@ -32,9 +39,17 @@ type ReactionRowProps = {
   readonly onToggle: (reaction: ReactionType) => void;
   /** あやすの中に置くときは一段小さくする */
   readonly compact?: boolean;
+  /** 自分のバブル・自分のあやす。押せるボタンを出さず、付いた数だけを見せる */
+  readonly readOnly?: boolean;
 };
 
-export function ReactionRow({ targetKind, state, onToggle, compact = false }: ReactionRowProps) {
+export function ReactionRow({
+  targetKind,
+  state,
+  onToggle,
+  compact = false,
+  readOnly = false,
+}: ReactionRowProps) {
   const [popping, setPopping] = useState<ReactionType | null>(null);
 
   const handleClick = useCallback(
@@ -45,6 +60,32 @@ export function ReactionRow({ targetKind, state, onToggle, compact = false }: Re
     },
     [onToggle],
   );
+
+  if (readOnly) {
+    // 付いているものだけを出す。0 のものを並べても読むものが無い
+    const received = REACTIONS_BY_TARGET[targetKind].filter(
+      (reaction) => (state.counts[reaction] ?? 0) > 0,
+    );
+    if (received.length === 0) {
+      return <p className={cx("eg-reactions__none", "t-caption")}>まだ リアクションは ないよ</p>;
+    }
+    return (
+      <ul className={cx("eg-reactions", compact && "eg-reactions--compact")}>
+        {received.map((reaction) => {
+          const Icon = REACTION_ICON[reaction];
+          return (
+            <li key={reaction}>
+              <span className={cx("eg-reaction", "eg-reaction--readonly")}>
+                <Icon className="eg-reaction__icon" />
+                <span className="eg-reaction__label t-label">{REACTION_LABEL[reaction]}</span>
+                <span className="eg-reaction__count t-counter">{state.counts[reaction]}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
 
   return (
     <ul className={cx("eg-reactions", compact && "eg-reactions--compact")}>

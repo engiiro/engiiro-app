@@ -62,6 +62,7 @@ export function BubbleCard({ bubble, onOpen, onToggleReaction }: BubbleCardProps
           targetKind="bubble"
           state={bubble.reactions}
           onToggle={(reaction) => onToggleReaction(bubble.id, reaction)}
+          readOnly={bubble.isMine}
         />
       </footer>
     </article>

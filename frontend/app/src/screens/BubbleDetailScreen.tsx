@@ -78,6 +78,7 @@ export function BubbleDetailScreen({
               targetKind="bubble"
               state={bubble.reactions}
               onToggle={(reaction) => onToggleBubbleReaction(bubble.id, reaction)}
+              readOnly={bubble.isMine}
             />
           </div>
           {/* 自分のバブルにだけ出す。他人のバブルには出さない */}

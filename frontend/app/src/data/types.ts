@@ -25,9 +25,14 @@ export type ReactionType = "ogya" | "yoshiyoshi" | "wakaruwa" | "babu";
 /** リアクションの対象。何を出せるかはこの種類だけで決まる（FR-REACT-003〜006） */
 export type ReactionTargetKind = "bubble" | "babySoothe" | "motherSoothe";
 
+/**
+ * リアクションの状態。
+ * リアクションにペルソナの要素は無い（人間の決定、2026-08-24）。
+ * 誰が押したかも持たない。持てば、それ自体が非連結を崩す材料になる。
+ */
 export type ReactionState = {
   readonly counts: Readonly<Partial<Record<ReactionType, number>>>;
-  /** 閲覧者自身が押したもの。誰が押したかは持たない */
+  /** 閲覧者自身が押したもの */
   readonly mine: readonly ReactionType[];
 };
 
@@ -56,6 +61,8 @@ export type Soothe = {
   readonly body: string;
   readonly createdAt: string;
   readonly reactions: ReactionState;
+  /** リアクションを出すかの判定だけに使う。識別子ではない */
+  readonly isMine: boolean;
   /** あやすへの返信のとき、その相手。返信できるペルソナの判定に使う（FR-COMMENT-005） */
   readonly replyToSootheId?: string;
 };

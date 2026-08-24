@@ -34,8 +34,19 @@
   padding: var(--space-xs);
 }
 
-.eg-reaction:active {
+.eg-reaction:active:not(.eg-reaction--readonly) {
   transform: scale(var(--press-scale-strong));
+}
+
+/* 自分のものに付いたリアクション。押せる形にしない */
+.eg-reaction--readonly {
+  background: var(--card);
+  border-style: dashed;
+  cursor: default;
+}
+
+.eg-reactions__none {
+  color: var(--muted);
 }
 
 /* 押下済。色だけでなく太さでも区別する（DESIGN.md §2.5） */

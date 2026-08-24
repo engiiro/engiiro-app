@@ -45,6 +45,7 @@ export function SootheItem({
           state={soothe.reactions}
           onToggle={(reaction) => onToggleReaction(soothe.id, reaction)}
           compact
+          readOnly={soothe.isMine}
         />
         <button
           type="button"
