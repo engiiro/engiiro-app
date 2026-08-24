@@ -1,0 +1,129 @@
+name: "🙋 その他・相談（AI 間議論・人間への確認依頼）"
+description: "AI 間の議論、または判断できない内容を AI から人間へ相談する"
+title: "[AI Discussion] "
+labels: ["type:discussion", "status:needs-response"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        判断できない内容を勝手に仮定して進めないでください。人間判断が必要な場合は、作成後に `status:needs-human` ラベルも付けます。
+
+  - type: textarea
+    id: message_header
+    attributes:
+      label: 識別ヘッダー
+      description: 5 行をすべて記入してください。AIのメッセージIDは #Issue::AI種別::運用者ID::連番です。作成後、new を実際の Issue 番号へ変え、このヘッダーと宛先タグを本文の文字どおりの先頭へ移します。
+      placeholder: |
+        メッセージID: #new::Codex-Local::akatonboboonboon::01
+        宛先: Claude-Work::akatonboboonboon
+        返信先: なし
+        種別: 判断依頼
+        優先度: 通常
+    validations:
+      required: true
+
+  - type: dropdown
+    id: recipient
+    attributes:
+      label: 宛先
+      description: AI宛ての場合は、作成後に対応する ai:* カテゴリラベルと agent:* 個別ラベルも付けてください。
+      options:
+        - ChatGPT-Web::akatonboboonboon
+        - Codex-Local::akatonboboonboon
+        - Claude-Work::akatonboboonboon
+        - Claude-Work::shitake-zense
+        - All
+        - Human:Supervisor
+    validations:
+      required: true
+
+  - type: input
+    id: routing_marker
+    attributes:
+      label: 宛先タグ
+      description: AI宛ては完全なインスタンスIDを含む正式な [AI:*] タグ、人間宛ては Human:Supervisor と記載してください。
+      placeholder: "[AI:Claude-Work::akatonboboonboon] / [AI:Claude-Work::shitake-zense] / [AI:All] / Human:Supervisor"
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 目的
+      description: この議論・相談で解決したいことを簡潔に記載してください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: conclusion
+    attributes:
+      label: 結論・求める判断
+      description: 現時点の結論・推奨案、または最終的に答えてほしいこと・決めてほしいことを先に記載してください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: 詳細・背景
+      description: 作業の経緯、関連する Issue / PR、設計書の箇所、すでに確認した内容を記載してください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 根拠
+      description: コード、設計書、ログ、検証結果など、選択肢を比較する根拠を記載してください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: 選択肢と利点・欠点
+      description: 必ず 2 案以上を示し、それぞれの利点と欠点を記載してください。
+      placeholder: |
+        - 案 A: ...
+          - 利点: ...
+          - 欠点: ...
+        - 案 B: ...
+          - 利点: ...
+          - 欠点: ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: human_decision
+    attributes:
+      label: 人間判断が必要ですか？
+      description: 必要な場合は、作成後に status:needs-human ラベルを付けてください。
+      options:
+        - 必要（人間の回答を待つ）
+        - 不要（AI 間で回答可能）
+    validations:
+      required: true
+
+  - type: dropdown
+    id: blocking
+    attributes:
+      label: ブロッキングですか？
+      options:
+        - ブロッキング（回答が来るまで対象作業を進められない）
+        - 非ブロッキング（安全な別作業を先に進められる）
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 確認事項
+      options:
+        - label: 識別ヘッダーを 5 行すべて記入し、メッセージID内の完全なAIインスタンスID、宛先、宛先タグを一致させた
+          required: true
+        - label: 作成後にメッセージIDと本文先頭の配置を更新することを理解した
+          required: true
+        - label: docs/design_doc.md と関連 Issue / PR を確認しても判断できず、未承認の仮定で実装を進めていない
+          required: true
+        - label: 選択肢を 2 案以上示し、利点・欠点と、結論・求める判断に推奨理由を記載した
+          required: true
