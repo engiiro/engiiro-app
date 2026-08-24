@@ -157,12 +157,12 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    FE["フロントエンド\n(HTML/CSS/JS or React+TS+Vite)\n技術は担当エンジニアの裁量"]
-    BE["バックエンドAPI\nTypeScript / Deno\n(Deno Deployにデプロイ)"]
-    DB["Deno KV\n(データベース)"]
-    AI["AI推論API\nPython / PyTorch・scikit-learn\n(Hugging Faceにデプロイ)"]
+    FE["フロントエンド<br/>(HTML/CSS/JS or React+TS+Vite)<br/>技術は担当エンジニアの裁量"]
+    BE["バックエンドAPI<br/>TypeScript / Deno<br/>(Deno Deployにデプロイ)"]
+    DB["Deno KV<br/>(データベース)"]
+    AI["AI推論API<br/>Python / PyTorch・scikit-learn<br/>(Hugging Faceにデプロイ)"]
 
-    FE -->|HTTPS (JSON)| BE
+    FE -->|"HTTPS (JSON)"| BE
     BE --> DB
     BE --> AI
 ```
