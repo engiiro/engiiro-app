@@ -1,5 +1,5 @@
 name: "🧑‍💬 人間から AI への質問"
-description: "人間から ChatGPT-Web、Claude-Work、Codex-Local へ質問・確認を依頼する"
+description: "人間から登録済みAIインスタンスへ質問・確認を依頼する"
 title: "[Human→AI] "
 labels: ["priority:human", "status:needs-response", "type:question"]
 body:
@@ -7,10 +7,10 @@ body:
     id: message_header
     attributes:
       label: 識別ヘッダー
-      description: 5 行をすべて記入してください。送信者はメッセージID内に記載します。作成後、new を実際の Issue 番号へ変え、このヘッダーと宛先タグを本文の文字どおりの先頭へ移します。
+      description: 5 行をすべて記入してください。AIのメッセージIDは #Issue::AI種別::運用者ID::連番、人間は #Issue::Human::名前または役割::連番です。作成後、new を実際の Issue 番号へ変え、このヘッダーと宛先タグを本文の文字どおりの先頭へ移します。
       placeholder: |
-        メッセージID: #new-Human-Supervisor-01
-        宛先: Codex-Local
+        メッセージID: #new::Human::Supervisor::01
+        宛先: Codex-Local::akatonboboonboon
         返信先: なし
         種別: 質問
         優先度: 人間優先
@@ -21,11 +21,12 @@ body:
     id: target_ai
     attributes:
       label: 対象 AI
-      description: 作成後、対応する ai:* ラベルも付けてください。
+      description: 作成後、対応する ai:* カテゴリラベルと agent:* 個別ラベルも付けてください。
       options:
-        - ChatGPT-Web
-        - Claude-Work
-        - Codex-Local
+        - ChatGPT-Web::akatonboboonboon
+        - Codex-Local::akatonboboonboon
+        - Claude-Work::akatonboboonboon
+        - Claude-Work::shitake-zense
         - All
     validations:
       required: true
@@ -34,8 +35,8 @@ body:
     id: ai_mention_tag
     attributes:
       label: 宛先タグ
-      description: 対象 AI と一致する正式タグを記載してください。
-      placeholder: "[AI:ChatGPT-Web] / [AI:Claude-Work] / [AI:Codex-Local] / [AI:All]"
+      description: 対象AIの完全なインスタンスIDと一致する正式タグを記載してください。全AI宛てには [AI:All] を使います。
+      placeholder: "[AI:ChatGPT-Web::akatonboboonboon] / [AI:Codex-Local::akatonboboonboon] / [AI:Claude-Work::akatonboboonboon] / [AI:Claude-Work::shitake-zense] / [AI:All]"
     validations:
       required: true
 
@@ -89,7 +90,7 @@ body:
     attributes:
       label: 安全確認
       options:
-        - label: 識別ヘッダーを 5 行すべて記入し、対象 AI、宛先、宛先タグを一致させた
+        - label: 識別ヘッダーを 5 行すべて記入し、対象AIの完全なインスタンスID、宛先、宛先タグを一致させた
           required: true
         - label: 作成後にメッセージIDと本文先頭の配置を更新することを理解した
           required: true
