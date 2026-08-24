@@ -1,0 +1,92 @@
+/* S5 あやすモーダル。下から出て下へ帰る（DESIGN.md §7.3 modal / §7.4） */
+
+.eg-soothe-scrim {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.eg-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--feed-max-width);
+  max-height: 92vh;
+  margin: 0 auto;
+  padding: var(--space-md) var(--gutter) calc(var(--space-md) + env(safe-area-inset-bottom));
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-lg) var(--rounded-lg) 0 0;
+  background: var(--surface);
+  box-shadow: var(--elevation-modal);
+  /* 起点はあやすボタン。画面の下から出る */
+  transform-origin: bottom center;
+  animation: eg-modal-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+/* 出た経路で帰す。閉じるほうが速い */
+.eg-scrim.is-leaving .eg-modal {
+  animation: eg-modal-out var(--duration-quick) var(--ease-smooth-out) both;
+}
+
+.eg-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.eg-modal__title {
+  color: var(--ink);
+}
+
+.eg-modal__close {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-control);
+  color: var(--accent-line);
+}
+
+.eg-modal__close:hover,
+.eg-modal__close:active {
+  background: var(--accent-soft);
+}
+
+.eg-modal__target {
+  margin-top: var(--space-xxs);
+  color: var(--muted);
+}
+
+.eg-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  overflow-y: auto;
+}
+
+.eg-modal__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.eg-modal__label {
+  color: var(--muted);
+}
+
+.eg-modal__reason {
+  color: var(--accent-line);
+}
+
+.eg-modal__nickname {
+  color: var(--muted);
+}
+
+.eg-modal__foot {
+  margin-top: var(--space-md);
+}
+
+/* お母さんとして選んだときは、役割色を面でも示す */
+.eg-persona-choice__item.is-selected-mother {
+  border-color: var(--mother);
+  background: var(--mother-soft);
+  color: var(--mother);
+}

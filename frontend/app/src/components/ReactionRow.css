@@ -1,0 +1,110 @@
+/* DESIGN.md §0.2・§4 リアクション行 */
+
+.eg-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  /* 1種のときも引き伸ばさず左寄せ。3種の行と同じリズムを保つ */
+  justify-content: flex-start;
+  gap: var(--space-xs);
+}
+
+.eg-reaction {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  /*
+   * 高さは縦 padding と .eg-touch の min-height で 44px を確保する（DESIGN.md §8.2）。
+   * 横は xs。375px のカード内幅（313px）に3種が1行で収まる値がここまで。
+   * 横を sm にすると3つ目が折り返して、行のリズムとカードの密度が崩れる。
+   */
+  padding: var(--space-sm) var(--space-xs);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--muted);
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-micro) var(--ease-smooth-out);
+}
+
+.eg-reactions--compact .eg-reaction {
+  padding: var(--space-xs);
+}
+
+.eg-reaction:active {
+  transform: scale(var(--press-scale-strong));
+}
+
+/* 押下済。色だけでなく太さでも区別する（DESIGN.md §2.5） */
+.eg-reaction.is-mine {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-line);
+}
+
+.eg-reaction.is-mine .eg-reaction__label {
+  font-weight: 700;
+}
+
+.eg-reaction__icon {
+  flex: none;
+}
+
+.eg-reaction__count {
+  min-width: var(--space-sm);
+  text-align: right;
+}
+
+/* 数が動いたときだけ立ち上げる */
+.eg-reaction[data-pop="true"] {
+  animation: eg-like-pop var(--duration-very-slow) var(--ease-bounce);
+}
+
+.eg-reaction[data-pop="true"] .eg-reaction__count {
+  animation: eg-number-pop-in var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* 粒子。押した瞬間だけ外へ散る */
+.eg-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.eg-burst span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--space-xxs);
+  height: var(--space-xxs);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-line);
+  opacity: 0;
+}
+
+.eg-reaction[data-pop="true"] .eg-burst span {
+  animation: eg-burst var(--duration-very-slow) var(--ease-smooth-out);
+}
+
+.eg-burst span:nth-child(1) {
+  --burst-x: calc(var(--distance-medium) * -1);
+  --burst-y: calc(var(--distance-medium) * -1);
+}
+
+.eg-burst span:nth-child(2) {
+  --burst-x: var(--distance-medium);
+  --burst-y: calc(var(--distance-medium) * -1);
+}
+
+.eg-burst span:nth-child(3) {
+  --burst-x: calc(var(--distance-base) * -1);
+  --burst-y: var(--distance-medium);
+}
+
+.eg-burst span:nth-child(4) {
+  --burst-x: var(--distance-base);
+  --burst-y: var(--distance-medium);
+}

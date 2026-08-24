@@ -1,0 +1,51 @@
+/* DESIGN.md §7.3 skeleton-reveal。空白より不安が少ない */
+
+.eg-skeleton-card {
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  background: var(--surface);
+}
+
+.eg-skeleton-line {
+  height: var(--space-sm);
+  border-radius: var(--rounded-xs);
+  background: var(--skeleton);
+  animation: eg-skeleton-pulse var(--duration-very-slow) var(--ease-linear) infinite;
+}
+
+.eg-skeleton-line + .eg-skeleton-line {
+  margin-top: var(--space-xs);
+}
+
+.eg-skeleton-line--head {
+  width: 45%;
+  height: var(--space-md);
+}
+
+.eg-skeleton-line--short {
+  width: 62%;
+}
+
+.eg-skeleton-row {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.eg-skeleton-stack {
+  flex: 1;
+}
+
+.eg-skeleton-pill {
+  width: calc(var(--space-xxl) * 2);
+  height: var(--touch-target-min);
+  border-radius: var(--radius-control);
+  background: var(--skeleton);
+  animation: eg-skeleton-pulse var(--duration-very-slow) var(--ease-linear) infinite;
+}
+
+/* 本体は cross-blur で立ち上げる */
+.eg-revealed {
+  animation: eg-content-reveal var(--duration-slow) var(--ease-smooth-out) both;
+}

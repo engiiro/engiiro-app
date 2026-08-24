@@ -1,0 +1,42 @@
+/* S2 タイムライン */
+
+.eg-timeline {
+  padding-top: var(--space-md);
+}
+
+/* カード間 12px（DESIGN.md §5.1） */
+.eg-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.eg-timeline__section + .eg-timeline__section {
+  margin-top: var(--space-lg);
+}
+
+.eg-timeline__band {
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm) var(--space-sm) var(--space-sm);
+  border-left: 2px solid var(--accent-line);
+  border-radius: var(--rounded-xs);
+  background: var(--accent-soft);
+}
+
+.eg-timeline__band-title {
+  color: var(--accent-line);
+}
+
+.eg-timeline__band-note {
+  margin-top: var(--space-xxs);
+  color: var(--accent-line);
+}
+
+.eg-timeline__rest-title {
+  margin-bottom: var(--space-sm);
+  color: var(--ink);
+}
+
+.eg-timeline__empty {
+  margin-top: var(--space-lg);
+}

@@ -1,0 +1,47 @@
+/* DESIGN.md §4 AI 文章変換の3状態。同じ場所に、状態ごとに違うものを出す */
+
+.eg-ai {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.eg-ai__working {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-xs);
+  background: var(--card);
+  color: var(--body);
+}
+
+.eg-ai__preview {
+  padding: var(--space-sm);
+  border: var(--border-width) var(--input-border-style) var(--accent-line);
+  border-radius: var(--rounded-md);
+  background: var(--surface);
+}
+
+.eg-ai__preview-label {
+  display: block;
+  color: var(--muted);
+}
+
+.eg-ai__preview-text {
+  margin-top: var(--space-xs);
+  color: var(--body);
+}
+
+.eg-ai__actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+/* 変換しただけでは保存しない、を文字でも書く（FR-AI-TRANS-006） */
+.eg-ai__caveat {
+  margin-top: var(--space-xs);
+  color: var(--muted);
+}

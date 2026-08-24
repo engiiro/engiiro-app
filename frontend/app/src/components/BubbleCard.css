@@ -1,0 +1,86 @@
+/* DESIGN.md §4 Cards / Tags */
+
+.eg-card {
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  background: var(--surface);
+  /* 影なし。ノーマルとダークでは 0。園児UI だけずらし影（DESIGN.md §6） */
+  box-shadow: var(--elevation-offset);
+}
+
+.eg-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.eg-card__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  flex: none;
+  color: var(--accent-line);
+}
+
+.eg-card__dot {
+  width: var(--space-xs);
+  height: var(--space-xs);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-line);
+}
+
+.eg-card__read {
+  color: var(--muted);
+}
+
+.eg-card__open {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-xs);
+  text-align: start;
+  /* ホバーで浮かせない。押した反応は面色で返す（DESIGN.md §4 Cards / §7.4） */
+  border-radius: var(--rounded-md);
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-card__open:active {
+  background: var(--card);
+}
+
+.eg-card__body {
+  display: block;
+  color: var(--body);
+}
+
+.eg-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.eg-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.eg-tag {
+  padding: 0 var(--space-xs);
+  border-radius: var(--rounded-pill);
+  background: var(--card);
+  color: var(--muted);
+}
+
+.eg-card__more {
+  flex: none;
+  color: var(--muted);
+}
+
+.eg-card__foot {
+  margin-top: var(--space-sm);
+}

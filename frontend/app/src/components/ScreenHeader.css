@@ -1,0 +1,45 @@
+/* 画面の見出し。上 padding を 1.07 倍にして光学的中央に寄せる（DESIGN.md §5.3-1） */
+
+.eg-screen-head {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--canvas);
+  border-bottom: var(--border-width) solid var(--hairline);
+}
+
+.eg-screen-head__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target-min);
+  padding-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
+}
+
+.eg-screen-head__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  margin-left: calc(var(--space-sm) * -1);
+  border-radius: var(--radius-control);
+  color: var(--accent-line);
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-screen-head__back:hover,
+.eg-screen-head__back:active {
+  background: var(--accent-soft);
+}
+
+.eg-screen-head__title {
+  color: var(--ink);
+}
+
+.eg-screen-head__sub {
+  margin-left: auto;
+  color: var(--muted);
+}

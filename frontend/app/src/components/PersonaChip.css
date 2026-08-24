@@ -1,0 +1,75 @@
+/* DESIGN.md §4 Persona Badge / Avatar */
+
+.eg-persona {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.eg-persona__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: var(--rounded-pill);
+  border: var(--border-width) solid currentColor;
+  font-family: var(--font-display);
+  font-size: var(--size-label);
+  font-weight: 700;
+  /* 園児UI だけ不定形＋傾き。他テーマは 0deg なので効かない（DESIGN.md §1.3） */
+  transform: rotate(var(--tilt));
+}
+
+.eg-persona--compact .eg-persona__avatar {
+  width: var(--avatar-size-sm);
+  height: var(--avatar-size-sm);
+}
+
+.eg-persona__avatar--baby {
+  color: var(--baby);
+  background: var(--baby-soft);
+}
+
+.eg-persona__avatar--mother {
+  color: var(--mother);
+  background: var(--mother-soft);
+}
+
+.eg-persona__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.eg-persona__name {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.eg-persona__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.eg-persona__role {
+  padding: 0 var(--space-xs);
+  border-radius: var(--rounded-pill);
+}
+
+.eg-persona__role.is-baby {
+  color: var(--baby);
+  background: var(--baby-soft);
+}
+
+.eg-persona__role.is-mother {
+  color: var(--mother);
+  background: var(--mother-soft);
+}
+
+.eg-persona__time {
+  color: var(--muted);
+}

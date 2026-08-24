@@ -1,0 +1,48 @@
+/* あやす1件。お母さんのあやすは地を mother-soft にして役割を面でも示す */
+
+.eg-soothe {
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-md);
+  background: var(--surface);
+}
+
+.eg-soothe.is-mother {
+  background: var(--mother-soft);
+  border-color: var(--mother);
+}
+
+.eg-soothe__quote {
+  margin-top: var(--space-xs);
+  padding-left: var(--space-xs);
+  border-left: var(--border-width) solid var(--hairline);
+  color: var(--muted);
+}
+
+.eg-soothe__body {
+  margin-top: var(--space-xs);
+  color: var(--body);
+}
+
+.eg-soothe__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.eg-soothe__reply {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-control);
+  color: var(--accent-line);
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-soothe__reply:hover,
+.eg-soothe__reply:active {
+  background: var(--accent-soft);
+}

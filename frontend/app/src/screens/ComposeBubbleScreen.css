@@ -1,0 +1,124 @@
+/* S3 バブル作成 */
+
+.eg-compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding-top: var(--space-md);
+}
+
+.eg-compose__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.eg-compose__title {
+  color: var(--muted);
+}
+
+/* DESIGN.md §4 Inputs。園児UI では枠が 2px 破線になる */
+.eg-textarea {
+  width: 100%;
+  padding: var(--input-padding);
+  border: var(--border-width) var(--input-border-style) var(--hairline);
+  border-radius: var(--rounded-md);
+  background: var(--surface);
+  color: var(--body);
+  resize: vertical;
+  transition: border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-textarea::placeholder {
+  color: var(--muted);
+}
+
+/* 超過中も入力は止めない。枠で気づかせるだけ */
+.eg-textarea.is-over {
+  border-color: var(--accent-line);
+}
+
+.eg-persona-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.eg-persona-choice__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xxs);
+  flex: 1 1 auto;
+  padding: var(--space-sm) var(--space-md);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--muted);
+  text-align: start;
+}
+
+.eg-persona-choice__item.is-selected {
+  border-color: var(--baby);
+  background: var(--baby-soft);
+  color: var(--baby);
+}
+
+/* DESIGN.md §4 Disabled。非表示にしない */
+.eg-persona-choice__item.is-disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.eg-persona-choice__role {
+  display: block;
+}
+
+.eg-persona-choice__name {
+  display: block;
+}
+
+.eg-tag-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.eg-tag-choice__item {
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-pill);
+  background: var(--card);
+  color: var(--muted);
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-tag-choice__item.is-selected {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-line);
+  font-weight: 700;
+}
+
+.eg-compose__ai-note:empty {
+  display: none;
+}
+
+.eg-compose__mock {
+  padding-top: var(--space-md);
+  border-top: var(--border-width) dashed var(--hairline);
+}
+
+.eg-compose__mock-caption {
+  color: var(--muted);
+}
+
+.eg-compose__mock-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}

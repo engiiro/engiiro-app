@@ -1,0 +1,25 @@
+/* DESIGN.md §4 文字数カウンタ */
+
+.eg-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-xxs);
+  /* 入力欄の右下 */
+  margin-top: var(--space-xxs);
+}
+
+.eg-counter__value {
+  color: var(--muted);
+  transition: color var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* 残り 20 文字から色を変える。超過中も同じ色で、理由の一行を足す */
+.eg-counter__value.is-warn {
+  color: var(--accent-line);
+}
+
+.eg-counter__reason {
+  color: var(--accent-line);
+  text-align: right;
+}

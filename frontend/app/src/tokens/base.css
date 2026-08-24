@@ -1,0 +1,147 @@
+/*
+ * base.css — 余白・レイアウト・共通の地ならし（DESIGN.md §5・§8）
+ *
+ * DESIGN.md の spacing / rounded / layout をトークンにし、
+ * §4 のコンポーネント仕様に出てくる寸法（48px の最小高さ、カード padding 14px など）も
+ * 名前付きで置く。コンポーネント側に素の px を書かないための土台。
+ */
+
+:root {
+  /* spacing（DESIGN.md §5.1） */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+
+  /* rounded */
+  --rounded-xs: 4px;
+  --rounded-sm: 6px;
+  --rounded-md: 10px;
+  --rounded-lg: 16px;
+  --rounded-pill: 999px;
+
+  /* layout */
+  --feed-max-width: 600px;
+  --gutter: 16px;
+  --touch-target-min: 44px;
+  --nav-width-desktop: 220px;
+
+  /* §4 の各コンポーネント仕様に書かれている寸法 */
+  --control-min-height: 48px;
+  --control-padding-y: 13px;
+  --control-padding-x: 20px;
+  --card-padding: 14px;
+  /*
+   * 光学的中央（DESIGN.md §5.3-1）。上下同値だと要素が下寄りに見えるので、
+   * 上 padding を 1.07 倍にする（14px → 15px。トークン値から ±2px 以内）。
+   */
+  --card-padding-top: 15px;
+  --input-padding: 12px;
+  --avatar-size: 34px;
+  --avatar-size-sm: 26px;
+  --meter-height: 9px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* iOS で横向きにしたときのフォント自動拡大を止める */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--body);
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+  /* 明暗の急変は避けるが、長い cross-fade は「壊れた」ように見える（DESIGN.md §7.2） */
+  transition:
+    background-color var(--duration-theme) var(--ease-in-out),
+    color var(--duration-theme) var(--ease-in-out);
+}
+
+h1,
+h2,
+h3,
+p,
+figure {
+  margin: 0;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/*
+ * フォーカスは常に見える形にする。枠色だけを変えない（色覚に依存させない）。
+ * DESIGN.md §4 Inputs の Focus 規則を全ての操作可能要素に広げている。
+ */
+:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+  border-radius: var(--rounded-xs);
+}
+
+/* 本文の折り返し（DESIGN.md §3.6）。break-all は当てない */
+.eg-prose {
+  word-break: normal;
+  overflow-wrap: anywhere;
+  line-break: strict;
+  white-space: pre-wrap;
+}
+
+/* 読み上げにだけ渡す文字 */
+.eg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * フィードは 600px のまま広げない。デスクトップでも余白を広げるだけで、
+ * カラムを増やさない（DESIGN.md §5.2）。
+ */
+.eg-column {
+  width: 100%;
+  max-width: var(--feed-max-width);
+  margin: 0 auto;
+  padding-inline: var(--gutter);
+}
+
+/* タッチターゲットは見た目が小さくても 44px を確保する（DESIGN.md §8.2） */
+.eg-touch {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+}

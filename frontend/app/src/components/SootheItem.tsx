@@ -1,0 +1,59 @@
+import { reactionTargetOfSoothe } from "../data/reactions";
+import type { ReactionType, Soothe } from "../data/types";
+import { cx } from "../lib/cx";
+import { PersonaChip } from "./PersonaChip";
+import { ReactionRow } from "./ReactionRow";
+import "./SootheItem.css";
+
+/*
+ * あやす1件（DESIGN.md §0.2）。
+ *
+ * ★ リアクション行の中身は、あやすの発信ペルソナだけで決まる：
+ *     赤ちゃんとしてのあやす → おぎゃー・よしよし・わかるわぁ の3種
+ *     お母さんとしてのあやす → ばぶー の1種のみ
+ *   ここで種類を選び直さない。reactionTargetOfSoothe に渡すだけ。
+ *
+ * 発信者から、同一アカウントのもう一方のペルソナを特定できる情報を出さない（FR-COMMENT-004）。
+ */
+
+type SootheItemProps = {
+  readonly soothe: Soothe;
+  readonly replyToNickname?: string;
+  readonly onToggleReaction: (sootheId: string, reaction: ReactionType) => void;
+  readonly onReply: (soothe: Soothe) => void;
+};
+
+export function SootheItem({
+  soothe,
+  replyToNickname,
+  onToggleReaction,
+  onReply,
+}: SootheItemProps) {
+  return (
+    <li className={cx("eg-soothe", "is-" + soothe.author.kind)}>
+      <PersonaChip persona={soothe.author} createdAt={soothe.createdAt} compact />
+
+      {replyToNickname ? (
+        <p className={cx("eg-soothe__quote", "t-caption")}>{replyToNickname} へ</p>
+      ) : null}
+
+      <p className={cx("eg-soothe__body", "t-bubble-body", "eg-prose")}>{soothe.body}</p>
+
+      <div className="eg-soothe__foot">
+        <ReactionRow
+          targetKind={reactionTargetOfSoothe(soothe.author.kind)}
+          state={soothe.reactions}
+          onToggle={(reaction) => onToggleReaction(soothe.id, reaction)}
+          compact
+        />
+        <button
+          type="button"
+          className={cx("eg-soothe__reply", "t-label", "eg-touch")}
+          onClick={() => onReply(soothe)}
+        >
+          返信する
+        </button>
+      </div>
+    </li>
+  );
+}
