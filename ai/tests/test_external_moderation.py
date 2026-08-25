@@ -462,3 +462,103 @@ def test_chakoshi_キーだけではだめ(monkeypatch):
     monkeypatch.setenv("CHAKOSHI_API_KEY", "key")
     assert E.chakoshi_available() is False
     assert E.check_chakoshi("テスト") is None
+
+
+# ============================================================
+# chakoshi：実APIで測った挙動の記録（2026-08）
+# ============================================================
+# 実際に叩いて確認した結果。将来の変更で挙動が変わったら気づけるようにする。
+
+def _chakoshi_nested(categories=None, pii=None):
+    """実APIの形（assessments の下に入れ子）で返す。"""
+    return {
+        "id": "01TEST",
+        "guardrail_id": "gr-test",
+        "assessments": {
+            "guardrails": ["pii_filter", "prompt_guard", "moderation"],
+            "user_input": "テスト",
+            "guardrails_result": {
+                "pii_filter": {
+                    "detect_pii_result": pii or [],
+                    "original_text": "テスト",
+                    "masked_text": "テスト",
+                },
+                "prompt_guard": {"unsafe_flag": False, "unsafe_score": "0.0000"},
+                "moderation": {
+                    "unsafe_flag": bool(categories),
+                    "unsafe_score": 0.9 if categories else 0.0,
+                    "categories": {
+                        name: {"enabled": True, "detected": detected}
+                        for name, detected in (categories or {}).items()
+                    },
+                },
+            },
+        },
+    }
+
+
+def test_chakoshi_実APIの入れ子構造を読める(monkeypatch, chakoshi_env):
+    """実APIは assessments の下に入れ子で返す。
+
+    MCPサーバーのREADMEにある例は、そこを抽出した後の形だった。
+    最初はREADMEの形で実装していて読めていなかった。
+    """
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_nested({"violence": True}))
+    assert E.check_chakoshi("テスト") == {"action": "block",
+                                          "reasonCodes": ["harm_others"]}
+
+
+def test_chakoshi_自傷を自傷として返す(monkeypatch, chakoshi_env):
+    """実測: 「死にたい。消えたい。」→ self-harm が detected。
+
+    Google は同じ文を Violent として返すため、
+    自傷の理由コードは chakoshi のほうが正確に取れる。
+    """
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_nested({"self-harm": True}))
+    assert E.check_chakoshi("テスト") == {"action": "block",
+                                          "reasonCodes": ["self_harm"]}
+
+
+def test_chakoshi_スラッシュ入りのカテゴリ名を読める(monkeypatch, chakoshi_env):
+    # 実APIは violence/graphic、sexual/minors のような名前を使う
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_nested({"violence/graphic": True}))
+    assert E.check_chakoshi("テスト")["reasonCodes"] == ["harm_others"]
+
+
+def test_chakoshi_個人情報フィルタを拾う(monkeypatch, chakoshi_env):
+    # 実測: 「連絡ください。090-1234-5678 です。」→ pii_filter が検出
+    monkeypatch.setattr(E, "_post_json", lambda *a, **k: _chakoshi_nested(
+        pii=[{"type": "PHONE", "text": "090-1234-5678"}]))
+    assert E.check_chakoshi("テスト") == {"action": "block",
+                                          "reasonCodes": ["personal_data"]}
+
+
+def test_chakoshi_エンジニアの話題を弾かない(monkeypatch, chakoshi_env, capsys):
+    """実測で allow だったもの。
+
+    「SQLインジェクションの脆弱性を直した。」
+    「薬を飲んで寝た。」
+    illicit/cybercrime と illicit/drugs を対応づけていないため通る。
+    仮にこれらが detected で返ってきても、警告なしで無視する。
+    """
+    monkeypatch.setattr(E, "_post_json", lambda *a, **k: _chakoshi_nested(
+        {"illicit/cybercrime": True, "illicit/drugs": True}))
+    assert E.check_chakoshi("テスト")["action"] == "allow"
+    assert "illicit" not in capsys.readouterr().err
+
+
+def test_chakoshi_成人向け作品の話を弾かない(monkeypatch, chakoshi_env):
+    # sexual は一律に禁止しない方針なので対応づけていない
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_nested({"sexual": True}))
+    assert E.check_chakoshi("テスト")["action"] == "allow"
+
+
+def test_chakoshi_未成年に関するものはblock(monkeypatch, chakoshi_env):
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_nested({"sexual/minors": True}))
+    assert E.check_chakoshi("テスト") == {"action": "block",
+                                          "reasonCodes": ["sexual_explicit"]}

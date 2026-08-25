@@ -79,7 +79,13 @@ UNMAPPED = {
     ],
     # chakoshi は管理画面で有効化したカテゴリだけが返る。
     # ここに挙げたものは「意図して対応づけない」もので、警告も出さない。
-    "chakoshi": ["sexual", "adult", "sexual_content"],
+    # 理由は _CHAKOSHI_TO_REASON の注記を参照。
+    "chakoshi": [
+        "sexual",
+        "illicit/drugs", "illicit/property", "illicit/financial",
+        "illicit/cybercrime",
+        "privacy/request",
+    ],
 }
 
 # 各サービスのカテゴリを、えんじいろの理由コードへ対応づける。
@@ -152,27 +158,30 @@ DEFAULT_CHAKOSHI_URL = "https://api.beta.chakoshi.ntt.com/v1/guardrails/apply"
 
 # chakoshi のカテゴリ名を、えんじいろの理由コードへ対応づける。
 #
-# 他のサービスと違い、chakoshi は「どのカテゴリを有効にするか」を
-# 管理画面のポリシー設定で決める。つまり返ってくる名前は運用側が決める。
-# ここに無い名前が detected で返ってきた場合は、警告を出して無視する。
-# 知らない名前を勝手に block へ回すと、意図しない拒否になるため。
+# 実APIで確認した16カテゴリ（2026-08）。有効にするものは
+# 管理画面のポリシー設定で決まるので、ここに無い名前が来ることもある。
+# その場合は警告を出して無視する。知らない名前を勝手に block へ回すと
+# 意図しない拒否になるため。
 #
-# 性的な内容は対応づけない。一律に禁止しない方針なので、
-# 文脈判断が要る。LLM側に任せる。
+# 対応づけないもの:
+#   sexual              一律に禁止しない方針。文脈判断が要るのでLLMへ
+#   illicit/drugs       「薬を飲んで寝た」のような話題と区別できない恐れ
+#   illicit/property
+#   illicit/financial
+#   illicit/cybercrime  エンジニアは脆弱性や攻撃手法を日常的に話す。
+#                       「SQLインジェクションを直した」で立つ可能性がある
+#   privacy/request     他人の情報を尋ねる行為。えんじいろの方針が未定
 _CHAKOSHI_TO_REASON = {
     "violence": "harm_others",
-    "weapon": "harm_others",
-    "weapons": "harm_others",
-    "self_harm": "self_harm",
-    "suicide": "self_harm",
-    "harassment": "harsh_criticism",
-    "insult": "harsh_criticism",
-    "abuse": "harsh_criticism",
+    "violence/graphic": "harm_others",
+    "illicit/weapons": "harm_others",
+    "illicit/bio": "harm_others",
+    "self-harm": "self_harm",
     "hate": "ng_word",
-    "hate_speech": "ng_word",
-    "discrimination": "ng_word",
-    "personal_information": "personal_data",
-    "privacy": "personal_data",
+    "harassment": "harsh_criticism",
+    "sexual/minors": "sexual_explicit",
+    "privacy/doxxing": "personal_data",
+    "privacy/self": "personal_data",
 }
 
 # どの理由コードなら block か。自傷・他害は人間監督の決定により必ず block。
@@ -324,8 +333,12 @@ def chakoshi_available() -> bool:
 
 
 def _normalize_category(name: str) -> str:
-    """カテゴリ名の書き方の違いを吸収する（self-harm と self_harm など）。"""
-    return (name or "").strip().lower().replace("-", "_").replace(" ", "_")
+    """カテゴリ名の書き方の違いを吸収する。
+
+    実APIは「self-harm」「violence/graphic」のように
+    ハイフンとスラッシュを使う。前後の空白と大文字小文字だけそろえる。
+    """
+    return (name or "").strip().lower()
 
 
 def check_chakoshi(text: str) -> dict | None:
@@ -350,7 +363,12 @@ def check_chakoshi(text: str) -> dict | None:
         _warn_once("chakoshi", f"chakoshi に問い合わせできませんでした: {exc}")
         return None
 
-    outcome = result.get("guardrails_result") or {}
+    # 実APIは assessments の下に入れ子で返す。
+    # MCPサーバーのREADMEにある例は、そこを抽出した後の形だった。
+    # 将来どちらに変わっても読めるよう、両方見る。
+    body = result.get("assessments") or result
+    outcome = body.get("guardrails_result") or {}
+
     reasons = []
     unknown = []
 
@@ -372,6 +390,10 @@ def check_chakoshi(text: str) -> dict | None:
             "external_moderation.py の _CHAKOSHI_TO_REASON へ追加してください。"
             "いまは無視しています。",
         )
+
+    # 個人情報フィルタ。何か見つかれば個人情報として扱う
+    if (outcome.get("pii_filter") or {}).get("detect_pii_result"):
+        reasons.append("personal_data")
 
     # キーワードフィルタは運用側が明示的に登録した語なので、当たれば弾く
     if (outcome.get("keyword_filter") or {}).get("matched"):
