@@ -1,0 +1,596 @@
+:root {
+  --base: #fff8f1;
+  --assort: #d8c7b8;
+  --accent: #9b3342;
+  --kid-blue: #2d8fb3;
+  --kid-yellow: #f4c51f;
+  --kid-orange: #ef7a22;
+  --ink: #312624;
+  --muted: #776964;
+  --paper: #fffdf9;
+  --line: color-mix(in srgb, var(--assort) 58%, #ffffff);
+  --soft-accent: color-mix(in srgb, var(--accent) 13%, #ffffff);
+  --persona-edge: color-mix(in srgb, var(--accent) 34%, #f7c7ce);
+  --persona-wash: color-mix(in srgb, var(--accent) 13%, #ffe7eb);
+  --persona-border: color-mix(in srgb, var(--accent) 38%, #ffffff);
+  --persona-solid: var(--accent);
+  --shadow: 0 22px 70px rgba(73, 38, 26, 0.14);
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 12%, color-mix(in srgb, var(--assort) 24%, transparent), transparent 32%),
+    linear-gradient(135deg, var(--base), color-mix(in srgb, var(--base) 78%, var(--assort)));
+  color: var(--ink);
+  font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  line-height: 1.65;
+}
+
+body[data-mode="kid"] {
+  --paper: #fffefa;
+  --line: color-mix(in srgb, var(--accent) 24%, var(--kid-yellow));
+  --soft-accent: color-mix(in srgb, var(--accent) 18%, #fff4cf);
+  --radius: 8px;
+  background:
+    repeating-linear-gradient(-8deg, transparent 0 22px, rgba(244, 197, 31, 0.08) 22px 24px),
+    linear-gradient(135deg, var(--base), color-mix(in srgb, var(--base) 72%, var(--kid-yellow)));
+}
+
+body[data-persona="mother"] {
+  --persona-edge: #a7cdb8;
+  --persona-wash: #e3f1e9;
+  --persona-border: #86b79c;
+  --persona-solid: #4f8f69;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.lab-panel {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(360px, 100%);
+  padding: 28px;
+  overflow-y: auto;
+  background: rgba(255, 253, 249, 0.88);
+  border-right: 1px solid var(--line);
+  backdrop-filter: blur(18px);
+  z-index: 2;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 10px;
+  font-size: 30px;
+  line-height: 1.25;
+}
+
+h2 {
+  margin-bottom: 10px;
+  font-size: 17px;
+}
+
+.lead,
+.notes,
+.contrast {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.mode-switch,
+.persona-switch,
+.controls,
+.preset-list,
+.notes,
+.contrast {
+  margin-top: 24px;
+}
+
+.mode-switch,
+.persona-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--base) 72%, #ffffff);
+}
+
+.mode-button,
+.persona-theme-button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.mode-button.is-active,
+.persona-theme-button.is-active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+body[data-mode="kid"] .mode-button.is-active {
+  background: linear-gradient(90deg, var(--accent), var(--kid-orange), var(--kid-yellow));
+}
+
+.persona-theme-button.is-active {
+  background: var(--persona-solid);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--persona-border) 52%, #ffffff);
+}
+
+.controls {
+  display: grid;
+  gap: 14px;
+}
+
+.controls label {
+  display: grid;
+  grid-template-columns: 74px 44px 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.controls input[type="color"] {
+  width: 44px;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.controls input[type="text"] {
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.preset-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.preset-group {
+  grid-column: 1 / -1;
+  margin: 12px 0 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.preset-group:first-child {
+  margin-top: 0;
+}
+
+.preset-list button,
+.reaction-row button,
+.persona,
+.icon-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--base) 74%, #ffffff);
+  color: var(--ink);
+}
+
+.preset-list button {
+  min-height: 42px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notes ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.contrast p {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.contrast strong {
+  color: var(--ink);
+}
+
+.preview {
+  min-height: 100vh;
+  padding: 36px 36px 36px 396px;
+}
+
+.app-shell {
+  width: min(900px, 100%);
+  margin: 0 auto;
+  border: 2px solid var(--persona-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, var(--persona-wash), transparent 38%),
+    rgba(255, 253, 249, 0.76);
+  box-shadow: 0 0 0 10px color-mix(in srgb, var(--persona-edge) 58%, transparent), var(--shadow);
+  overflow: hidden;
+}
+
+body[data-mode="kid"] .app-shell {
+  border: 2px dashed color-mix(in srgb, var(--accent) 62%, var(--kid-yellow));
+  border-radius: 18px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px;
+  background:
+    linear-gradient(90deg, var(--persona-wash), color-mix(in srgb, var(--persona-edge) 22%, transparent)),
+    color-mix(in srgb, var(--assort) 34%, #ffffff);
+  border-bottom: 2px solid color-mix(in srgb, var(--persona-border) 68%, #ffffff);
+}
+
+body[data-mode="kid"] .topbar {
+  background:
+    linear-gradient(90deg, rgba(244, 197, 31, 0.18), rgba(239, 122, 34, 0.10)),
+    color-mix(in srgb, var(--base) 65%, #ffffff);
+}
+
+.brand-mark,
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+body[data-mode="kid"] .brand-mark,
+body[data-mode="kid"] .avatar {
+  border: 2px solid var(--kid-yellow);
+  border-radius: 35% 48% 40% 44%;
+  transform: rotate(-3deg);
+}
+
+.topbar p {
+  margin: 0;
+  font-weight: 900;
+}
+
+.topbar span,
+.post-card span,
+.profile-card p,
+.drawing-hero p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.icon-button {
+  width: 42px;
+  height: 42px;
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 900;
+}
+
+.drawing-hero {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) 1fr;
+  align-items: center;
+  gap: 18px;
+  margin: 22px 22px 0;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--persona-border) 65%, #ffffff);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.38)),
+    color-mix(in srgb, var(--base) 72%, #ffffff);
+}
+
+.drawing-hero img {
+  display: block;
+  width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+  filter: saturate(0.78) opacity(0.76);
+}
+
+.drawing-hero h2,
+.drawing-hero p {
+  margin-bottom: 0;
+}
+
+body[data-mode="kid"] .drawing-hero {
+  border: 2px solid color-mix(in srgb, var(--accent) 50%, var(--kid-yellow));
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 247, 212, 0.68)),
+    color-mix(in srgb, var(--base) 78%, var(--kid-yellow));
+}
+
+body[data-mode="kid"] .drawing-hero img {
+  max-height: 190px;
+  filter: saturate(1.18) opacity(1);
+}
+
+body[data-mode="kid"] .drawing-hero h2::after {
+  content: " ★";
+  color: var(--kid-yellow);
+}
+
+.composer {
+  margin: 22px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--persona-border) 68%, #ffffff);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+body[data-mode="kid"] .composer,
+body[data-mode="kid"] .post-card,
+body[data-mode="kid"] .profile-card {
+  border-width: 2px;
+  box-shadow: 7px 7px 0 color-mix(in srgb, var(--kid-yellow) 32%, transparent);
+}
+
+.persona-row,
+.stamp-row,
+.reaction-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.persona {
+  padding: 7px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.persona.is-active {
+  background: color-mix(in srgb, var(--persona-solid) 14%, #ffffff);
+  border-color: color-mix(in srgb, var(--persona-solid) 35%, #ffffff);
+  color: var(--persona-solid);
+}
+
+body[data-mode="kid"] .persona.is-active {
+  background: color-mix(in srgb, var(--kid-yellow) 34%, #ffffff);
+}
+
+textarea {
+  width: 100%;
+  min-height: 112px;
+  margin: 14px 0;
+  padding: 14px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--base) 54%, #ffffff);
+  color: var(--ink);
+}
+
+body[data-mode="kid"] textarea {
+  border: 2px dashed color-mix(in srgb, var(--accent) 42%, var(--kid-yellow));
+}
+
+.stamp {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--assort) 42%, #ffffff);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+body[data-mode="kid"] .stamp {
+  background: color-mix(in srgb, var(--kid-yellow) 30%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--kid-yellow));
+}
+
+.primary-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 900;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+body[data-mode="kid"] .primary-button {
+  border: 2px solid color-mix(in srgb, var(--accent) 64%, #ffffff);
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 74%, var(--kid-orange)));
+}
+
+.feed {
+  display: grid;
+  gap: 14px;
+  padding: 0 22px 22px;
+}
+
+.post-card,
+.profile-card {
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--persona-border) 62%, #ffffff);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.post-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.post-card strong,
+.post-card span {
+  display: block;
+}
+
+.avatar.baby {
+  background: var(--accent);
+}
+
+.avatar.mother {
+  background: color-mix(in srgb, var(--assort) 78%, var(--accent));
+  color: var(--ink);
+}
+
+.post-card p {
+  margin: 14px 0;
+}
+
+.reaction-row button {
+  padding: 7px 11px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.reaction-row .accent-link {
+  border-color: color-mix(in srgb, var(--accent) 38%, #ffffff);
+  color: var(--accent);
+}
+
+.mother-card {
+  background: color-mix(in srgb, var(--assort) 22%, #ffffff);
+}
+
+.profile-card {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-card h2,
+.profile-card p {
+  margin-bottom: 0;
+}
+
+.meter {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--assort) 42%, #ffffff);
+}
+
+.meter span {
+  display: block;
+  width: 64%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+body[data-mode="kid"] .meter span {
+  background: linear-gradient(90deg, var(--kid-blue), var(--kid-yellow), var(--accent));
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: min(900px, 100%);
+  margin: 16px auto 0;
+}
+
+.swatch {
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+}
+
+.swatch span,
+.swatch strong {
+  display: block;
+}
+
+.swatch span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.swatch strong {
+  margin-top: 20px;
+}
+
+.swatch.base {
+  background: var(--base);
+}
+
+.swatch.assort {
+  background: var(--assort);
+}
+
+.swatch.accent {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+@media (max-width: 860px) {
+  .lab-panel {
+    position: static;
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .preview {
+    padding: 18px;
+  }
+
+  .drawing-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .swatches {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>engiiro color check</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body data-mode="calm" data-persona="baby">
+    <aside class="lab-panel" aria-label="色調整パネル">
+      <div>
+        <p class="eyebrow">color lab</p>
+        <h1>えんじいろ仮配色</h1>
+        <p class="lead">疲れたエンジニアが少し赤ちゃんになれる、やさしいSNSの色味チェック用。</p>
+      </div>
+
+      <section class="mode-switch" aria-label="表示テイスト">
+        <button class="mode-button is-active" type="button" data-mode-button="calm">標準表示</button>
+        <button class="mode-button" type="button" data-mode-button="kid">園児装飾</button>
+      </section>
+
+      <section class="persona-switch" aria-label="ペルソナモード">
+        <button class="persona-theme-button is-active" type="button" data-persona-button="baby">赤ちゃん</button>
+        <button class="persona-theme-button" type="button" data-persona-button="mother">お母さん</button>
+      </section>
+
+      <section class="controls" aria-label="メインカラー">
+        <label>
+          <span>ベース</span>
+          <input id="basePicker" type="color" value="#fff8f1">
+          <input id="baseText" type="text" value="#FFF8F1" spellcheck="false">
+        </label>
+        <label>
+          <span>アソート</span>
+          <input id="assortPicker" type="color" value="#d8c7b8">
+          <input id="assortText" type="text" value="#D8C7B8" spellcheck="false">
+        </label>
+        <label>
+          <span>アクセント</span>
+          <input id="accentPicker" type="color" value="#9b3342">
+          <input id="accentText" type="text" value="#9B3342" spellcheck="false">
+        </label>
+      </section>
+
+      <section class="preset-list" aria-label="プリセット">
+        <p class="preset-group">ぬくもり避難所</p>
+        <button type="button" data-preset="#FFF8F1,#D8C7B8,#9B3342">避難所 01</button>
+        <button type="button" data-preset="#FFF7EC,#CFC0B0,#8E2F3B">避難所 02</button>
+        <button type="button" data-preset="#FAF4EA,#C7B9AA,#7D2633">避難所 03</button>
+        <button type="button" data-preset="#FDF6EE,#BFAFA2,#8A3440">避難所 05</button>
+
+        <p class="preset-group">鮮やか臙脂</p>
+        <button type="button" data-preset="#FFF8F1,#D7C8BB,#B22342">鮮やか 01</button>
+        <button type="button" data-preset="#FFF7F3,#D9C6D0,#C22648">鮮やか 02</button>
+        <button type="button" data-preset="#FFF9EC,#C6D8C9,#B51F3A">鮮やか 03</button>
+        <button type="button" data-preset="#FFF5EE,#BFD1D6,#AD1E3C">鮮やか 04</button>
+        <button type="button" data-preset="#FAF6F1,#CEC3BC,#C13A50">鮮やか 05</button>
+
+        <p class="preset-group">園児UI配色</p>
+        <button type="button" data-preset="#FFFAED,#BFD4C2,#A43A4A">名札 01</button>
+        <button type="button" data-preset="#FFF4E5,#D9BFA6,#A73D4C">名札 05</button>
+        <button type="button" data-preset="#FFFAE8,#F6D85F,#B22342">園児 01</button>
+        <button type="button" data-preset="#FFF7EC,#8FC8B3,#C22648">園児 02</button>
+        <button type="button" data-preset="#FFFBEF,#7FBAD0,#B61F3A">園児 03</button>
+        <button type="button" data-preset="#FFF3E6,#F2A95F,#A91F3E">園児 04</button>
+        <button type="button" data-preset="#FFFAF2,#C7D987,#C7374F">園児 05</button>
+
+        <p class="preset-group">ふとんの中</p>
+        <button type="button" data-preset="#FFF4E8,#E1BFAE,#8F2D3C">ふとん 01</button>
+        <button type="button" data-preset="#FFF6F4,#E6C9C4,#8A2432">ふとん 02</button>
+        <button type="button" data-preset="#FFF2E0,#D8B9A8,#7A1E2B">ふとん 03</button>
+        <button type="button" data-preset="#FDF1E8,#CDB8AA,#853242">ふとん 05</button>
+
+        <p class="preset-group">比較用</p>
+        <button type="button" data-preset="#FFF6F4,#C9B8A8,#8A2432">おひるねSNS</button>
+        <button type="button" data-preset="#FAF7F2,#B9AAA0,#7A1E2B">大人の逃げ場</button>
+      </section>
+
+      <section class="notes" aria-label="チェック観点">
+        <h2>見るところ</h2>
+        <ul>
+          <li>落ち着くモードを標準にして、長時間見ても疲れないか</li>
+          <li>園児UI用の3色が、名札・スタンプ・空状態に使いやすいか</li>
+          <li>臙脂が強すぎず、でも押したくなるか</li>
+          <li>子どもの絵がブランド素材として浮かずに馴染むか</li>
+        </ul>
+      </section>
+
+      <section class="contrast" aria-label="コントラスト">
+        <h2>Contrast</h2>
+        <p><span>Accent / White</span><strong id="accentWhiteRatio">-</strong></p>
+        <p><span>Accent / Base</span><strong id="accentBaseRatio">-</strong></p>
+        <p><span>Text / Base</span><strong id="textBaseRatio">-</strong></p>
+      </section>
+    </aside>
+
+    <main class="preview">
+      <section class="app-shell" aria-label="SNSプレビュー">
+        <nav class="topbar">
+          <div class="brand-mark">え</div>
+          <div>
+            <p>engiiro</p>
+            <span>やさしい現実逃避SNS</span>
+          </div>
+          <button class="icon-button" type="button" aria-label="通知">♪</button>
+        </nav>
+
+        <section class="drawing-hero" aria-label="子どもの絵を使ったブランドエリア">
+          <img src="./assets/engiiro-crayon-logo.png" alt="子どもが描いたえんじいろロゴ">
+          <div>
+            <p class="eyebrow">crayon identity</p>
+            <h2>ちゃんとしてなくていい場所</h2>
+            <p>園児UIではこのクレヨン線を前面に。落ち着くモードでは、手触りだけを少し残します。</p>
+          </div>
+        </section>
+
+        <section class="composer">
+          <div class="persona-row">
+            <button class="persona is-active" type="button" data-persona-button="baby">赤ちゃん</button>
+            <button class="persona" type="button" data-persona-button="mother">お母さん</button>
+          </div>
+          <textarea aria-label="投稿本文">もうレビューでつかれた。きょうはコードのことわすれて、ばぶばぶしてたい。</textarea>
+          <div class="stamp-row">
+            <span class="stamp">おぎゃー</span>
+            <span class="stamp">ばぶばぶ</span>
+            <span class="stamp">よしよし</span>
+          </div>
+          <button class="primary-button" type="button">やさしく投稿</button>
+        </section>
+
+        <section class="feed">
+          <article class="post-card">
+            <header>
+              <div class="avatar baby">ば</div>
+              <div>
+                <strong>ばぶ太郎</strong>
+                <span>推定 3さい / 12分前</span>
+              </div>
+            </header>
+            <p>本番障害の夢を見たので、今日はふわふわの毛布にくるまっていることにします。</p>
+            <div class="reaction-row">
+              <button type="button">おぎゃー 12</button>
+              <button type="button">ばぶばぶ 8</button>
+              <button class="accent-link" type="button">よしよしする</button>
+            </div>
+          </article>
+
+          <article class="post-card mother-card">
+            <header>
+              <div class="avatar mother">母</div>
+              <div>
+                <strong>やさし山さん</strong>
+                <span>お母さんコメント</span>
+              </div>
+            </header>
+            <p>えらかったね。今日はログもチケットもいったんお布団の外に置いておこうね。</p>
+          </article>
+
+          <article class="profile-card">
+            <div>
+              <p class="eyebrow">profile</p>
+              <h2>今日の赤ちゃん度</h2>
+            </div>
+            <div class="meter" aria-hidden="true"><span></span></div>
+            <p>推定 4さい。ちょっと甘えたい日。</p>
+          </article>
+        </section>
+      </section>
+
+      <section class="swatches" aria-label="色見本">
+        <div class="swatch base"><span>Base</span><strong id="baseValue">#FFF8F1</strong></div>
+        <div class="swatch assort"><span>Assort</span><strong id="assortValue">#D8C7B8</strong></div>
+        <div class="swatch accent"><span>Accent</span><strong id="accentValue">#9B3342</strong></div>
+      </section>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
