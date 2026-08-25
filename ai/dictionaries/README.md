@@ -106,3 +106,25 @@ python ai/dictionaries/build_formats.py
 辞書を育てる価値は変わりません。
 
 外部APIの設定は `ai/external_moderation.py` の冒頭を読んでください。
+
+### 使えるサービス
+
+| サービス | 無料枠 | 得意 |
+|---|---|---|
+| OpenAI Moderation | 完全無料 | 自傷・暴力・嫌がらせ |
+| Azure AI Content Safety | 5,000件/月 | **自傷の専用カテゴリがある** |
+| Google Cloud Natural Language | 月5万ユニット | 侮辱・差別的表現 |
+
+**Google は自傷の検出に向きません。** 返ってくる `Death, Harm & Tragedy` は
+話題の分類であって、自傷の意図ではないからです。
+「祖父が亡くなった」でも高く出ます。自傷は Azure か OpenAI が担当します。
+
+### 検討して見送ったもの
+
+| サービス | 理由 |
+|---|---|
+| Google Perspective API | 2026年12月で終了。新規申請も2026年2月で締切済み |
+| NTT chakoshi | 日本語に強く無料だが、API仕様が公開されていない（要アカウント） |
+| ジェットラン センシティブ判定API | 有料。ただし**教育機関・非営利は無償**とのことなので、確認の価値あり |
+| メタデータ NG判定API | 有料 |
+| ことばゲート | 無料プランは1ドメイン制限 |

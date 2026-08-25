@@ -20,6 +20,11 @@ Azure AI Content Safety（無料枠 5,000件/月）
     AZURE_CONTENT_SAFETY_ENDPOINT=https://<名前>.cognitiveservices.azure.com
     AZURE_CONTENT_SAFETY_KEY=...
 
+Google Cloud Natural Language（無料枠 月5万ユニット。100文字で1ユニット）
+    GOOGLE_CLOUD_NL_API_KEY=...
+    ※ AI Studio のキーとは別。GCPプロジェクトで
+      Cloud Natural Language API を有効にして発行する
+
 ## 個人情報は送らない
 
 呼び出し元（transform_api.moderate）は、規則で personal_data を検出した時点で
@@ -71,6 +76,30 @@ _AZURE_TO_REASON = {
     "SelfHarm": "self_harm",
     "Violence": "harm_others",
     "Hate": "ng_word",
+}
+
+# Google Cloud Natural Language の confidence は 0.00〜1.00。どこから拾うか。
+# 実データで調整が要る。下げると弱音や愚痴を巻き込む。
+GOOGLE_CONFIDENCE_THRESHOLD = 0.8
+
+# Google のカテゴリ16種には「話題の分類」が混ざっている。
+# 有害性を示すものだけを対応づける。
+#
+# 対応づけないもの（無害な投稿を弾いてしまうため）:
+#   Death, Harm & Tragedy … 話題の分類。「祖父が亡くなった」も高く出る。
+#                            自傷の意図とは別物なので self_harm にはしない
+#   Health / Religion & Belief / Politics / Finance / Legal
+#   War & Conflict / Firearms & Weapons / Public Safety / Illicit Drugs
+#                         … いずれも話題の分類であって有害性ではない
+#   Sexual                … えんじいろの方針が未定
+#
+# つまり Google は自傷の検出には向かない。そこは Azure か OpenAI が担当する。
+_GOOGLE_TO_REASON = {
+    "Derogatory": "ng_word",
+    "Violent": "harm_others",
+    "Toxic": "harsh_criticism",
+    "Insult": "harsh_criticism",
+    "Profanity": "harsh_criticism",
 }
 
 # どの理由コードなら block か。自傷・他害は人間監督の決定により必ず block。
@@ -178,12 +207,46 @@ def check_azure(text: str) -> dict | None:
 
 
 # ============================================================
+# Google Cloud Natural Language（Text Moderation）
+# ============================================================
+
+def google_available() -> bool:
+    return bool(os.getenv("GOOGLE_CLOUD_NL_API_KEY"))
+
+
+def check_google(text: str) -> dict | None:
+    """Google Cloud Natural Language に見てもらう。設定が無ければ None。"""
+    api_key = os.getenv("GOOGLE_CLOUD_NL_API_KEY")
+    if not api_key:
+        return None
+
+    url = f"https://language.googleapis.com/v2/documents:moderateText?key={api_key}"
+    payload = {
+        "document": {"type": "PLAIN_TEXT", "content": text, "languageCode": "ja"}
+    }
+    try:
+        result = _post_json(url, payload, {})
+    except Exception as exc:
+        _warn_once("google", f"Google Cloud NL に問い合わせできませんでした: {exc}")
+        return None
+
+    reasons = []
+    for category in result.get("moderationCategories") or []:
+        name = category.get("name")
+        confidence = category.get("confidence", 0.0)
+        if name in _GOOGLE_TO_REASON and confidence >= GOOGLE_CONFIDENCE_THRESHOLD:
+            reasons.append(_GOOGLE_TO_REASON[name])
+    return _to_verdict(reasons)
+
+
+# ============================================================
 # まとめ
 # ============================================================
 
 PROVIDERS = {
     "openai": (openai_available, check_openai),
     "azure": (azure_available, check_azure),
+    "google": (google_available, check_google),
 }
 
 

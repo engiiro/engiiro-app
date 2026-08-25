@@ -18,7 +18,7 @@ import external_moderation as E
 def _clear_env(monkeypatch):
     """他のテストや実環境の設定を持ち込まない。"""
     for name in ("OPENAI_API_KEY", "AZURE_CONTENT_SAFETY_ENDPOINT",
-                 "AZURE_CONTENT_SAFETY_KEY"):
+                 "AZURE_CONTENT_SAFETY_KEY", "GOOGLE_CLOUD_NL_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     E._warned.clear()
 
@@ -48,6 +48,7 @@ def test_設定が無ければ呼ばない(monkeypatch):
     assert E.enabled_providers() == []
     assert E.check_openai("テスト") is None
     assert E.check_azure("テスト") is None
+    assert E.check_google("テスト") is None
 
 
 # ============================================================
@@ -180,3 +181,67 @@ def test_設定した分だけ問い合わせる(monkeypatch, azure_env):
     assert len(verdicts) == 2
     assert {v["provider"] for v in verdicts} == {"openai", "azure"}
     assert sorted(E.enabled_providers()) == ["azure", "openai"]
+
+
+# ============================================================
+# Google Cloud Natural Language
+# ============================================================
+
+def _google_response(**confidences):
+    return {"moderationCategories": [
+        {"name": name.replace("_", " "), "confidence": value}
+        for name, value in confidences.items()
+    ]}
+
+
+@pytest.fixture
+def google_env(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLOUD_NL_API_KEY", "key")
+
+
+def test_google_侮辱はrewrite_required(monkeypatch, google_env):
+    monkeypatch.setattr(E, "_post_json", lambda *a, **k: _google_response(Insult=0.95))
+    verdict = E.check_google("テスト")
+    assert verdict == {"action": "rewrite_required", "reasonCodes": ["harsh_criticism"]}
+
+
+def test_google_差別的表現はblock(monkeypatch, google_env):
+    monkeypatch.setattr(E, "_post_json", lambda *a, **k: _google_response(Derogatory=0.9))
+    assert E.check_google("テスト") == {"action": "block", "reasonCodes": ["ng_word"]}
+
+
+def test_google_しきい値未満は拾わない(monkeypatch, google_env):
+    monkeypatch.setattr(E, "_post_json", lambda *a, **k: _google_response(Toxic=0.3))
+    assert E.check_google("テスト") == {"action": "allow", "reasonCodes": []}
+
+
+def test_google_話題の分類は拾わない(monkeypatch, google_env):
+    """「祖父が亡くなった」で Death, Harm & Tragedy が高く出ても弾かない。
+
+    Google のカテゴリには話題の分類が混ざっている。
+    有害性ではないので、対応づけていない。
+    """
+    response = _google_response(**{"Death,_Harm_&_Tragedy": 0.99})
+    monkeypatch.setattr(E, "_post_json", lambda *a, **k: response)
+    assert E.check_google("祖父が亡くなった。") == {"action": "allow", "reasonCodes": []}
+
+
+def test_google_健康や政治の話題を弾かない(monkeypatch, google_env):
+    for topic in ("Health", "Politics", "Finance", "Legal", "Religion_&_Belief"):
+        response = _google_response(**{topic: 0.99})
+        monkeypatch.setattr(E, "_post_json", lambda *a, **k: response)
+        assert E.check_google("テスト")["action"] == "allow", topic
+
+
+def test_google_URLにキーを載せる(monkeypatch, google_env):
+    called = {}
+
+    def capture(url, payload, headers):
+        called["url"] = url
+        called["payload"] = payload
+        return _google_response()
+
+    monkeypatch.setattr(E, "_post_json", capture)
+    E.check_google("テスト")
+    assert called["url"].startswith("https://language.googleapis.com/v2/documents:moderateText?key=")
+    assert called["payload"]["document"]["languageCode"] == "ja"
