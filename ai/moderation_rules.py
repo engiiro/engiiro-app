@@ -74,21 +74,63 @@ NG_WORDS_REWRITE = {
 # いずれも実測で確認済み。文脈を見ないと判定できないので、
 # LLM側のマサカリ判定に任せる。
 
-# 自傷・他害の疑い。TBD-9（専用応答の設計）が未確定のため、
-# ここでは検出して理由コードを立てるだけにする。
-# 実際にどう応答するかは人間監督の決定を待つ。
+# 自傷を示す表現。
+#
+# 人間監督の決定（TBD-9 の回答）:
+#   「自傷・他害は絶対に弾いてください。ここは犯罪者・自殺者応援サイトでは
+#     ないのです」
+#
+# したがって、上の「言い換えて愚痴になるなら rewrite_required」という基準を
+# ここには適用しない。言い換えられそうに見えても block とする。
+# この扱いを変えるのは人間監督だけ。AIの判断で緩めない。
+#
+# 一方で「つらい」「しんどい」「もう限界」といった弱音は、
+# えんじいろが書くための場所として用意しているものなので、ここには入れない。
+# 「死ぬ」は入れない。「サーバーが死んだ」「プロセスが死んでる」という
+# 言い方をエンジニアは日常的に使う。原形で照合すると全部巻き込む。
 SELF_HARM_WORDS = {
-    "死にたい": None,
-    "しにたい": None,
-    "消えたい": None,
-    "きえたい": None,
-    "自殺": None,
-    "リストカット": None,
-    "リスカ": None,
+    "死にたい": ANY_POS,
+    "しにたい": ANY_POS,
+    "死のう": ANY_POS,
+    "しのう": ANY_POS,
+    "消えたい": ANY_POS,
+    "きえたい": ANY_POS,
+    "生きていたくない": ANY_POS,
+    "生きるのをやめる": ANY_POS,
+    "自殺": ANY_POS,
+    "自傷": ANY_POS,
+    "自害": ANY_POS,
+    "リストカット": ANY_POS,
+    "リスカ": ANY_POS,
+    "首を吊る": ANY_POS,
+    "首吊り": ANY_POS,
+    "飛び降りる": ANY_POS,
+    "練炭": ANY_POS,
+    "オーバードーズ": ANY_POS,
 }
 
-# TBD-9 が決まるまでの暫定。人間監督の決定で変更すること。
+# 他人を傷つけること、犯罪をほのめかす表現。
+# 「殺す」「ころす」は NG_WORDS_BLOCK にも入っているが、
+# 理由コードを分けたいのでここにも置く。
+#
+# 「刺す」「殴る」は入れない。「釘を刺す」「壁を殴る」と区別できないため。
+# この種のものは LLM 側の判定に任せる。
+HARM_OTHERS_WORDS = {
+    "殺してやる": ANY_POS,
+    "殺害": ANY_POS,
+    "殺人": ANY_POS,
+    "放火": ANY_POS,
+    "爆破": ANY_POS,
+    "通り魔": ANY_POS,
+    "刺してやる": ANY_POS,
+    "殴ってやる": ANY_POS,
+    "ぶっ殺": ANY_POS,
+}
+
+# 自傷・他害を検出したときの扱い。人間監督の決定により block で固定。
+# 設定値として残してあるが、AIの判断で変更しないこと。
 SELF_HARM_ACTION = "block"
+HARM_OTHERS_ACTION = "block"
 
 
 # ============================================================
@@ -198,12 +240,16 @@ def tokenizer_available() -> bool:
     return _tokenizer is not None
 
 
-def iter_tokens(text: str) -> list[tuple[str, str]]:
-    """(表層形, 品詞) の一覧を返す。解析器がなければ空。"""
+def iter_tokens(text: str) -> list[tuple[str, str, str]]:
+    """(表層形, 品詞, 原形) の一覧を返す。解析器がなければ空。
+
+    原形も返すのは、活用で表層形が変わる語を拾うため。
+    「首を吊ろうとした」の「吊ろ」は原形が「吊る」になる。
+    """
     if not tokenizer_available():
         return []
     return [
-        (token.surface, token.part_of_speech.split(",")[0])
+        (token.surface, token.part_of_speech.split(",")[0], token.base_form)
         for token in _tokenizer.tokenize(normalize_for_tokenize(text))
     ]
 
@@ -221,22 +267,76 @@ _COMPOUND_POS = ("名詞", "形容詞")
 _VERB_ENDINGS = ("て", "で", "ば")
 
 
-def _is_compound_or_conjugation(tokens: list, index: int) -> bool:
-    """直後のトークンを見て、罵倒ではないと分かるかを判定する。"""
+def _is_conjugation(tokens: list, index: int) -> bool:
+    """直後が て・で・ば なら、名詞ではなく動詞の活用形とみなす。
+
+    どの語にも当てはめてよい。
+    「写真がボケていた」「しねばよかった」を除外するためのもの。
+    """
     if index + 1 >= len(tokens):
         return False
-    next_surface, next_pos = tokens[index + 1]
-    if next_pos.startswith(_COMPOUND_POS):
-        return True
-    return next_surface in _VERB_ENDINGS
+    return tokens[index + 1][0] in _VERB_ENDINGS
 
 
-def match_ng_words(text: str, table: dict) -> list[str]:
+def _is_compound(tokens: list, index: int) -> bool:
+    """直後が名詞・形容詞なら、複合語の一部とみなす。
+
+    これは罵倒に使う名詞（バカ・クズ・ボケ）の曖昧さを解くための規則で、
+    品詞を指定した語にだけ当てはめる。
+    自傷・他害の語に当てはめてはいけない。
+    「殺害予告」「しにたい気分」まで無害と判定してしまう（実測で確認）。
+    """
+    if index + 1 >= len(tokens):
+        return False
+    return tokens[index + 1][1].startswith(_COMPOUND_POS)
+
+
+# 「消えたい」のように、解析すると複数のトークンに分かれる語がある。
+#   消えたい      → 消え[動詞] | たい[助動詞]
+#   消えたいくつか → 消え[動詞] | た[助動詞] | いくつか[名詞]
+# 続きをつないで照合すれば、この2つを取り違えずに済む。
+MAX_TOKEN_WINDOW = 5
+
+
+def _match_by_tokens(text: str, tokenized: dict) -> list[str]:
+    """連続するトークンをつないで、辞書の語と一致するかを調べる。"""
+    hits = []
+    wanted = {normalize_for_check(w): (w, r) for w, r in tokenized.items()}
+    tokens = iter_tokens(text)
+
+    for start in range(len(tokens)):
+        joined = ""
+        for end in range(start, min(start + MAX_TOKEN_WINDOW, len(tokens))):
+            prefix = joined
+            joined += normalize_for_check(tokens[end][0])
+            # 表層形でも原形でも照合する。最後の語だけ活用が変わるため、
+            # 原形に差し替えるのは末尾のトークンだけでよい。
+            with_base = prefix + normalize_for_check(tokens[end][2])
+            found = wanted.get(joined) or wanted.get(with_base)
+            if not found:
+                continue
+            word, rule = found
+            if _is_conjugation(tokens, end):
+                continue
+            if rule != ANY_POS:
+                # 品詞は先頭のトークンで見る
+                if not tokens[start][1].startswith(rule):
+                    continue
+                if _is_compound(tokens, end):
+                    continue
+            hits.append(word)
+    return hits
+
+
+def match_ng_words(text: str, table: dict, fallback_to_substring: bool = False) -> list[str]:
     """辞書に載っている語が使われているかを調べる。
 
     None の語は、正規化した文字列への部分一致で拾う。
-    それ以外は、形態素解析して1語として一致したときだけ拾う。
-    解析器がなければ後者は調べない。誤検出を出すよりは見逃すほうがましなため。
+    それ以外は、形態素解析して語として一致したときだけ拾う。
+
+    解析器がないときは、通常は後者を調べない。誤検出を出すより
+    見逃すほうがましだからである。ただし fallback_to_substring を
+    立てた辞書（自傷・他害）だけは、見逃すほうが困るので部分一致で拾う。
     """
     hits = []
 
@@ -246,19 +346,13 @@ def match_ng_words(text: str, table: dict) -> list[str]:
             hits.append(word)
 
     tokenized = {w: r for w, r in table.items() if r is not None}
-    if tokenized and tokenizer_available():
-        wanted = {normalize_for_check(w): (w, r) for w, r in tokenized.items()}
-        tokens = iter_tokens(text)
-        for index, (surface, pos) in enumerate(tokens):
-            found = wanted.get(normalize_for_check(surface))
-            if not found:
-                continue
-            word, rule = found
-            if rule != ANY_POS and not pos.startswith(rule):
-                continue
-            if _is_compound_or_conjugation(tokens, index):
-                continue
-            hits.append(word)
+    if tokenized:
+        if tokenizer_available():
+            hits.extend(_match_by_tokens(text, tokenized))
+        elif fallback_to_substring:
+            for word in tokenized:
+                if normalize_for_check(word) in checked:
+                    hits.append(word)
 
     return sorted(set(hits))
 
@@ -366,7 +460,9 @@ def check_rules(text: str) -> dict:
     """
     hit_block = match_ng_words(text, NG_WORDS_BLOCK)
     hit_rewrite = match_ng_words(text, NG_WORDS_REWRITE)
-    hit_self_harm = match_ng_words(text, SELF_HARM_WORDS)
+    # 自傷・他害は見逃すほうが困るので、解析器が無いときは部分一致で拾う
+    hit_self_harm = match_ng_words(text, SELF_HARM_WORDS, fallback_to_substring=True)
+    hit_harm_others = match_ng_words(text, HARM_OTHERS_WORDS, fallback_to_substring=True)
     hit_personal = find_personal_data(text)
 
     reason_codes = []
@@ -374,15 +470,21 @@ def check_rules(text: str) -> dict:
         reason_codes.append("ng_word")
     if hit_self_harm:
         reason_codes.append("self_harm")
+    if hit_harm_others:
+        reason_codes.append("harm_others")
     if hit_personal:
         reason_codes.append("personal_data")
     if hit_rewrite:
         reason_codes.append("harsh_criticism")
 
-    if hit_block or hit_personal:
-        action = "block"
-    elif hit_self_harm:
+    # 自傷・他害を最初に見る。人間監督の決定により、
+    # 他に何が当たっていても、ここに当たったら必ず block。
+    if hit_self_harm:
         action = SELF_HARM_ACTION
+    elif hit_harm_others:
+        action = HARM_OTHERS_ACTION
+    elif hit_block or hit_personal:
+        action = "block"
     elif hit_rewrite:
         action = "rewrite_required"
     else:
@@ -395,6 +497,7 @@ def check_rules(text: str) -> dict:
             "ng_word": hit_block,
             "harsh_criticism": hit_rewrite,
             "self_harm": hit_self_harm,
+            "harm_others": hit_harm_others,
             "personal_data": hit_personal,
         },
     }

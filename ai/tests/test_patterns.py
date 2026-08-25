@@ -40,8 +40,16 @@ def test_マサカリ語をrewrite_requiredにする(text):
 
 
 @pytest.mark.parametrize("text", P.SELF_HARM, ids=_label)
-def test_自傷表現を検出する(text):
-    assert "self_harm" in check_rules(text)["reasonCodes"]
+def test_自傷は必ず弾く(text):
+    result = check_rules(text)
+    assert "self_harm" in result["reasonCodes"]
+    assert result["action"] == "block", "人間監督の決定により自傷は例外なく block"
+
+
+@pytest.mark.parametrize("text", P.HARM_OTHERS, ids=_label)
+def test_他害は必ず弾く(text):
+    result = check_rules(text)
+    assert result["action"] == "block", "人間監督の決定により他害は例外なく block"
 
 
 @pytest.mark.parametrize("text,expected,reason", P.KNOWN_GAPS,

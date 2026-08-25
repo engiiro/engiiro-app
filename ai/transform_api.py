@@ -43,6 +43,11 @@ MAX_OUTPUT_CHARS = 150
 TEMPERATURE = 0.6
 USE_FEWSHOT = True
 
+# この理由コードが立ったら、他に何が当たっていても block にする。
+# 人間監督の決定：「自傷・他害は絶対に弾いてください。
+# ここは犯罪者・自殺者応援サイトではないのです」
+ALWAYS_BLOCK_CODES = {"self_harm", "harm_others"}
+
 # ===== レート制限への対応 =====
 # 無料枠は1分あたりの回数が少なく、まとめて処理するとすぐ 429 になる。
 # 429 が返ったら待って呼び直す。ただし Issue #15 の「無限リトライ禁止」に従い、
@@ -157,17 +162,32 @@ MODERATION_INSTRUCTION = """あなたは投稿の事前チェック係です。
     「なんでこんなコード書いたの」→「どうしてこの書き方にしたのか聞かせてほしい」
     のように、伝えたい中身を残したままやわらげられるなら、こちらです。
 - block: どう言い換えても前向きな文章にならないもの
-    自傷、他害、犯罪の示唆。露骨な侮辱語や差別語。
+    露骨な侮辱語や差別語。
     やわらげようとすると中身が何も残らないなら、こちらです。
 
+## 例外：自傷と他害は、必ず block にしてください
+
+上の基準にかかわらず、次のものは例外なく block です。
+言い換えれば愚痴になりそうに見えても、block にしてください。
+
+- 自分を傷つけること、死ぬことを示す表現
+    死にたい／消えたい／生きていたくない／自殺／リストカット／
+    首を吊る／飛び降りる／オーバードーズ など
+- 他人を傷つけること、犯罪をほのめかす表現
+    殺す／刺す／殴ってやる／放火／爆破 など
+
+ここだけは、迷ったら block を選んでください。
+えんじいろは弱音を書く場所ですが、自傷や他害を後押しする場所ではありません。
+
 reasonCodes には、該当したものだけを入れてください。
-  self_harm / ng_word / harsh_criticism
+  self_harm / harm_others / ng_word / harsh_criticism
 
 重要な注意:
 - React.js、index.ts、Node.js、v2 などの技術用語やファイル名は問題ありません。
-- 自分の弱音、愚痴、つらさの表明は allow です。self_harm ではありません。
-  えんじいろは、それを書くための場所です。
-- 判定に迷ったら、block ではなく rewrite_required を選んでください。
+- 「つらい」「しんどい」「もう限界かもしれない」「何もうまくいかない」のような
+  弱音や愚痴は allow です。えんじいろは、それを書くための場所です。
+  自傷を示す具体的な表現があるときだけ self_harm にしてください。
+- 自傷・他害以外で判定に迷ったら、block ではなく rewrite_required を選んでください。
   言い換えられる可能性があるなら、その機会を残します。
 
 次のJSONだけを出力してください。説明は書かないでください。
@@ -469,7 +489,14 @@ def moderate(text: str, client=None) -> dict:
         "action": parsed["action"],
         "reasonCodes": list(parsed.get("reasonCodes") or []),
     }
-    return merge_verdicts(rule_verdict, llm_verdict)
+    verdict = merge_verdicts(rule_verdict, llm_verdict)
+
+    # 人間監督の決定により、自傷・他害は例外なく block。
+    # LLM が self_harm を立てながら rewrite_required を返すことがあるため、
+    # 理由コードを見て必ず block へ倒す。ここは緩めないこと。
+    if ALWAYS_BLOCK_CODES & set(verdict["reasonCodes"]):
+        verdict["action"] = "block"
+    return verdict
 
 
 def transform(mode: Mode, text: str, client=None) -> dict:
