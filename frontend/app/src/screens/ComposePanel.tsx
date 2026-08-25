@@ -85,6 +85,12 @@ export function ComposePanel({
   const [evaluation, setEvaluation] = useState<AiEvaluateResult | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [evaluateFailed, setEvaluateFailed] = useState(false);
+  /*
+   * 保存が閾値に届かず弾かれたか。
+   * 「はかる」で見る指標とは別で、これは backend が返した結果（PO 説明 2026-08-25）。
+   * 閾値を frontend が持たないので、押してみるまで分からない。
+   */
+  const [gateRejected, setGateRejected] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [rejected, setRejected] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -127,6 +133,7 @@ export function ComposePanel({
     setBody(next);
     setEvaluation(null);
     setEvaluateFailed(false);
+    setGateRejected(false);
   }
 
   function toggleDrawer(next: DrawerKind) {
@@ -169,6 +176,7 @@ export function ComposePanel({
   async function submit() {
     setSubmitting(true);
     setRejected(false);
+    setGateRejected(false);
     const result = isBubble
       ? await createBubble({ body })
       : await createSoothe({
@@ -188,7 +196,8 @@ export function ComposePanel({
       setRejected(true);
     }
     if (result.reason === "evaluation") {
-      // 閾値に届かなかった。なぜ届かなかったのかを引き出しで見せる
+      // 閾値に届かなかった。いまの指標を引き出しで見せる（閾値そのものは見せない）
+      setGateRejected(true);
       setDrawer("evaluate");
       void runEvaluate();
     }
@@ -318,8 +327,8 @@ export function ComposePanel({
           いま ことばを はかれないので、投稿できません。
         </p>
       ) : null}
-      {/* 閾値に届かず弾かれたとき（FR-AI-EVAL-007） */}
-      {evaluation !== null && !evaluation.passed ? (
+      {/* 閾値に届かず弾かれたとき（FR-AI-EVAL-007）。判定したのは backend */}
+      {gateRejected ? (
         <p className={cx("eg-compose__gate", "t-caption")} role="status">
           {persona === "baby"
             ? "もう少し 赤ちゃんっぽく 書けたら 投稿できます。"
@@ -447,7 +456,10 @@ function ToolButton({
 /**
  * 赤ちゃん度・お母さん度（FR-AI-EVAL-001〜004）。
  * バーだけで伝えず、数値を添える（DESIGN.md §4 Meter）。
- * この結果で投稿の可否は決めない（FR-AI-EVAL-006）。
+ *
+ * ここは「自分がいまどれくらいか」を見るための場所で、合否は出さない
+ * （PO 説明 2026-08-25、Issue #19）。保存してよいかを決めるのは backend で、
+ * その閾値は frontend に無い。
  */
 function EvaluateView({
   busy,
@@ -492,16 +504,8 @@ function EvaluateView({
           style={{ width: String(Math.round((result.months / MAX_MONTHS) * 100)) + "%" }}
         />
       </div>
-      <p
-        className={cx("eg-evaluate__verdict", "t-label", result.passed ? "is-pass" : "is-fail")}
-        role="status"
-      >
-        {result.passed ? "このまま 投稿できます" : "このままだと 投稿できません"}
-      </p>
       <p className={cx("eg-evaluate__note", "t-caption")}>
-        {result.passed
-          ? "書きかえたら、もう一度 はかってね。"
-          : "つらさは そのままで だいじょうぶ。言い方だけ やわらかくしてみて。"}
+        書きかえたら、もう一度 はかってね。
       </p>
     </div>
   );

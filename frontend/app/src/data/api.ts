@@ -276,8 +276,21 @@ export async function createSoothe(input: CreateSootheInput): Promise<CreateSoot
 }
 
 /**
+ * 保存を許す上限の月齢。**backend が持つ値**（PO 決定 2026-08-25、Issue #19）。
+ *
+ * 「はかる」ボタンで利用者に見せる指標とは別物で、こちらは
+ * データベースに保存してよいかを決めるためだけの数値。
+ * 画面側はこの値を知らないし、知る必要もない。export しないのはそのため。
+ *
+ * 3歳（36か月）以下を通す仮置き。実際の値は backend の実装で決まる。
+ */
+const EVALUATE_PASS_MAX_MONTHS = 36;
+
+/**
  * 保存してよいかを AI 評価で判定する（FR-AI-EVAL-007 / NFR-003）。
  * 評価そのものが使えないときは保存しない（NFR-004 と同じ立場）。
+ *
+ * AI が返すのは指標だけ。閾値と突き合わせて可否を決めるのはここ（backend）の仕事。
  */
 async function evaluateGate(
   body: string,
@@ -285,7 +298,7 @@ async function evaluateGate(
 ): Promise<"ok" | "evaluation" | "ai_unavailable"> {
   try {
     const result = await mockAiEvaluate(body, personaKind, { available: evaluateAvailable });
-    return result.passed ? "ok" : "evaluation";
+    return result.months <= EVALUATE_PASS_MAX_MONTHS ? "ok" : "evaluation";
   } catch (error) {
     if (error instanceof AiUnavailableError) {
       return "ai_unavailable";

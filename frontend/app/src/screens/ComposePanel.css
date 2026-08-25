@@ -328,19 +328,6 @@
   background: var(--mother-fill);
 }
 
-.eg-evaluate__verdict {
-  display: block;
-  margin-top: var(--space-xs);
-}
-
-.eg-evaluate__verdict.is-pass {
-  color: var(--mother);
-}
-
-.eg-evaluate__verdict.is-fail {
-  color: var(--accent-line);
-}
-
 .eg-compose__gate {
   margin-top: var(--space-xs);
   color: var(--accent-line);
