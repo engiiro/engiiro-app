@@ -1,7 +1,20 @@
-"""えんじいろ 文章変換クライアント（Gemini API）。
+"""えんじいろ AI 側の2つのAPI。
 
-Issue #15 の実装。ローカルモデルを読み込むのではなく、
-Google AI Studio から提供される API を呼び出す。
+Issue #15 の実装。仕様書の FR-AI-001「文章評価と文章変換は別の機能」に対応する。
+
+    判定API  moderate(text)
+        形態素解析と辞書だけで判定する。**通信しない。**
+        人間監督の決定により、判定はAPI制限を消費しない。
+        投稿ごとに何度呼んでも枠を使わず、Gemini が落ちていても動く。
+
+    変換API  transform(mode, text) / transform_text(mode, text)
+        Gemini で言い換える。ここだけAPI制限を使う。
+        仕様書 FR-MOD-001 / FR-MOD-002 に従い、変換の前後で判定APIを呼ぶ。
+        判定はローカルなので、前後2回呼んでも枠は増えない。
+
+LLMと外部モデレーションサービスは、判定APIでは使わない。
+辞書へ入れる語を探すための道具として別に置いてある（moderate_by_llm）。
+形態素解析では語単位で表れないマサカリを拾えないため、その探索に使う。
 
 Colab で対話的に試す場合は ai/transform_colab.ipynb を使う。
 あちらは Colab 単体で完結させるため、同じロジックを自前で持っている。
@@ -33,8 +46,9 @@ APIキー:
                      ・空の応答
                      ・判定結果をJSONとして読めない
 
-    判定（moderate / check_rules）は辞書と形態素解析だけで動くので、
-    APIが落ちていても使える。変換（transform_text）はAPIが要る。
+    判定API（moderate）は通信しないので、上のどれも起きない。
+    例外は空文字列のときの ValueError だけである。
+    RuntimeError が出るのは変換API（transform / transform_text）だけ。
     APIが落ちているときに何をするかは、このモジュールでは決めない。
 
 このモジュールは Gemini を再学習・ファインチューニングするものではない。
@@ -295,6 +309,22 @@ reasonCodes には、該当したものだけを入れてください。
 # API 呼び出し
 # ============================================================
 
+# thinking_config を受け付けないモデルがある。
+# gemini-3.5-flash-lite は 400 INVALID_ARGUMENT を返す。
+# 毎回試すと1回の変換で必ず2回APIを呼ぶことになり、制限を2倍消費する。
+# 一度断られたら覚えておき、以降は付けずに呼ぶ。
+THINKING_SUPPORTED = True
+
+
+def _remember_thinking_unsupported():
+    """thinking設定が使えないと分かったら覚える。以降は付けない。"""
+    global THINKING_SUPPORTED
+    if THINKING_SUPPORTED:
+        THINKING_SUPPORTED = False
+        print(f"[情報] {MODEL_NAME} は thinking 設定を受け付けないため、"
+              "以降は付けずに呼びます。", file=sys.stderr, flush=True)
+
+
 def build_client():
     """APIキーを環境変数から読み、クライアントを作る。"""
     api_key = os.getenv("GOOGLE_API_KEY")
@@ -318,7 +348,8 @@ def _call_api(client, system_instruction, contents, *, json_mode=False, thinking
     """1回だけAPIを呼ぶ。thinking設定が非対応なら1度だけ外して呼び直す。
 
     Gemini 3系は既定で思考にトークンを使う。思考だけで上限に達すると
-    本文が空で返るため、変換タスクでは思考を切る。
+    本文が空で返るため、変換タスクでは思考を切りたい。
+    ただし受け付けないモデルもあるので、断られたら覚えて付けなくする。
     """
     from google.genai import types
 
@@ -329,7 +360,7 @@ def _call_api(client, system_instruction, contents, *, json_mode=False, thinking
     }
     if json_mode:
         settings["response_mime_type"] = "application/json"
-    if thinking_off:
+    if thinking_off and THINKING_SUPPORTED:
         settings["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
 
     try:
@@ -340,7 +371,9 @@ def _call_api(client, system_instruction, contents, *, json_mode=False, thinking
         )
     except Exception as exc:
         message = str(exc)
-        if thinking_off and ("400" in message or "INVALID_ARGUMENT" in message):
+        if (thinking_off and THINKING_SUPPORTED
+                and ("400" in message or "INVALID_ARGUMENT" in message)):
+            _remember_thinking_unsupported()
             return _call_api(client, system_instruction, contents,
                              json_mode=json_mode, thinking_off=False)
         raise
@@ -544,11 +577,49 @@ def transform_text(mode: Mode, text: str, retry: bool = False, client=None) -> s
 # モデレーション
 # ============================================================
 
-def moderate(text: str, client=None) -> dict:
-    """規則ベースの判定と、LLMによる文脈判定を合わせる。
+def moderate(text: str) -> dict:
+    """文章を判定する。判定APIの本体。
+
+    **形態素解析と辞書だけで動く。通信しない。**
+    人間監督の決定により、判定APIはAPI制限を消費しない。
+    そのため投稿ごとに何度呼んでも枠を使わず、Gemini が落ちていても動く。
+
+    LLMや外部モデレーションサービスは、ここでは使わない。
+    辞書を育てるための道具として別に置いてある（moderate_by_llm）。
 
     Returns:
         {"action": "allow"|"rewrite_required"|"block", "reasonCodes": [...]}
+    """
+    if not text or not text.strip():
+        raise ValueError("空文字列は判定できません。")
+
+    verdict = check_rules(text)
+
+    # 人間監督の決定により、自傷・他害は例外なく block。
+    # 辞書側の設定を書き換えられても倒れるように、ここで二重に見る。
+    if ALWAYS_BLOCK_CODES & set(verdict["reasonCodes"]):
+        verdict["action"] = "block"
+    return {"action": verdict["action"], "reasonCodes": verdict["reasonCodes"]}
+
+
+# ============================================================
+# 辞書を育てるための道具（判定APIでは使わない）
+# ============================================================
+# 形態素解析だけでは、語単位で表れないマサカリを拾えない。
+#   「なんでこんなコード書いたの。ありえないんだけど。」
+# こういう文を人手で探すのは大変なので、LLMと外部サービスに
+# 見つけさせて、辞書へ入れる語を探す。
+#
+# ここを判定APIから呼んではいけない。API制限を消費する。
+
+def moderate_by_llm(text: str, client=None) -> dict:
+    """LLMと外部サービスにも見てもらう。辞書を育てるとき用。
+
+    判定APIの経路では呼ばない。API制限を消費するためである。
+    辞書に入れるべき語を探すときや、規則の取りこぼしを調べるときに使う。
+
+    Returns:
+        {"action": ..., "reasonCodes": [...]}
     """
     if not text or not text.strip():
         raise ValueError("空文字列は判定できません。")
@@ -594,9 +665,6 @@ def moderate(text: str, client=None) -> dict:
     }
     verdict = merge_verdicts(rule_verdict, llm_verdict, *external_verdicts)
 
-    # 人間監督の決定により、自傷・他害は例外なく block。
-    # LLM が self_harm を立てながら rewrite_required を返すことがあるため、
-    # 理由コードを見て必ず block へ倒す。ここは緩めないこと。
     if ALWAYS_BLOCK_CODES & set(verdict["reasonCodes"]):
         verdict["action"] = "block"
     return verdict
@@ -625,7 +693,7 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     _validate_input(mode, text)
     client = client or build_client()
 
-    before = moderate(text, client=client)
+    before = moderate(text)
     if before["action"] == "block":
         return {"action": "block", "transformedText": None, "reasonCodes": before["reasonCodes"]}
 
@@ -635,7 +703,7 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     if len(converted) > MAX_OUTPUT_CHARS:
         raise RuntimeError(f"再生成後も{len(converted)}文字です。切り捨てはしません。")
 
-    after = moderate(converted, client=client)
+    after = moderate(converted)
     if after["action"] == "block":
         return {
             "action": "block",

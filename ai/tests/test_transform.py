@@ -1,10 +1,16 @@
-"""transform() と transform_text() の契約を確かめる。
+"""判定APIと変換APIの契約を確かめる。
 
 Codex-Local::akatonboboonboon の独立レビュー（#21::…::01 の3番）で
 「変換契約全体のテストが無い」と指摘された箇所。
 
-APIは呼ばない。_call_api を差し替えて、何回どんな順で呼ばれたか、
-戻り値がどうなるかを見る。実APIが要るものはここでは扱わない。
+人間監督の決定により、2つのAPIは性質が違う。
+
+    判定API  moderate()      通信しない。API制限を消費しない
+    変換API  transform()     Gemini を使う。ここだけ制限を消費する
+
+ここでは実際のAPIを呼ばない。_call_api を差し替えて、
+何回どんな順で呼ばれたか、戻り値がどうなるかを見る。
+**判定APIが1回も _call_api を呼ばないことも、ここで固定している。**
 """
 
 import json
@@ -30,9 +36,7 @@ class FakeResponse:
 def calls(monkeypatch):
     """_call_api を差し替え、呼び出しを記録する。
 
-    返す文字列は scripted へ順に積む。足りなくなったら最後のものを使い回す。
-    json_mode で呼ばれたかどうかも記録するので、
-    判定と変換のどちらの呼び出しかを見分けられる。
+    返す文字列は script へ順に積む。足りなくなったら最後のものを使い回す。
     """
     log = []
     scripted = []
@@ -48,21 +52,75 @@ def calls(monkeypatch):
         return FakeResponse(scripted.pop(0) if len(scripted) > 1 else scripted[0])
 
     monkeypatch.setattr(T, "_call_api", fake)
-    # 外部モデレーションは環境変数が無ければ何もしないが、明示的に止める
-    monkeypatch.setattr(T.external_moderation, "check", lambda text: [])
     return {"log": log, "script": scripted}
 
 
-def _allow():
-    return json.dumps({"action": "allow", "reasonCodes": []}, ensure_ascii=False)
+@pytest.fixture
+def no_network(monkeypatch):
+    """通信しないはずの経路で、うっかり通信したら落ちるようにする。"""
+    def boom(*args, **kwargs):
+        raise AssertionError("通信しないはずの経路でAPIを呼びました")
 
-
-def _verdict(action, codes):
-    return json.dumps({"action": action, "reasonCodes": codes}, ensure_ascii=False)
+    monkeypatch.setattr(T, "_call_api", boom)
+    monkeypatch.setattr(T.external_moderation, "check", boom)
+    monkeypatch.setattr(T, "build_client", boom)
 
 
 # ============================================================
-# 入力の検査。APIを呼ぶ前に落ちること
+# 判定API。通信しないことが最も大事な性質
+# ============================================================
+
+@pytest.mark.parametrize("text,action,codes", [
+    ("今日は仕様書をレビューしました。", "allow", []),
+    ("テストが全部落ちた。つらい。", "allow", []),
+    ("React.js の index.ts が壊れた。", "allow", []),
+    ("まったく無能だ。", "rewrite_required", ["harsh_criticism"]),
+    ("きえろ。", "block", ["ng_word"]),
+    ("消えたい。", "block", ["self_harm"]),
+    ("殺してやる。", "block", ["harm_others"]),
+    ("首を吊って死ぬ。", "block", ["self_harm"]),
+])
+def test_判定APIは通信せずに判定する(no_network, text, action, codes):
+    verdict = T.moderate(text)
+    assert verdict == {"action": action, "reasonCodes": codes}
+
+
+def test_判定APIはclientを受け取らない():
+    """通信しないので client を渡す余地が無い。
+
+    引数に残しておくと「渡せば通信する」と誤解されるため、
+    署名から外していることをここで固定する。
+    """
+    with pytest.raises(TypeError):
+        T.moderate("テストです", client=object())
+
+
+def test_判定APIは空文字列をValueError(no_network):
+    for bad in ("", "   ", "\n"):
+        with pytest.raises(ValueError):
+            T.moderate(bad)
+
+
+def test_判定APIは自傷を必ずblockへ倒す(no_network, monkeypatch):
+    """辞書側の設定が緩められても block になること。
+
+    人間監督の決定「自傷・他害は絶対に弾いてください」に対する二重の保険。
+    """
+    monkeypatch.setattr(T, "check_rules",
+                        lambda text: {"action": "rewrite_required",
+                                      "reasonCodes": ["self_harm"]})
+    assert T.moderate("なにか")["action"] == "block"
+
+
+def test_判定APIは辞書に無い理由コードでは倒さない(no_network, monkeypatch):
+    monkeypatch.setattr(T, "check_rules",
+                        lambda text: {"action": "rewrite_required",
+                                      "reasonCodes": ["harsh_criticism"]})
+    assert T.moderate("なにか")["action"] == "rewrite_required"
+
+
+# ============================================================
+# 変換API。入力の検査はAPIを呼ぶ前に効くこと
 # ============================================================
 
 @pytest.mark.parametrize("mode,text", [
@@ -79,9 +137,9 @@ def test_おかしな入力はAPIを呼ぶ前にValueError(calls, mode, text):
 
 
 def test_入力の上限ちょうどは通る(calls):
-    calls["script"].extend([_allow(), "へんかんしたよ", _allow()])
-    result = T.transform("baby", "あ" * T.MAX_INPUT_CHARS, client=object())
-    assert result["action"] == "allow"
+    calls["script"].append("へんかんしたよ")
+    assert T.transform("baby", "あ" * T.MAX_INPUT_CHARS,
+                       client=object())["action"] == "allow"
 
 
 # ============================================================
@@ -95,32 +153,40 @@ def test_APIキーが無ければRuntimeError(monkeypatch):
     assert "GOOGLE_API_KEY" in str(err.value)
 
 
-def test_APIキーが無くてもclientを渡せば動く(calls, monkeypatch):
-    """client を明示で渡した場合、build_client を経由しない。
+def test_APIキーが無くても判定APIは動く(no_network, monkeypatch):
+    """判定APIは通信しないので、キーの有無に関係なく動く。
 
-    テストと Colab がキーの有無に関係なく動かせるようにするため。
+    これが「API制限を使わない判定API」の実際の意味である。
     """
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    calls["script"].extend([_allow(), "へんかんしたよ", _allow()])
-    result = T.transform("baby", "テストです", client=object())
-    assert result["transformedText"] == "へんかんしたよ"
+    assert T.moderate("消えたい。")["action"] == "block"
+
+
+def test_APIキーが無くてもclientを渡せば変換できる(calls, monkeypatch):
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    calls["script"].append("へんかんしたよ")
+    assert T.transform("baby", "テストです",
+                       client=object())["transformedText"] == "へんかんしたよ"
 
 
 # ============================================================
 # 呼び出し回数。レート制限と費用に直接ひびく
 # ============================================================
 
-def test_通常の変換はGeminiを3回呼ぶ(calls):
-    calls["script"].extend([_allow(), "へんかんしたよ", _allow()])
+def test_通常の変換はGeminiを1回だけ呼ぶ(calls):
+    """判定が前後2回あっても、判定はローカルなので枠を使わない。
+
+    Gemini を使うのは変換の1回だけである。
+    """
+    calls["script"].append("へんかんしたよ")
     T.transform("baby", "テストです", client=object())
 
-    assert len(calls["log"]) == 3
-    assert [c["json_mode"] for c in calls["log"]] == [True, False, True], \
-        "判定→変換→判定の順でなければならない"
+    assert len(calls["log"]) == 1
+    assert calls["log"][0]["json_mode"] is False, "判定でAPIを呼んでいる"
 
 
 def test_規則でblockなら1回も呼ばない(calls):
-    result = T.transform("baby", "死にたい。", client=object())
+    result = T.transform("baby", "消えたい。", client=object())
     assert result == {"action": "block", "transformedText": None,
                       "reasonCodes": ["self_harm"]}
     assert calls["log"] == [], "規則で決まったのにAPIを呼んでいる"
@@ -132,18 +198,17 @@ def test_規則でblockなら1回も呼ばない(calls):
 
 def test_長すぎたら1回だけ作り直す(calls):
     long = "あ" * (T.MAX_OUTPUT_CHARS + 1)
-    calls["script"].extend([_allow(), long, "みじかいよ", _allow()])
+    calls["script"].extend([long, "みじかいよ"])
     result = T.transform("baby", "テストです", client=object())
 
     assert result["transformedText"] == "みじかいよ"
-    assert len(calls["log"]) == 4, "判定→変換→再変換→判定の4回"
-    # 2回目の変換は、作り直しの指示が入った内容で呼ばれる
-    assert calls["log"][1]["text"] != calls["log"][2]["text"]
+    assert len(calls["log"]) == 2, "変換→再変換の2回"
+    # 2回目は、作り直しの指示が入った内容で呼ばれる
+    assert calls["log"][0]["text"] != calls["log"][1]["text"]
 
 
 def test_作り直しても長ければ切り捨てずに諦める(calls):
-    long = "あ" * (T.MAX_OUTPUT_CHARS + 1)
-    calls["script"].extend([_allow(), long, long, _allow()])
+    calls["script"].append("あ" * (T.MAX_OUTPUT_CHARS + 1))
     with pytest.raises(RuntimeError) as err:
         T.transform("baby", "テストです", client=object())
     assert "切り捨てはしません" in str(err.value)
@@ -151,19 +216,22 @@ def test_作り直しても長ければ切り捨てずに諦める(calls):
 
 def test_150文字ちょうどは作り直さない(calls):
     exact = "あ" * T.MAX_OUTPUT_CHARS
-    calls["script"].extend([_allow(), exact, _allow()])
+    calls["script"].append(exact)
     result = T.transform("baby", "テストです", client=object())
     assert result["transformedText"] == exact
-    assert len(calls["log"]) == 3
+    assert len(calls["log"]) == 1
 
 
 # ============================================================
-# 変換後モデレーション。ここが本題
+# 変換後の判定。仕様書 FR-MOD-002
 # ============================================================
 
 def test_変換後blockなら変換結果を返さない(calls):
-    calls["script"].extend([_allow(), "だめなことばになったよ",
-                            _verdict("block", ["ng_word"])])
+    """変換によって新しくNG語が生じた場合。
+
+    変換前は allow なので、後段の判定が効いていないと素通りする。
+    """
+    calls["script"].append("おまえなんてきえろ")
     result = T.transform("baby", "テストです", client=object())
 
     assert result["action"] == "block"
@@ -177,36 +245,39 @@ def test_変換後のrewrite_requiredを捨てない(calls):
     以前はここを捨てていて allow / [] を返していた。
     捨てると、変換後に判定する意味がなくなる。
     """
-    calls["script"].extend([_allow(), "ちょっとひどいことばになったよ",
-                            _verdict("rewrite_required", ["harsh_criticism"])])
+    calls["script"].append("まったく無能なのー")
     result = T.transform("baby", "テストです", client=object())
 
     assert result["action"] == "rewrite_required"
     assert result["reasonCodes"] == ["harsh_criticism"]
-    assert result["transformedText"] == "ちょっとひどいことばになったよ", \
+    assert result["transformedText"] == "まったく無能なのー", \
         "block ではないので、変換結果は返す"
 
 
 def test_変換前と変換後の理由コードを合わせる(calls):
-    calls["script"].extend([
-        _verdict("rewrite_required", ["harsh_criticism"]),
-        "へんかんしたよ",
-        _verdict("rewrite_required", ["ng_word"]),
-    ])
-    result = T.transform("baby", "テストです", client=object())
+    calls["script"].append("おまえなんてきえろ")
+    result = T.transform("baby", "まったく無能だ。", client=object())
     assert result["reasonCodes"] == ["harsh_criticism", "ng_word"]
 
 
 def test_変換前rewrite_requiredは変換後allowでも残る(calls):
-    calls["script"].extend([
-        _verdict("rewrite_required", ["harsh_criticism"]),
-        "やさしいことばになったよ",
-        _allow(),
-    ])
-    result = T.transform("baby", "テストです", client=object())
+    calls["script"].append("やさしいことばになったよ")
+    result = T.transform("baby", "まったく無能だ。", client=object())
     assert result["action"] == "rewrite_required", \
         "変換で表面が和らいでも、元の投稿への指摘は消えない"
     assert result["reasonCodes"] == ["harsh_criticism"]
+
+
+def test_変換後の判定も通信しない(calls, monkeypatch):
+    """変換後の判定でも外部サービスへ送らないこと。
+
+    変換結果は原文由来なので、ここで外へ出すと原文の内容が漏れる。
+    """
+    monkeypatch.setattr(T.external_moderation, "check",
+                        lambda text: (_ for _ in ()).throw(
+                            AssertionError("変換後の判定で外部へ送っています")))
+    calls["script"].append("へんかんしたよ")
+    assert T.transform("baby", "テストです", client=object())["action"] == "allow"
 
 
 # ============================================================
@@ -289,11 +360,11 @@ def test_判定の重さは3段階すべて並ぶ():
 # transform_text。判定を挟まない素の変換
 # ============================================================
 
-def test_transform_textは判定を呼ばない(calls):
-    calls["script"].append("へんかんしたよ")
-    assert T.transform_text("baby", "テストです", client=object()) == "へんかんしたよ"
-    assert len(calls["log"]) == 1
-    assert calls["log"][0]["json_mode"] is False
+def test_transform_textは判定を挟まない(calls):
+    calls["script"].append("おまえなんてきえろ")
+    assert T.transform_text("baby", "テストです",
+                            client=object()) == "おまえなんてきえろ"
+    assert len(calls["log"]) == 1, "判定は行わない関数なので変換の1回だけ"
 
 
 def test_空応答はRuntimeError(calls):
@@ -319,20 +390,137 @@ def test_babyとmotherで違う指示を使う(calls):
 
 
 # ============================================================
-# moderate の応答が壊れているとき
+# thinking 設定。断られたら覚えること
 # ============================================================
+# 毎回試すと1回の変換で必ず2回APIを呼ぶ。制限を2倍消費するので、
+# 一度断られたら以降は付けずに呼ぶ。実測で見つけた無駄である。
 
-def test_判定が壊れたJSONならRuntimeError(calls):
+class FakeModels:
+    """thinking_config を渡されると 400 を返すモデル。
+
+    gemini-3.5-flash-lite の実際のふるまい。
+    """
+
+    def __init__(self):
+        self.calls = []
+
+    def generate_content(self, *, model, contents, config):
+        thinking = getattr(config, "thinking_config", None)
+        self.calls.append(thinking is not None)
+        if thinking is not None:
+            raise Exception("400 INVALID_ARGUMENT. Request contains an invalid argument.")
+        return FakeResponse("へんかんしたよ")
+
+
+class FakeClient:
+    def __init__(self):
+        self.models = FakeModels()
+
+
+@pytest.fixture
+def thinking_reset(monkeypatch):
+    """モジュール全体の状態なので、テストごとに戻す。"""
+    monkeypatch.setattr(T, "THINKING_SUPPORTED", True)
+
+
+def test_thinking設定を断られたら覚えて2回目からは付けない(thinking_reset):
+    client = FakeClient()
+
+    T.transform_text("baby", "テストです", client=client)
+    assert client.models.calls == [True, False], "1回目は試して、断られて呼び直す"
+
+    T.transform_text("baby", "テストです", client=client)
+    assert client.models.calls == [True, False, False], \
+        "2回目は最初から付けない。付けるとAPI消費が2倍になる"
+
+    T.transform_text("baby", "テストです", client=client)
+    assert client.models.calls.count(True) == 1, "試すのは最初の1回だけ"
+
+
+def test_thinking設定が通るなら付け続ける(thinking_reset):
+    class Accepting(FakeModels):
+        def generate_content(self, *, model, contents, config):
+            self.calls.append(getattr(config, "thinking_config", None) is not None)
+            return FakeResponse("へんかんしたよ")
+
+    client = FakeClient()
+    client.models = Accepting()
+
+    T.transform_text("baby", "テストです", client=client)
+    T.transform_text("baby", "テストです", client=client)
+    assert client.models.calls == [True, True], "通るモデルでは外さない"
+    assert T.THINKING_SUPPORTED is True
+
+
+def test_400以外のエラーは覚えずにそのまま投げる(thinking_reset):
+    class Failing(FakeModels):
+        def generate_content(self, *, model, contents, config):
+            self.calls.append(getattr(config, "thinking_config", None) is not None)
+            raise Exception("500 INTERNAL error")
+
+    client = FakeClient()
+    client.models = Failing()
+
+    with pytest.raises(RuntimeError):
+        T.transform_text("baby", "テストです", client=client)
+    assert client.models.calls == [True], "呼び直さない"
+    assert T.THINKING_SUPPORTED is True, "無関係なエラーで諦めてはいけない"
+
+
+# ============================================================
+# moderate_by_llm。辞書を育てるための道具
+# ============================================================
+# 判定APIではない。API制限を消費するので、判定の経路から呼んではいけない。
+
+def test_LLM判定は形態素解析で拾えないマサカリを拾える(calls, monkeypatch):
+    """この関数が存在する理由そのもの。
+
+    「なんでこんなコード書いたの。ありえないんだけど。」は
+    語単位では表れないため、形態素解析では allow になる。
+    """
+    monkeypatch.setattr(T.external_moderation, "check", lambda text: [])
+    masakari = "なんでこんなコード書いたの。ありえないんだけど。"
+
+    assert T.moderate(masakari)["action"] == "allow", "規則では拾えない"
+
+    calls["script"].append(json.dumps(
+        {"action": "rewrite_required", "reasonCodes": ["harsh_criticism"]},
+        ensure_ascii=False))
+    assert T.moderate_by_llm(masakari, client=object())["action"] == "rewrite_required"
+
+
+def test_LLM判定は規則でblockなら外部へ送らない(calls, monkeypatch):
+    monkeypatch.setattr(T.external_moderation, "check",
+                        lambda text: (_ for _ in ()).throw(
+                            AssertionError("規則でblockなのに外部へ送っています")))
+    result = T.moderate_by_llm("電話番号は090-1234-5678です。", client=object())
+    assert result["action"] == "block"
+    assert calls["log"] == []
+
+
+def test_LLM判定が壊れたJSONならRuntimeError(calls, monkeypatch):
+    monkeypatch.setattr(T.external_moderation, "check", lambda text: [])
     calls["script"].append("これはJSONではありません")
     with pytest.raises(RuntimeError):
-        T.moderate("テストです", client=object())
+        T.moderate_by_llm("テストです", client=object())
 
 
-def test_判定のコードブロックを剥がす(calls):
-    calls["script"].append("```json\n" + _allow() + "\n```")
-    assert T.moderate("テストです", client=object())["action"] == "allow"
+def test_LLM判定のコードブロックを剥がす(calls, monkeypatch):
+    monkeypatch.setattr(T.external_moderation, "check", lambda text: [])
+    calls["script"].append(
+        "```json\n" + json.dumps({"action": "allow", "reasonCodes": []}) + "\n```")
+    assert T.moderate_by_llm("テストです", client=object())["action"] == "allow"
 
 
-def test_空文字列は判定できない():
+def test_LLM判定は自傷をblockへ倒す(calls, monkeypatch):
+    """LLM が self_harm を立てながら rewrite_required を返すことがある。"""
+    monkeypatch.setattr(T.external_moderation, "check", lambda text: [])
+    calls["script"].append(json.dumps(
+        {"action": "rewrite_required", "reasonCodes": ["self_harm"]},
+        ensure_ascii=False))
+    assert T.moderate_by_llm("なにか", client=object())["action"] == "block"
+
+
+def test_LLM判定は空文字列をValueError():
     with pytest.raises(ValueError):
-        T.moderate("", client=object())
+        T.moderate_by_llm("", client=object())
