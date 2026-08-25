@@ -52,7 +52,7 @@ import time
 from typing import Any, Literal
 
 import external_moderation
-from moderation_rules import check_rules, merge_verdicts
+from moderation_rules import SEVERITY, check_rules, merge_verdicts, severer
 
 
 MODEL_NAME = "gemini-3.5-flash-lite"
@@ -600,15 +600,6 @@ def moderate(text: str, client=None) -> dict:
     if ALWAYS_BLOCK_CODES & set(verdict["reasonCodes"]):
         verdict["action"] = "block"
     return verdict
-
-
-# 判定の重さ。変換前と変換後で違う結論が出たとき、重いほうを採る。
-SEVERITY = {"allow": 0, "rewrite_required": 1, "block": 2}
-
-
-def severer(first: str, second: str) -> str:
-    """2つの判定のうち重いほうを返す。"""
-    return first if SEVERITY[first] >= SEVERITY[second] else second
 
 
 def transform(mode: Mode, text: str, client=None) -> dict:

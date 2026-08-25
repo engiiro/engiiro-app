@@ -210,6 +210,60 @@ def test_変換前rewrite_requiredは変換後allowでも残る(calls):
 
 
 # ============================================================
+# 判定の合成。規則・LLM・外部4種をまとめる中核
+# ============================================================
+
+def test_合成は重いほうへ寄せる():
+    merged = T.merge_verdicts(
+        {"action": "allow", "reasonCodes": []},
+        {"action": "rewrite_required", "reasonCodes": ["harsh_criticism"]},
+        {"action": "allow", "reasonCodes": []},
+    )
+    assert merged == {"action": "rewrite_required", "reasonCodes": ["harsh_criticism"]}
+
+
+def test_合成は1つでもblockがあればblock():
+    merged = T.merge_verdicts(
+        {"action": "allow", "reasonCodes": []},
+        {"action": "block", "reasonCodes": ["self_harm"]},
+        {"action": "rewrite_required", "reasonCodes": ["ng_word"]},
+    )
+    assert merged["action"] == "block"
+    assert merged["reasonCodes"] == ["ng_word", "self_harm"], "軽い側の理由も残す"
+
+
+def test_合成は理由コードを捨てない():
+    """allow の判定が混ざっても、他が挙げた理由は消えない。
+
+    外部APIは1社が拾って他が見逃すことが普通にある。
+    多数決ではなく、1つでも挙げたら残す。
+    """
+    merged = T.merge_verdicts(
+        {"action": "allow", "reasonCodes": []},
+        {"action": "allow", "reasonCodes": []},
+        {"action": "rewrite_required", "reasonCodes": ["ng_word"]},
+    )
+    assert merged["reasonCodes"] == ["ng_word"]
+
+
+def test_合成は理由コードの重複を畳む():
+    merged = T.merge_verdicts(
+        {"action": "block", "reasonCodes": ["self_harm"]},
+        {"action": "block", "reasonCodes": ["self_harm", "harm_others"]},
+    )
+    assert merged["reasonCodes"] == ["harm_others", "self_harm"]
+
+
+def test_合成は理由コードが無くても落ちない():
+    assert T.merge_verdicts({"action": "allow"}) == {"action": "allow", "reasonCodes": []}
+
+
+def test_合成の引数が1つでも動く():
+    one = {"action": "rewrite_required", "reasonCodes": ["harsh_criticism"]}
+    assert T.merge_verdicts(one) == one
+
+
+# ============================================================
 # 重さの比較そのもの
 # ============================================================
 

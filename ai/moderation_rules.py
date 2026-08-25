@@ -508,13 +508,24 @@ def check_rules(text: str) -> dict:
     }
 
 
+# 判定の重さ。複数の判定が食い違ったときは重いほうを採る。
+# 順序をここ1箇所に置く。2箇所に書くと、片方だけ直したときに食い違う。
+SEVERITY = {"allow": 0, "rewrite_required": 1, "block": 2}
+
+
+def severer(first: str, second: str) -> str:
+    """2つの判定のうち重いほうを返す。"""
+    return first if SEVERITY[first] >= SEVERITY[second] else second
+
+
 def merge_verdicts(*verdicts: dict) -> dict:
-    """複数の判定結果を、厳しいほうへ寄せて1つにまとめる。"""
-    order = {"allow": 0, "rewrite_required": 1, "block": 2}
+    """複数の判定結果を、厳しいほうへ寄せて1つにまとめる。
+
+    理由コードは全部を合わせる。どれか1つでも指摘していれば残す。
+    """
     action = "allow"
     codes: list[str] = []
     for verdict in verdicts:
-        if order[verdict["action"]] > order[action]:
-            action = verdict["action"]
+        action = severer(action, verdict["action"])
         codes.extend(verdict.get("reasonCodes") or [])
     return {"action": action, "reasonCodes": sorted(set(codes))}
