@@ -95,8 +95,24 @@ _AZURE_TO_REASON = {
 }
 
 # Google Cloud Natural Language の confidence は 0.00〜1.00。どこから拾うか。
-# 実データで調整が要る。下げると弱音や愚痴を巻き込む。
+#
+# 日本語で実測した値（2026-08）。下げてはいけない根拠になっている。
+#   「あいつは本当に無能だ。役立たず。」   Toxic 0.837 / Insult 0.825 / Violent 0.774
+#   「うんこもらしちゃったのー。」         Profanity 0.716 / Sexual 0.628
+#   「つらい。しんどい。もう限界かも。」   Health 0.606（対応づけていない）
+#   「サーバーが死んだ。」                 Death,Harm&Tragedy 0.825（対応づけていない）
+#
+# 0.7 まで下げると、ただの罵倒が Violent で block になり、
+# 幼児的な下ネタが Profanity で rewrite_required になる。どちらも方針に反する。
 GOOGLE_CONFIDENCE_THRESHOLD = 0.8
+
+# カテゴリごとの上書き。block へ回すものは余裕を持たせる。
+#
+# Violent は日本語の罵倒に対して高く出る。上の実測で 0.774。
+# 既定の0.8では余裕が0.03しかなく、言い回しが少し違えば block になる。
+# 誤って block にするのは利用者から見て取り返しがつかないので、ここだけ上げる。
+# 実際の脅迫は「殺してやる。」で 0.996 出ているため、0.95 でも拾える。
+GOOGLE_CATEGORY_THRESHOLDS = {"Violent": 0.95}
 
 # Google のカテゴリ16種には「話題の分類」が混ざっている。
 # 有害性を示すものだけを対応づける。
@@ -251,8 +267,10 @@ def check_google(text: str) -> dict | None:
     reasons = []
     for category in result.get("moderationCategories") or []:
         name = category.get("name")
-        confidence = category.get("confidence", 0.0)
-        if name in _GOOGLE_TO_REASON and confidence >= GOOGLE_CONFIDENCE_THRESHOLD:
+        if name not in _GOOGLE_TO_REASON:
+            continue
+        threshold = GOOGLE_CATEGORY_THRESHOLDS.get(name, GOOGLE_CONFIDENCE_THRESHOLD)
+        if category.get("confidence", 0.0) >= threshold:
             reasons.append(_GOOGLE_TO_REASON[name])
     return _to_verdict(reasons)
 

@@ -245,3 +245,88 @@ def test_google_URLにキーを載せる(monkeypatch, google_env):
     E.check_google("テスト")
     assert called["url"].startswith("https://language.googleapis.com/v2/documents:moderateText?key=")
     assert called["payload"]["document"]["languageCode"] == "ja"
+
+
+# ============================================================
+# Google：日本語での実測値を使った回帰テスト
+# ============================================================
+# 2026-08 に実APIで測った値をそのまま入れている。
+# しきい値を下げるとここが落ちる。落ちたら、下げてよいかを考え直すこと。
+
+MEASURED = {
+    # 「あいつは本当に無能だ。役立たず。」
+    "罵倒": {"Toxic": 0.837, "Insult": 0.825, "Violent": 0.774,
+             "Profanity": 0.523, "Derogatory": 0.138},
+    # 「うんこもらしちゃったのー。」
+    "幼児的な下ネタ": {"Profanity": 0.716, "Sexual": 0.628, "Toxic": 0.520},
+    # 「つらい。しんどい。もう限界かもしれない。」
+    "弱音": {"Health": 0.606, "Death, Harm & Tragedy": 0.190},
+    # 「React.js のバージョンで詰んだ。サーバーが死んだ。」
+    "技術用語": {"Death, Harm & Tragedy": 0.825},
+    # 「殺してやる。」
+    "脅迫": {"Violent": 0.996, "Toxic": 0.926, "Insult": 0.856,
+             "Death, Harm & Tragedy": 0.704},
+    # 「なんでこんなコード書いたの。ありえないんだけど。」
+    "会話調のマサカリ": {"Health": 0.103},
+    # 「成人向けゲームの開発でシナリオを書いている。」
+    "成人向け作品の話": {"Finance": 0.102},
+}
+
+
+def _measured(name):
+    return {"moderationCategories": [
+        {"name": k, "confidence": v} for k, v in MEASURED[name].items()]}
+
+
+def _verdict_for(monkeypatch, name):
+    monkeypatch.setattr(E, "_post_json", lambda *a, **k: _measured(name))
+    return E.check_google("（実測値を使用）")
+
+
+def test_google_罵倒はrewrite_requiredで止まる(monkeypatch, google_env):
+    """block ではなく rewrite_required であること。
+
+    Violent が 0.774 出ているため、しきい値の余裕が足りないと
+    ただの罵倒が block になる。
+    """
+    verdict = _verdict_for(monkeypatch, "罵倒")
+    assert verdict["action"] == "rewrite_required", verdict
+    assert "harm_others" not in verdict["reasonCodes"]
+
+
+def test_google_幼児的な下ネタを弾かない(monkeypatch, google_env):
+    # Profanity 0.716。人間監督の決定により、それ自体では弾かない
+    assert _verdict_for(monkeypatch, "幼児的な下ネタ")["action"] == "allow"
+
+
+def test_google_弱音を弾かない(monkeypatch, google_env):
+    assert _verdict_for(monkeypatch, "弱音")["action"] == "allow"
+
+
+def test_google_サーバーが死んだを弾かない(monkeypatch, google_env):
+    """Death, Harm & Tragedy が 0.825 出るが、対応づけていないので通る。
+
+    このカテゴリを self_harm へ対応づけると、
+    エンジニアの日常語がすべて弾かれる。
+    """
+    assert _verdict_for(monkeypatch, "技術用語")["action"] == "allow"
+
+
+def test_google_脅迫はblockする(monkeypatch, google_env):
+    verdict = _verdict_for(monkeypatch, "脅迫")
+    assert verdict["action"] == "block"
+    assert "harm_others" in verdict["reasonCodes"]
+
+
+def test_google_成人向け作品の話を弾かない(monkeypatch, google_env):
+    assert _verdict_for(monkeypatch, "成人向け作品の話")["action"] == "allow"
+
+
+def test_google_会話調のマサカリは拾えない(monkeypatch, google_env):
+    """Googleは会話調のマサカリを検出できない（実測）。
+
+    「なんでこんなコード書いたの。ありえないんだけど。」で
+    最高が Health 0.103 だった。ここは Gemini 側の判定に頼る。
+    拾えるようになったらこのテストが落ちるので、そのとき見直す。
+    """
+    assert _verdict_for(monkeypatch, "会話調のマサカリ")["action"] == "allow"
