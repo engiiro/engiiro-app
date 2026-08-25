@@ -30,11 +30,17 @@ Google Cloud Natural Language（無料枠 月5万ユニット。100文字で1ユ
 呼び出し元（transform_api.moderate）は、規則で personal_data を検出した時点で
 block を返し、外部へは一切送らない。ここへ来る文には個人情報が含まれていない。
 
-## 未確定の方針
+## 性的な内容の扱い
 
-性的な内容の扱いは、えんじいろの仕様で決まっていない。
-両サービスとも該当カテゴリを返すが、対応づけをしていない（UNMAPPED を参照）。
-人間監督が方針を決めたら、ここへ足すこと。
+人間監督の決定により、一律には禁止しない。文脈で判断する。
+成人向け作品の制作・業務の話や、露骨でない子どもっぽい下ネタは通す。
+
+そのため、各サービスが返す一律の sexual カテゴリは使わない。
+これを block へ対応づけると「成人向けゲームのシナリオを書いている」まで
+弾いてしまう。文脈判断が要るので、そこは LLM 側に任せる。
+
+例外は未成年に関するもの。OpenAI の sexual/minors だけは、
+文脈を問わず block なので対応づけている。
 """
 
 from __future__ import annotations
@@ -51,10 +57,18 @@ TIMEOUT_SECONDS = 5
 # 実データで調整が要る。低くすると「つらい」のような弱音を巻き込む。
 AZURE_SEVERITY_THRESHOLD = 4
 
-# 対応づけていないカテゴリ。方針が決まっていないので無視している。
+# 対応づけていないカテゴリと、その理由。
+# ここを機械的に足すと無害な投稿を弾くので、増やすときは実測してから。
 UNMAPPED = {
-    "openai": ["sexual", "sexual/minors", "illicit"],
+    # 一律のsexualは使わない。成人向け作品の制作・業務の話を巻き込むため
+    "openai": ["sexual", "illicit"],
     "azure": ["Sexual"],
+    # Googleは「話題の分類」が多い。_GOOGLE_TO_REASON の注記を参照
+    "google": [
+        "Death, Harm & Tragedy", "Health", "Religion & Belief",
+        "Politics", "Finance", "Legal", "War & Conflict",
+        "Firearms & Weapons", "Public Safety", "Illicit Drugs", "Sexual",
+    ],
 }
 
 # 各サービスのカテゴリを、えんじいろの理由コードへ対応づける。
@@ -70,6 +84,8 @@ _OPENAI_TO_REASON = {
     "hate/threatening": "harm_others",
     "hate": "ng_word",
     "harassment": "harsh_criticism",
+    # 未成年に関するものだけは、文脈を問わず block
+    "sexual/minors": "sexual_explicit",
 }
 
 _AZURE_TO_REASON = {
@@ -91,7 +107,9 @@ GOOGLE_CONFIDENCE_THRESHOLD = 0.8
 #   Health / Religion & Belief / Politics / Finance / Legal
 #   War & Conflict / Firearms & Weapons / Public Safety / Illicit Drugs
 #                         … いずれも話題の分類であって有害性ではない
-#   Sexual                … えんじいろの方針が未定
+#   Sexual                … 一律には禁止しない方針なので使わない。
+#                            成人向け作品の制作・業務の話を巻き込む。
+#                            文脈判断が要るのでLLM側に任せる
 #
 # つまり Google は自傷の検出には向かない。そこは Azure か OpenAI が担当する。
 _GOOGLE_TO_REASON = {
@@ -103,7 +121,7 @@ _GOOGLE_TO_REASON = {
 }
 
 # どの理由コードなら block か。自傷・他害は人間監督の決定により必ず block。
-_BLOCK_REASONS = {"self_harm", "harm_others", "ng_word"}
+_BLOCK_REASONS = {"self_harm", "harm_others", "ng_word", "sexual_explicit"}
 
 _warned: set[str] = set()
 
