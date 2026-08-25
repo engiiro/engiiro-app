@@ -47,16 +47,18 @@ import type {
 const MOCK_LATENCY_MS = 520;
 
 /*
- * サーバ側から見た AI の生死。モック操作帯の「AI: 稼働 / 停止」がここを動かす。
+ * サーバ側から見た「AI 文章評価」の生死。モック操作帯の「AI評価」がここを動かす。
  *
- * 投稿の可否が AI 評価に依存するようになったため（FR-AI-EVAL-007 / NFR-003、
- * 2026-08-25 の PO 改訂）、AI が落ちていれば保存もできない。
- * 画面側でもボタンを止めるが、止めるのはこちら。
+ * 評価は投稿の関門なので（FR-AI-EVAL-007 / NFR-003、2026-08-25 の PO 改訂）、
+ * 評価が落ちていれば保存もできない。画面側でもボタンを止めるが、止めるのはこちら。
+ *
+ * 「AI 文章生成（変換）」は別物で、ここには関係しない。
+ * 生成が落ちていても投稿とあやすは続けられる（NFR-001。PO 回答 2026-08-25、Issue #19）。
  */
-let aiAvailable = true;
+let evaluateAvailable = true;
 
-export function setAiAvailability(available: boolean): void {
-  aiAvailable = available;
+export function setAiEvaluateAvailability(available: boolean): void {
+  evaluateAvailable = available;
 }
 
 /** 画面を開いた時刻を基準に、ダミーの相対時刻を絶対時刻へ直す */
@@ -282,7 +284,7 @@ async function evaluateGate(
   personaKind: PersonaKind,
 ): Promise<"ok" | "evaluation" | "ai_unavailable"> {
   try {
-    const result = await mockAiEvaluate(body, personaKind, { available: aiAvailable });
+    const result = await mockAiEvaluate(body, personaKind, { available: evaluateAvailable });
     return result.passed ? "ok" : "evaluation";
   } catch (error) {
     if (error instanceof AiUnavailableError) {

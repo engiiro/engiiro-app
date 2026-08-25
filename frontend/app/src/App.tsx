@@ -7,7 +7,7 @@ import {
   fetchEmptyFeed,
   fetchFeed,
   markRead,
-  setAiAvailability,
+  setAiEvaluateAvailability,
 } from "./data/api";
 import type { FeedResult } from "./data/api";
 import { ME } from "./data/personas";
@@ -46,7 +46,13 @@ import "./App.css";
 
 export function App() {
   const { theme, setTheme } = useTheme();
-  const [aiAvailable, setAiAvailable] = useState(true);
+  /*
+   * AI は「評価」と「生成」を別に扱う（PO 回答 2026-08-25、Issue #19）。
+   *   評価が使えない … バブルもあやすもできない（NFR-003）
+   *   生成が使えない … 投稿とあやすは続けられる（NFR-001）
+   */
+  const [aiEvaluateAvailable, setAiEvaluateAvailable] = useState(true);
+  const [aiTransformAvailable, setAiTransformAvailable] = useState(true);
   const [feedMode, setFeedMode] = useState<FeedMode>("normal");
 
   const [view, setView] = useState<CenterView>("timeline");
@@ -170,12 +176,14 @@ export function App() {
       <MockControls
         theme={theme}
         onThemeChange={setTheme}
-        aiAvailable={aiAvailable}
-        onAiAvailableChange={(available) => {
-          setAiAvailable(available);
-          // サーバ側の AI も落ちている扱いにする（投稿の可否が評価に依存するため）
-          setAiAvailability(available);
+        aiEvaluateAvailable={aiEvaluateAvailable}
+        onAiEvaluateChange={(available) => {
+          setAiEvaluateAvailable(available);
+          // サーバ側の評価も落ちている扱いにする（投稿の可否が評価に依存するため）
+          setAiEvaluateAvailability(available);
         }}
+        aiTransformAvailable={aiTransformAvailable}
+        onAiTransformChange={setAiTransformAvailable}
         feedMode={feedMode}
         onFeedModeChange={(mode) => {
           setFeedLoading(true);
@@ -238,7 +246,8 @@ export function App() {
             <ComposePanel
               mode={compose}
               me={ME}
-              aiAvailable={aiAvailable}
+              aiEvaluateAvailable={aiEvaluateAvailable}
+              aiTransformAvailable={aiTransformAvailable}
               onClose={() => setCompose(null)}
               onPosted={(message) => {
                 setCompose(null);

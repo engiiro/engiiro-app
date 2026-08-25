@@ -14,6 +14,9 @@ import { AiUnavailableError } from "./mockAiTransform";
  *   NFR-003         評価が使えない場合は投稿を妨げる（同上。以前とは逆）
  *
  * 中身は差し替え前提のプレースホルダー。ai/src/evaluate.py と同じ立場。
+ *
+ * 閾値は backend が持つ（PO 決定 2026-08-25、Issue #19）。
+ * フロントは合否と目安を受け取って表示するだけで、自分では判定しない。
  */
 
 export type AiEvaluateResult = {
@@ -31,14 +34,15 @@ const MAX_MONTHS = 72;
 const MOCK_THINKING_MS = 800;
 
 /**
- * 投稿を許す上限の月齢（仮の値）。
+ * 投稿を許す上限の月齢。
  *
- * FR-AI-EVAL-007 は「ある一定の閾値」としか書いておらず、値が決まっていない。
- * 赤ちゃんは文章自体の幼さ、お母さんは向けている相手の年齢なので、
- * どちらも「低いほど それらしい」。3歳（36か月）以下を通す仮置き。
- * backend と揃えるべき数値なので、決まったらここだけ直す。
+ * これは backend が持つ値で、frontend が持ってよい値ではない（PO 決定 2026-08-25）。
+ * ここにあるのは「backend の代わり」としてのモックなので、この定数を
+ * 画面側から読まない。export しないのはそのため。
+ *
+ * 3歳（36か月）以下を通す仮置き。実際の値は backend の実装で決まる。
  */
-export const EVALUATE_PASS_MAX_MONTHS = 36;
+const EVALUATE_PASS_MAX_MONTHS = 36;
 
 export async function mockAiEvaluate(
   text: string,

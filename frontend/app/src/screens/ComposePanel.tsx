@@ -59,12 +59,22 @@ type DrawerKind = "none" | "stamp" | "evaluate" | "transform";
 type ComposePanelProps = {
   readonly mode: ComposeMode;
   readonly me: Me;
-  readonly aiAvailable: boolean;
+  /** AI 文章評価が使えるか。投稿の関門なので、落ちていると送れない（NFR-003） */
+  readonly aiEvaluateAvailable: boolean;
+  /** AI 文章生成が使えるか。落ちていても投稿とあやすは続けられる（NFR-001） */
+  readonly aiTransformAvailable: boolean;
   readonly onClose: () => void;
   readonly onPosted: (message: string) => void;
 };
 
-export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: ComposePanelProps) {
+export function ComposePanel({
+  mode,
+  me,
+  aiEvaluateAvailable,
+  aiTransformAvailable,
+  onClose,
+  onPosted,
+}: ComposePanelProps) {
   const rule = mode.kind === "reply" ? soothePersonaRule(mode.target) : { allowed: ["baby"] as const };
   const canSwapPersona = mode.kind === "reply" && rule.allowed.length > 1;
 
@@ -89,8 +99,9 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
    * 押してから理由が分かる形にして、書くたびに1手増えるのを避けている。
    *
    * 評価そのものが使えないときだけ、押す前に止める（NFR-003。以前とは逆の規定）。
+   * 文章生成が落ちているかどうかはここに関係しない（NFR-001）。
    */
-  const canSend = body.trim().length > 0 && !over && !submitting && aiAvailable;
+  const canSend = body.trim().length > 0 && !over && !submitting && aiEvaluateAvailable;
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -126,7 +137,7 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
     setRejected(false);
     setAi({ kind: "working" });
     try {
-      const result = await mockAiTransform(body, persona, { available: aiAvailable });
+      const result = await mockAiTransform(body, persona, { available: aiTransformAvailable });
       setAi(result.action === "allow" ? { kind: "allow", transformedText: result.transformedText } : { kind: result.action });
     } catch (error) {
       if (error instanceof AiUnavailableError) {
@@ -141,10 +152,10 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
     setEvaluating(true);
     setEvaluateFailed(false);
     try {
-      setEvaluation(await mockAiEvaluate(body, persona, { available: aiAvailable }));
+      setEvaluation(await mockAiEvaluate(body, persona, { available: aiEvaluateAvailable }));
     } catch (error) {
       if (error instanceof AiUnavailableError) {
-        // 評価が使えなくても投稿は止めない（NFR-003 / FR-AI-EVAL-006）
+        // 評価が使えないときは投稿もできない（NFR-003、2026-08-25 の PO 改訂）
         setEvaluateFailed(true);
         setEvaluation(null);
       } else {
@@ -301,8 +312,8 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
         </div>
       </div>
 
-      {/* 押す前に止めるのは AI が落ちているときだけ（NFR-003） */}
-      {!aiAvailable ? (
+      {/* 押す前に止めるのは AI 評価が落ちているときだけ（NFR-003） */}
+      {!aiEvaluateAvailable ? (
         <p className={cx("eg-compose__gate", "t-caption")} role="status">
           いま ことばを はかれないので、投稿できません。
         </p>
@@ -393,7 +404,7 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
 
             {drawer === "transform" ? (
               <AiTransformPanel
-                state={aiAvailable ? ai : { kind: "unavailable" }}
+                state={aiTransformAvailable ? ai : { kind: "unavailable" }}
                 onUseTransformed={(text) => {
                   // 本文欄に入るだけ。保存はしない（FR-AI-TRANS-006/007）
                   changeBody(text);
@@ -460,7 +471,7 @@ function EvaluateView({
   if (failed) {
     return (
       <NoteBox title="ことばのお手伝い" icon={<IconGauge />}>
-        いま はかれません。判定できなくても、そのまま 投稿できます。
+        いま はかれません。はかれないあいだは 投稿できません。
       </NoteBox>
     );
   }
