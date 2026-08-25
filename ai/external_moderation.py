@@ -11,21 +11,27 @@
 
 ## 使えるサービス
 
-環境変数を設定したものだけが有効になる。両方設定すれば両方使う。
+環境変数を設定したものだけが有効になる。複数設定すればすべて使う。
 
-OpenAI Moderation（完全無料）
+料金と無料枠の条件は各社の都合で変わるので、ここには断定を書かない。
+下の記述は「どの環境変数を読むか」だけを正とする。
+
+OpenAI Moderation
     OPENAI_API_KEY=sk-...
+    ※ モデレーションの呼び出し自体に課金は無いが、利用可否は
+      アカウント側の設定に依存する。実測では、支払い情報を
+      登録していないアカウントは 429 で呼べなかった
 
-Azure AI Content Safety（無料枠 5,000件/月）
+Azure AI Content Safety
     AZURE_CONTENT_SAFETY_ENDPOINT=https://<名前>.cognitiveservices.azure.com
     AZURE_CONTENT_SAFETY_KEY=...
 
-Google Cloud Natural Language（無料枠 月5万ユニット。100文字で1ユニット）
+Google Cloud Natural Language
     GOOGLE_CLOUD_NL_API_KEY=...
     ※ AI Studio のキーとは別。GCPプロジェクトで
       Cloud Natural Language API を有効にして発行する
 
-chakoshi（NTT。パブリックβで無料。日本語のニュアンスに強い）
+chakoshi（NTT。日本語のニュアンスに強い）
     CHAKOSHI_API_KEY=...
     CHAKOSHI_GUARDRAIL_ID=...
     CHAKOSHI_API_URL=...  （任意。既定は下の DEFAULT_CHAKOSHI_URL）
@@ -33,10 +39,17 @@ chakoshi（NTT。パブリックβで無料。日本語のニュアンスに強�
       ガードレールIDを発行する必要がある
     ※ ベータ版のため、NTTは本番環境での使用を推奨していない
 
-## 個人情報は送らない
+## 検出できた個人情報は送らない
 
 呼び出し元（transform_api.moderate）は、規則で personal_data を検出した時点で
-block を返し、外部へは一切送らない。ここへ来る文には個人情報が含まれていない。
+block を返し、外部へもLLMへも送らない。外部サービスが増えるほど、投稿を
+渡す相手も増えるためである。
+
+ただし保証できるのは「検出できたものは送らない」までである。
+規則の側は正規表現とTLD一覧による当て推量なので、知らないTLD、
+想定外の書式、文脈でしか個人情報にならないもの（勤務先と最寄り駅を
+別々の文で書く、など）は素通りしうる。**取りこぼした個人情報が
+外部へ渡る可能性は残る。** ここを許容するかは人間監督の判断事項。
 
 ## 性的な内容の扱い
 
@@ -303,12 +316,15 @@ def check_google(text: str) -> dict | None:
     if not api_key:
         return None
 
-    url = f"https://language.googleapis.com/v2/documents:moderateText?key={api_key}"
+    # キーはURLクエリではなくヘッダーへ入れる。URLはアクセスログや
+    # プロキシの記録へそのまま残るので、クエリに載せると漏れる経路が増える。
+    # ヘッダー方式で同じ結果が返ることは実APIで確認済み。
+    url = "https://language.googleapis.com/v2/documents:moderateText"
     payload = {
         "document": {"type": "PLAIN_TEXT", "content": text, "languageCode": "ja"}
     }
     try:
-        result = _post_json(url, payload, {})
+        result = _post_json(url, payload, {"X-Goog-Api-Key": api_key})
     except Exception as exc:
         _warn_once("google", f"Google Cloud NL に問い合わせできませんでした: {exc}")
         return None

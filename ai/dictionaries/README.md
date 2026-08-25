@@ -109,16 +109,23 @@ python ai/dictionaries/build_formats.py
 
 ### 使えるサービス
 
-| サービス | 無料枠 | 得意 |
+| サービス | 得意 | 実測 |
 |---|---|---|
-| OpenAI Moderation | 完全無料 | 自傷・暴力・嫌がらせ |
-| Azure AI Content Safety | 5,000件/月 | **自傷の専用カテゴリがある** |
-| Google Cloud Natural Language | 月5万ユニット | 侮辱・差別的表現 |
-| chakoshi（NTT） | ベータ期間中は無料 | **日本語のニュアンス**。カテゴリを自分で選べる |
+| chakoshi（NTT） | **日本語のニュアンス**。カテゴリを自分で選べる | 確認済み |
+| Google Cloud Natural Language | 侮辱・差別的表現 | 確認済み |
+| Azure AI Content Safety | 自傷の専用カテゴリがある | 未確認（キー未取得） |
+| OpenAI Moderation | 自傷・暴力・嫌がらせ | 未確認（429で呼べず） |
+
+料金と無料枠は各社の都合で変わるので、ここには書きません。
+必要な環境変数は `ai/external_moderation.py` の冒頭にあります。
 
 **Google は自傷の検出に向きません。** 返ってくる `Death, Harm & Tragedy` は
 話題の分類であって、自傷の意図ではないからです。
-「祖父が亡くなった」でも高く出ます。自傷は Azure か OpenAI が担当します。
+「サーバーが死んだ」で 0.825 出ることを実測しました。そのため対応づけていません。
+
+**自傷は chakoshi が担当します。** 「死にたい。消えたい。」に対し、
+Google は `Violent` を返すだけですが、chakoshi は `self-harm` を返します。
+理由コードを `self_harm` として正しく取れるのは今のところ chakoshi だけです。
 
 ### chakoshi について
 

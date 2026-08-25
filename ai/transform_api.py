@@ -555,9 +555,10 @@ def moderate(text: str, client=None) -> dict:
 
     rule_verdict = check_rules(text)
 
-    # 規則で block が確定したものは、外部へ一切送らずに止める。
+    # 規則で block が確定したものは、外部へ送らずに止める。
     # 送っても結論は変わらず、API呼び出しと個人情報の外部送信が増えるだけ。
-    # 個人情報を含む文が外へ出ないのは、この早期打ち切りによる。
+    # ただし守れるのは「規則が検出できた個人情報」までで、
+    # 取りこぼしたものは外へ渡る。詳しくは external_moderation の冒頭。
     if rule_verdict["action"] == "block":
         return {"action": "block", "reasonCodes": rule_verdict["reasonCodes"]}
 

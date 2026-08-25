@@ -312,11 +312,16 @@ def _match_by_tokens(text: str, tokenized: dict) -> list[str]:
             # 表層形でも原形でも照合する。最後の語だけ活用が変わるため、
             # 原形に差し替えるのは末尾のトークンだけでよい。
             with_base = prefix + normalize_for_check(tokens[end][2])
-            found = wanted.get(joined) or wanted.get(with_base)
+            by_surface = wanted.get(joined)
+            found = by_surface or wanted.get(with_base)
             if not found:
                 continue
             word, rule = found
-            if _is_conjugation(tokens, end):
+            # 原形で一致したときは、辞書の語がすでに動詞の終止形である。
+            # 直後の て・で・ば はただの活用なので、活用の除外規則を
+            # 当てはめてはいけない。当てはめると「首を吊って死ぬ」を
+            # 見逃す（実測で確認）。
+            if by_surface and _is_conjugation(tokens, end):
                 continue
             if rule != ANY_POS:
                 # 品詞は先頭のトークンで見る

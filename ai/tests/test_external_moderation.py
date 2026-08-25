@@ -198,7 +198,10 @@ def _google_response(**confidences):
 
 @pytest.fixture
 def google_env(monkeypatch):
-    monkeypatch.setenv("GOOGLE_CLOUD_NL_API_KEY", "key")
+    # URLへ混ざっていないことを確かめるため、偶然一致しない値にしている
+    key = "GOOGLE-TEST-KEY-DO-NOT-LEAK"
+    monkeypatch.setenv("GOOGLE_CLOUD_NL_API_KEY", key)
+    return key
 
 
 def test_google_侮辱はrewrite_required(monkeypatch, google_env):
@@ -235,17 +238,25 @@ def test_google_健康や政治の話題を弾かない(monkeypatch, google_env)
         assert E.check_google("テスト")["action"] == "allow", topic
 
 
-def test_google_URLにキーを載せる(monkeypatch, google_env):
+def test_google_キーをURLではなくヘッダーへ入れる(monkeypatch, google_env):
+    """URLはアクセスログやプロキシの記録に残るので、キーを載せてはいけない。
+
+    Issue #15 の「APIキーをURLクエリへ埋め込まない」に対応する。
+    ヘッダー方式で同じ結果が返ることは実APIで確認している。
+    """
     called = {}
 
     def capture(url, payload, headers):
-        called["url"] = url
-        called["payload"] = payload
+        called.update(url=url, payload=payload, headers=headers)
         return _google_response()
 
     monkeypatch.setattr(E, "_post_json", capture)
     E.check_google("テスト")
-    assert called["url"].startswith("https://language.googleapis.com/v2/documents:moderateText?key=")
+
+    key = google_env
+    assert called["url"] == "https://language.googleapis.com/v2/documents:moderateText"
+    assert key not in called["url"]
+    assert called["headers"]["X-Goog-Api-Key"] == key
     assert called["payload"]["document"]["languageCode"] == "ja"
 
 
