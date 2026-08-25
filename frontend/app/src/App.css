@@ -39,12 +39,25 @@
 
 .eg-center {
   position: relative;
+  /*
+   * 縦に flex で積む。中身が短くても「バブる」を下端に置くため
+   * （下のスロットが margin-top: auto で余りを吸う）。
+   */
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   max-height: 100vh;
   padding: 0 var(--space-sm);
+  /* 下端のボタンに本文が隠れないぶんだけ空ける */
+  padding-bottom: calc(var(--control-min-height) + var(--space-lg));
   border-inline: var(--border-width) solid var(--hairline);
   /* 左に詰まっても中央はスクロールできる */
   overflow-y: auto;
+}
+
+/* flex の子が中身より縮まないようにする（画面はそれぞれ自分の高さで積む） */
+.eg-center > * {
+  flex: none;
 }
 
 .eg-center__loading {
@@ -56,11 +69,29 @@
   top: 0;
 }
 
+/*
+ * 「バブる」の置き場所。
+ *
+ * 高さ 0 のスロットを中央の列の末尾に置き、margin-top: auto で下端へ送る。
+ * position: sticky なので、中身が長くてスクロールしても下端に貼りついたまま動かない。
+ * ボタン自体を sticky にすると、中身が短いときに本文の直後まで上がってきてしまう。
+ */
+.eg-fab-slot {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin-top: auto;
+  height: 0;
+  /* 高さ 0 の帯が本文のクリックを奪わないように */
+  pointer-events: none;
+}
+
 /* 中央の右下。深夜に片手でなくても、視線の帰る先に置く */
 .eg-bubble-fab {
-  position: sticky;
+  position: absolute;
+  right: var(--space-md);
   bottom: var(--space-lg);
-  left: 100%;
+  pointer-events: auto;
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
@@ -71,7 +102,6 @@
   background: var(--accent-fill-large);
   color: var(--on-accent);
   box-shadow: var(--elevation-modal);
-  transform: translateX(calc(var(--space-md) * -1));
   transition:
     background-color var(--duration-quick) var(--ease-smooth-out),
     transform var(--duration-micro) var(--ease-smooth-out);
@@ -82,7 +112,7 @@
 }
 
 .eg-bubble-fab:active {
-  transform: translateX(calc(var(--space-md) * -1)) scale(var(--press-scale));
+  transform: scale(var(--press-scale));
 }
 
 /*
@@ -136,15 +166,10 @@
     border-inline: none;
   }
 
+  /* 中央が画面いっぱいになるので、下端のバーの上に置く */
   .eg-bubble-fab {
     position: fixed;
-    left: auto;
     right: var(--gutter);
     bottom: calc(var(--touch-target-min) + var(--space-lg) + env(safe-area-inset-bottom));
-    transform: none;
-  }
-
-  .eg-bubble-fab:active {
-    transform: scale(var(--press-scale));
   }
 }

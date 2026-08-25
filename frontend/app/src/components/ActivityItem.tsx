@@ -1,4 +1,4 @@
-import type { MyActivityItem } from "../data/types";
+import type { ActivityEntry } from "../data/types";
 import { cx } from "../lib/cx";
 import { relativeTimeText } from "../lib/relativeTime";
 import { BubbleBody } from "./BubbleBody";
@@ -22,7 +22,7 @@ import "./ActivityItem.css";
  */
 
 type ActivityItemProps = {
-  readonly item: MyActivityItem;
+  readonly item: ActivityEntry;
   readonly onOpen: (bubbleId: string) => void;
   /** 自分のバブルにだけ渡る。あやすの削除は仕様に無いので口を作っていない（FR-POST-006） */
   readonly onDelete?: (bubbleId: string) => void;

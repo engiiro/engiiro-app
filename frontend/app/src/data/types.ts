@@ -123,7 +123,6 @@ export type PersonaStatus = {
 /** 本人専用プロフィール（S8）の1ペルソナぶん */
 export type MyProfileEntry = {
   readonly persona: PublicPersona;
-  readonly bio?: string;
   /**
    * AI 文章評価が使えないときは null（NFR-002）。
    * ここが null でも他の機能は止めない。プロフィールは読めるままにする。
@@ -157,18 +156,21 @@ export type MyProfile = {
 };
 
 /**
- * S8 の一覧の切り替え（人間の指示、2026-08-25 のモック）。
+ * プロフィールの一覧の切り替え（人間の指示、2026-08-25 のモック）。
+ * S8（自分）と S6（他人）で同じものを使う。
  *
  *   babyBubbles    … 赤ちゃんとして書いたバブルだけ
  *   babyAll        … 赤ちゃんとしてのバブルとあやすの両方
  *   motherSoothes  … お母さんとしてのあやすだけ
  *
- * この3つは本人の行動しか含まない。他人の行動が混ざる口にしない。
+ * ★ どれも「1つのペルソナの行動」しか含まない。
+ *   赤ちゃんの一覧にお母さんとしてのあやすを混ぜると、その時点で
+ *   2つのペルソナが同じ人のものだと分かってしまう（FR-PERSONA-003）。
  */
-export type MyActivityTab = "babyBubbles" | "babyAll" | "motherSoothes";
+export type ActivityTab = "babyBubbles" | "babyAll" | "motherSoothes";
 
-/** S8 の一覧に並ぶ1件。バブルとあやすが混ざるので種別を持つ */
-export type MyActivityItem =
+/** 一覧に並ぶ1件。バブルとあやすが混ざるので種別を持つ */
+export type ActivityEntry =
   | { readonly kind: "bubble"; readonly bubble: Bubble }
   | {
       readonly kind: "soothe";
@@ -176,3 +178,25 @@ export type MyActivityItem =
       /** どのバブルへのあやすかを思い出すための短い抜粋。本文そのものではない */
       readonly toBubbleExcerpt: string;
     };
+
+/**
+ * 他人から見える公開プロフィール（S6 / FR-PROFILE-005）。
+ *
+ * ★ 持たせていないものが、この型の本体：
+ *   - もう一方のペルソナ、およびそこへ到達できる手がかり（FR-PERSONA-004）
+ *   - 生年月日。両ペルソナは同時に作られるので、公開すると突き合わせで
+ *     同一人物が割れる（FR-PRIV-004。人間の指示でも非表示）
+ *   - フォロー中の数と中身（人間の指示。FR-FOLLOW-003 は本人だけが参照できる要件）
+ *   - フォロワー数・フォロワー一覧（FR-FOLLOW-004/005、OUT-004）
+ *
+ * 推定年齢は1ペルソナぶんだけ持つ。まとめて見せないかぎり FR-PERSONA-005 に触れない。
+ */
+export type PublicProfile = {
+  readonly persona: PublicPersona;
+  /** そのペルソナ単独の推定。使えないときは null（NFR-002） */
+  readonly status: PersonaStatus | null;
+  /** 閲覧者がこのペルソナを「大好き」にしているか（FR-FOLLOW-001/002） */
+  readonly liked: boolean;
+  /** 自分自身のペルソナか。大好きボタンを出すかどうかだけに使う */
+  readonly isMe: boolean;
+};

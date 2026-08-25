@@ -25,6 +25,7 @@ type TimelineScreenProps = {
   readonly feed: FeedResult | null;
   readonly loading: boolean;
   readonly onOpenBubble: (bubbleId: string) => void;
+  readonly onOpenProfile: (personaId: string) => void;
   readonly onReact: (bubbleId: string, reaction: ReactionType) => void;
   readonly onCompose: () => void;
 };
@@ -33,6 +34,7 @@ export function TimelineScreen({
   feed,
   loading,
   onOpenBubble,
+  onOpenProfile,
   onReact,
   onCompose,
 }: TimelineScreenProps) {
@@ -75,6 +77,7 @@ export function TimelineScreen({
                       key={bubble.id}
                       bubble={bubble}
                       onOpen={onOpenBubble}
+                      onOpenProfile={onOpenProfile}
                       onReact={onReact}
                     />
                   ))}
@@ -93,6 +96,7 @@ export function TimelineScreen({
                       key={bubble.id}
                       bubble={bubble}
                       onOpen={onOpenBubble}
+                      onOpenProfile={onOpenProfile}
                       onReact={onReact}
                     />
                   ))}

@@ -20,6 +20,8 @@ import "./SootheItem.css";
 type SootheItemProps = {
   readonly soothe: Soothe;
   readonly replyToNickname?: string;
+  /** ニックネームから S6 公開プロフィールへ */
+  readonly onOpenProfile: (personaId: string) => void;
   readonly onReact: (sootheId: string, reaction: ReactionType) => void;
   readonly onReply: (soothe: Soothe) => void;
 };
@@ -27,12 +29,18 @@ type SootheItemProps = {
 export function SootheItem({
   soothe,
   replyToNickname,
+  onOpenProfile,
   onReact,
   onReply,
 }: SootheItemProps) {
   return (
     <li className={cx("eg-soothe", "is-" + soothe.author.kind)}>
-      <PersonaChip persona={soothe.author} createdAt={soothe.createdAt} compact />
+      <PersonaChip
+        persona={soothe.author}
+        createdAt={soothe.createdAt}
+        compact
+        onOpenProfile={onOpenProfile}
+      />
 
       {replyToNickname ? (
         <p className={cx("eg-soothe__quote", "t-caption")}>{replyToNickname} へ</p>
@@ -53,7 +61,7 @@ export function SootheItem({
           className={cx("eg-soothe__reply", "t-label", "eg-touch")}
           onClick={() => onReply(soothe)}
         >
-          返信する
+          あやす
         </button>
       </div>
     </li>

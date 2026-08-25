@@ -22,11 +22,13 @@ type PersonaSummaryCardProps = {
   readonly persona: PublicPersona;
   /** ニックネームの下の一行。「推定 1歳2か月」など */
   readonly caption: ReactNode;
-  /** さらに下に足すもの。メーターやひとことを入れる */
-  readonly footer?: ReactNode;
+  /** さらに小さく添える一行。何を測ったのかの説明に使う */
+  readonly note?: string;
+  /** 見出しの右端。大好きボタンなど。無ければ何も置かない */
+  readonly action?: ReactNode;
 };
 
-export function PersonaSummaryCard({ persona, caption, footer }: PersonaSummaryCardProps) {
+export function PersonaSummaryCard({ persona, caption, note, action }: PersonaSummaryCardProps) {
   return (
     <section className={cx("eg-summary", "is-" + persona.kind)}>
       <div className="eg-summary__head">
@@ -36,9 +38,10 @@ export function PersonaSummaryCard({ persona, caption, footer }: PersonaSummaryC
             {persona.nickname}
           </h2>
           <p className={cx("eg-summary__caption", "t-body")}>{caption}</p>
+          {note ? <p className={cx("eg-summary__note", "t-caption")}>{note}</p> : null}
         </div>
+        {action ? <div className="eg-summary__action">{action}</div> : null}
       </div>
-      {footer ? <div className="eg-summary__foot">{footer}</div> : null}
     </section>
   );
 }

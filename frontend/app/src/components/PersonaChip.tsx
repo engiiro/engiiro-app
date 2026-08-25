@@ -9,8 +9,9 @@ import "./PersonaChip.css";
  *
  * アバターの規則は PersonaAvatar が持つ（頭文字と役割色だけ。DESIGN.md §0.1-2/3）。
  *
- * ニックネームは本来 S6（公開プロフィール）への入り口だが、S6 は今回の対象外なので
- * リンクにしていない。DM の入口を作らないため、タップ先は将来も S6 だけ（DESIGN.md §0.5）。
+ * ニックネームは S6（公開プロフィール）への入り口。onOpenProfile を渡すと押せるようになる。
+ * ★ タップ先は S6 だけ。DM の入口を作らない（OUT-001、DESIGN.md §0.5）。
+ *   渡す先はペルソナ id ひとつで、そこから もう一方のペルソナへ辿る道は無い（FR-PERSONA-004）。
  */
 
 const ROLE_LABEL = { baby: "赤ちゃん", mother: "お母さん" } as const;
@@ -21,6 +22,8 @@ type PersonaChipProps = {
   readonly createdAt?: string;
   readonly compact?: boolean;
   readonly showRole?: boolean;
+  /** 渡すとニックネームが S6 への入り口になる。渡さなければただの文字 */
+  readonly onOpenProfile?: (personaId: string) => void;
 };
 
 export function PersonaChip({
@@ -28,12 +31,23 @@ export function PersonaChip({
   createdAt,
   compact = false,
   showRole = true,
+  onOpenProfile,
 }: PersonaChipProps) {
   return (
     <div className={cx("eg-persona", compact && "eg-persona--compact")}>
       <PersonaAvatar kind={persona.kind} size={compact ? "sm" : "md"} />
       <span className="eg-persona__text">
-        <span className="eg-persona__name t-card-title">{persona.nickname}</span>
+        {onOpenProfile ? (
+          <button
+            type="button"
+            className="eg-persona__name eg-persona__name--link t-card-title"
+            onClick={() => onOpenProfile(persona.id)}
+          >
+            {persona.nickname}
+          </button>
+        ) : (
+          <span className="eg-persona__name t-card-title">{persona.nickname}</span>
+        )}
         <span className="eg-persona__meta">
           {showRole ? (
             <span className={cx("eg-persona__role", "t-label", "is-" + persona.kind)}>

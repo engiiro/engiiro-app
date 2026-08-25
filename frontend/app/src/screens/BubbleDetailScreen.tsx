@@ -29,6 +29,7 @@ import "./BubbleDetailScreen.css";
 type BubbleDetailScreenProps = {
   readonly detail: BubbleDetail;
   readonly onBack: () => void;
+  readonly onOpenProfile: (personaId: string) => void;
   readonly onReactToBubble: (bubbleId: string, reaction: ReactionType) => void;
   readonly onReactToSoothe: (
     sootheId: string,
@@ -42,6 +43,7 @@ type BubbleDetailScreenProps = {
 export function BubbleDetailScreen({
   detail,
   onBack,
+  onOpenProfile,
   onReactToBubble,
   onReactToSoothe,
   onOpenSoothe,
@@ -63,7 +65,12 @@ export function BubbleDetailScreen({
 
       <div className={cx("eg-column", "eg-detail")}>
         <article className="eg-detail__bubble">
-          <PersonaChip persona={bubble.author} createdAt={bubble.createdAt} showRole={false} />
+          <PersonaChip
+            persona={bubble.author}
+            createdAt={bubble.createdAt}
+            showRole={false}
+            onOpenProfile={onOpenProfile}
+          />
           <BubbleBody body={bubble.body} className="eg-detail__body" />
           <div className="eg-detail__reactions">
             <ReactionRow
@@ -107,6 +114,7 @@ export function BubbleDetailScreen({
                   key={soothe.id}
                   soothe={soothe}
                   replyToNickname={nicknameOf(soothe.replyToSootheId)}
+                  onOpenProfile={onOpenProfile}
                   onReact={(sootheId, reaction) =>
                     onReactToSoothe(sootheId, soothe.author.kind, reaction)
                   }

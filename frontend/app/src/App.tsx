@@ -8,18 +8,22 @@ import {
   fetchFeed,
   fetchMyActivity,
   fetchMyProfile,
+  fetchPublicActivity,
+  fetchPublicProfile,
   markRead,
   setAiEvaluateAvailability,
+  setLiked,
 } from "./data/api";
 import type { FeedResult } from "./data/api";
 import { ME } from "./data/personas";
 import { reactionTargetOfSoothe } from "./data/reactions";
 import type {
   BubbleDetail,
-  MyActivityItem,
-  MyActivityTab,
+  ActivityEntry,
+  ActivityTab,
   MyProfile,
   PersonaKind,
+  PublicProfile,
   ReactionType,
 } from "./data/types";
 import { LeftRail } from "./components/LeftRail";
@@ -38,6 +42,7 @@ import { ComposePanel } from "./screens/ComposePanel";
 import type { ComposeMode } from "./screens/ComposePanel";
 import { MyProfileScreen } from "./screens/MyProfileScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
+import { PublicProfileScreen } from "./screens/PublicProfileScreen";
 import { TimelineScreen } from "./screens/TimelineScreen";
 import "./App.css";
 
@@ -82,9 +87,25 @@ export function App() {
    */
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [activityTab, setActivityTab] = useState<MyActivityTab>("babyBubbles");
-  const [activity, setActivity] = useState<readonly MyActivityItem[]>([]);
+  const [activityTab, setActivityTab] = useState<ActivityTab>("babyBubbles");
+  const [activity, setActivity] = useState<readonly ActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
+
+  /*
+   * S6 他人の公開プロフィール。
+   *
+   * 持つのはペルソナ id ひとつだけ。ここに accountId を置かない。
+   * 開いているペルソナから もう一方へ移る道を、状態の形としても作らない（FR-PERSONA-004）。
+   */
+  const [publicPersonaId, setPublicPersonaId] = useState<string | null>(null);
+  const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
+  const [publicLoading, setPublicLoading] = useState(true);
+  const [publicTab, setPublicTab] = useState<ActivityTab>("babyBubbles");
+  const [publicActivity, setPublicActivity] = useState<readonly ActivityEntry[]>([]);
+  const [publicActivityLoading, setPublicActivityLoading] = useState(true);
+  const [likePending, setLikePending] = useState(false);
+  /** S6 を閉じたときに戻る先 */
+  const [publicBackTo, setPublicBackTo] = useState<CenterView>("timeline");
 
   const loadFeed = useCallback(async () => {
     const result = feedMode === "empty" ? await fetchEmptyFeed() : await fetchFeed();
@@ -115,10 +136,54 @@ export function App() {
     setProfileLoading(false);
   }, []);
 
-  const loadActivity = useCallback(async (tab: MyActivityTab) => {
+  const loadActivity = useCallback(async (tab: ActivityTab) => {
     setActivityLoading(true);
     setActivity(await fetchMyActivity(tab));
     setActivityLoading(false);
+  }, []);
+
+  /**
+   * S6 を開く。
+   *
+   * ★ 渡すのはペルソナ id ひとつ。どのペルソナから来たかも、
+   *   その人のもう一方のペルソナも、この関数は受け取らない（FR-PERSONA-004）。
+   *   一覧の初期タブは、開いたペルソナの種類だけで決まる。
+   */
+  const openProfile = useCallback(
+    async (personaId: string) => {
+      setPublicBackTo(view);
+      setPublicPersonaId(personaId);
+      setPublicLoading(true);
+      setPublicActivityLoading(true);
+
+      const found = await fetchPublicProfile(personaId);
+      setPublicProfile(found);
+      setPublicLoading(false);
+      if (!found) {
+        setPublicActivity([]);
+        setPublicActivityLoading(false);
+        return;
+      }
+      const first: ActivityTab = found.persona.kind === "mother" ? "motherSoothes" : "babyBubbles";
+      setPublicTab(first);
+      setPublicActivity(await fetchPublicActivity(personaId, first));
+      setPublicActivityLoading(false);
+    },
+    [view],
+  );
+
+  const loadPublicActivity = useCallback(
+    async (personaId: string, tab: ActivityTab) => {
+      setPublicActivityLoading(true);
+      setPublicActivity(await fetchPublicActivity(personaId, tab));
+      setPublicActivityLoading(false);
+    },
+    [],
+  );
+
+  const closeProfile = useCallback(() => {
+    setPublicPersonaId(null);
+    setPublicProfile(null);
   }, []);
 
   const openBubble = useCallback(
@@ -144,6 +209,8 @@ export function App() {
       setView(next);
       setDetailBubbleId(null);
       setDetail(null);
+      setPublicPersonaId(null);
+      setPublicProfile(null);
       if (next === "timeline" && feedMode !== "loading") {
         setFeedLoading(true);
         void loadFeed();
@@ -208,13 +275,34 @@ export function App() {
     [activityTab, backToTimeline, loadActivity, loadProfile, view],
   );
 
-  /** S8 の一覧からバブルを開く。詳細はタイムライン側の画面なので、そちらへ移る */
+  /**
+   * 「大好き」の付け外し（＝フォロー。FR-FOLLOW-001/002）。
+   * 取り消せる操作なので確認は出さない。結果はサーバの返した値で上書きする。
+   */
+  const toggleLike = useCallback(
+    async (next: boolean) => {
+      if (!publicPersonaId) {
+        return;
+      }
+      setLikePending(true);
+      const result = await setLiked(publicPersonaId, next);
+      setLikePending(false);
+      if (!result.ok) {
+        return;
+      }
+      setPublicProfile((current) => (current ? { ...current, liked: result.liked } : current));
+    },
+    [publicPersonaId],
+  );
+
+  /** プロフィールの一覧からバブルを開く。詳細はタイムライン側の画面なので、そちらへ移る */
   const openBubbleFromProfile = useCallback(
     (bubbleId: string) => {
+      closeProfile();
       setView("timeline");
       openBubble(bubbleId);
     },
-    [openBubble],
+    [closeProfile, openBubble],
   );
 
   const openReply = useCallback((target: SootheTarget) => {
@@ -224,9 +312,11 @@ export function App() {
   // 画面を入れ替えたら中央を先頭へ戻す
   useEffect(() => {
     document.querySelector(".eg-center")?.scrollTo({ top: 0 });
-  }, [view, detailBubbleId]);
+  }, [view, detailBubbleId, publicPersonaId]);
 
-  const showTimeline = view === "timeline";
+  /** S6 を開いているあいだは、左サイドの選択に関わらず中央を S6 にする */
+  const showPublicProfile = publicPersonaId !== null;
+  const showTimeline = view === "timeline" && !showPublicProfile;
 
   return (
     <div className={cx("eg-app", compose && "is-composing")}>
@@ -254,9 +344,34 @@ export function App() {
         </div>
 
         <main className="eg-center">
-          {!showTimeline && view !== "profile" ? <PlaceholderScreen view={view} /> : null}
+          {showPublicProfile ? (
+            <PublicProfileScreen
+              profile={publicProfile}
+              activity={publicActivity}
+              loading={publicLoading}
+              activityLoading={publicActivityLoading}
+              tab={publicTab}
+              likePending={likePending}
+              onTabChange={(next) => {
+                setPublicTab(next);
+                if (publicPersonaId) {
+                  void loadPublicActivity(publicPersonaId, next);
+                }
+              }}
+              onToggleLike={(next) => void toggleLike(next)}
+              onOpenBubble={openBubbleFromProfile}
+              onBack={() => {
+                closeProfile();
+                setView(publicBackTo);
+              }}
+            />
+          ) : null}
 
-          {view === "profile" ? (
+          {!showPublicProfile && !showTimeline && view !== "profile" ? (
+            <PlaceholderScreen view={view} />
+          ) : null}
+
+          {!showPublicProfile && view === "profile" ? (
             <MyProfileScreen
               profile={profile}
               activity={activity}
@@ -282,6 +397,7 @@ export function App() {
               feed={feed}
               loading={showFeedSkeleton}
               onOpenBubble={openBubble}
+              onOpenProfile={(personaId) => void openProfile(personaId)}
               onReact={(bubbleId, reaction) => void reactToBubble(bubbleId, reaction)}
               onCompose={() => setCompose({ kind: "bubble" })}
             />
@@ -296,6 +412,7 @@ export function App() {
               <BubbleDetailScreen
                 detail={detail}
                 onBack={backToTimeline}
+                onOpenProfile={(personaId) => void openProfile(personaId)}
                 onReactToBubble={(bubbleId, reaction) => void reactToBubble(bubbleId, reaction)}
                 onReactToSoothe={(sootheId, authorKind, reaction) =>
                   void reactToSoothe(sootheId, authorKind, reaction)
@@ -306,16 +423,21 @@ export function App() {
             )
           ) : null}
 
-          {/* 中央の右下。押すと右の列が投稿パネルに入れ替わる */}
+          {/*
+            中央の右下。押すと右の列が投稿パネルに入れ替わる。
+            高さ 0 のスロットに入れて下端へ固定する（中身の長さで位置が動かないように）
+          */}
           {compose === null ? (
-            <button
-              type="button"
-              className={cx("eg-bubble-fab", "t-button")}
-              onClick={() => setCompose({ kind: "bubble" })}
-            >
-              <IconPen />
-              バブる
-            </button>
+            <div className="eg-fab-slot">
+              <button
+                type="button"
+                className={cx("eg-bubble-fab", "t-button")}
+                onClick={() => setCompose({ kind: "bubble" })}
+              >
+                <IconPen />
+                バブる
+              </button>
+            </div>
           ) : null}
         </main>
 

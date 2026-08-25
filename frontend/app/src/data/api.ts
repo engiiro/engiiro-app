@@ -3,7 +3,7 @@ import { AiUnavailableError } from "../lib/mockAiTransform";
 import { moderate } from "../lib/mockModeration";
 import { BUBBLE_MAX_LENGTH, REACTION_MAX_PER_USER, countChars } from "./constants";
 import { BUBBLE_SEEDS } from "./bubbles";
-import { BABY_PERSONAS, ME, MOTHER_PERSONAS, PERSONA_BIOS, PERSONA_BY_ID } from "./personas";
+import { BABY_PERSONAS, ME, MOTHER_PERSONAS, PERSONA_BY_ID } from "./personas";
 import { isReactionAllowed } from "./reactions";
 import { SOOTHE_SEEDS } from "./soothes";
 import { STAMP_CATALOG } from "./stamps";
@@ -12,13 +12,14 @@ import type {
   BubbleDetail,
   CreateBubbleInput,
   CreateSootheInput,
+  ActivityEntry,
+  ActivityTab,
   Me,
-  MyActivityItem,
-  MyActivityTab,
   MyProfile,
   PersonaKind,
   PersonaStatus,
   PublicPersona,
+  PublicProfile,
   ReactionState,
   ReactionTargetKind,
   ReactionType,
@@ -32,9 +33,11 @@ import type {
  * 実 API に差し替えるときは、ここの各関数の中身を fetch に置き換える。画面側は触らない。
  * 対応する口は docs/design_doc.md §7：
  *   fetchMe            → GET  /api/profile/me
- *   fetchMyProfile     → GET  /api/profile/me（S8。両ペルソナのステータス付き）
- *   fetchPublicProfile → GET  /api/personas/:id（S6。設計書に未記載。FR-PROFILE-005 の受け皿）
- *   setFollow          → POST / DELETE /api/personas/:id/follow
+ *   fetchMyProfile      → GET  /api/profile/me（S8。両ペルソナのステータス付き）
+ *   fetchMyActivity     → GET  /api/profile/me/activity（設計書に未記載）
+ *   fetchPublicProfile  → GET  /api/personas/:id（S6。設計書に未記載。FR-PROFILE-005 の受け皿）
+ *   fetchPublicActivity → GET  /api/personas/:id/activity（同）
+ *   setLiked            → POST / DELETE /api/personas/:id/follow
  *   fetchFeed          → GET  /api/posts/feed
  *   fetchBubbleDetail  → GET  /api/posts/:id（+ あやす一覧。読み取り系は Issue #8 で未確定）
  *   createBubble       → POST /api/posts
@@ -213,11 +216,8 @@ const following = new Set<string>([
  *          プロフィールそのものは読めるままにする。
  */
 export async function fetchMyProfile(): Promise<MyProfile> {
-  const babyTexts = [
-    ...myBubbles().map((bubble) => bubble.body),
-    ...mySoothes("baby").map((soothe) => soothe.body),
-  ];
-  const motherTexts = mySoothes("mother").map((soothe) => soothe.body);
+  const babyTexts = textsFor(ME.baby.id, "baby");
+  const motherTexts = textsFor(ME.mother.id, "mother");
 
   const [baby, mother] = await Promise.all([
     statusOf(babyTexts, "baby"),
@@ -225,8 +225,8 @@ export async function fetchMyProfile(): Promise<MyProfile> {
   ]);
 
   return {
-    baby: { persona: ME.baby, bio: PERSONA_BIOS[ME.baby.id], status: baby },
-    mother: { persona: ME.mother, bio: PERSONA_BIOS[ME.mother.id], status: mother },
+    baby: { persona: ME.baby, status: baby },
+    mother: { persona: ME.mother, status: mother },
     birthday: MY_BIRTHDAY,
     followingBabyCount: countFollowing("baby"),
     followingMotherCount: countFollowing("mother"),
@@ -237,38 +237,58 @@ export async function fetchMyProfile(): Promise<MyProfile> {
  * S8 の一覧。3つの切り替えは、どれも本人の行動しか含まない。
  * 新しい順に並べる（自分の記録なので、ここは新着順でよい。FR-FEED-002 はタイムラインの要件）。
  */
-export async function fetchMyActivity(tab: MyActivityTab): Promise<readonly MyActivityItem[]> {
+export async function fetchMyActivity(tab: ActivityTab): Promise<readonly ActivityEntry[]> {
   await sleep(MOCK_LATENCY_MS);
+  const personaId = tab === "motherSoothes" ? ME.mother.id : ME.baby.id;
+  return activityOf(personaId, tab);
+}
 
-  const items: MyActivityItem[] = [];
+/**
+ * 1つのペルソナぶんの一覧。S8 も S6 もここを通る。
+ *
+ * ★ 引数はペルソナ id ひとつ。「この人のもう一方のペルソナ」を混ぜる道が構造として無い。
+ *   ここに accountId を渡す形にすると、その時点で非連結が崩せる（FR-PERSONA-003）。
+ */
+function activityOf(personaId: string, tab: ActivityTab): readonly ActivityEntry[] {
+  const items: ActivityEntry[] = [];
   if (tab === "babyBubbles" || tab === "babyAll") {
-    for (const bubble of myBubbles()) {
+    for (const bubble of bubblesOf(personaId)) {
       items.push({ kind: "bubble", bubble });
     }
   }
   if (tab === "babyAll" || tab === "motherSoothes") {
-    const kind: PersonaKind = tab === "motherSoothes" ? "mother" : "baby";
-    for (const soothe of mySoothes(kind)) {
+    for (const soothe of soothesOf(personaId)) {
       items.push({ kind: "soothe", soothe, toBubbleExcerpt: excerptOf(soothe.bubbleId) });
     }
   }
-
   items.sort((a, b) => timeOf(b) - timeOf(a));
   return items;
 }
 
-function timeOf(item: MyActivityItem): number {
+function timeOf(item: ActivityEntry): number {
   const iso = item.kind === "bubble" ? item.bubble.createdAt : item.soothe.createdAt;
   return new Date(iso).getTime();
 }
 
-function myBubbles(): readonly Bubble[] {
-  return bubbles.filter((bubble) => bubble.author.id === ME.baby.id);
+function bubblesOf(personaId: string): readonly Bubble[] {
+  return bubbles.filter((bubble) => bubble.author.id === personaId);
 }
 
-function mySoothes(kind: PersonaKind): readonly Soothe[] {
-  const meId = kind === "mother" ? ME.mother.id : ME.baby.id;
-  return soothes.filter((soothe) => soothe.author.id === meId);
+function soothesOf(personaId: string): readonly Soothe[] {
+  return soothes.filter((soothe) => soothe.author.id === personaId);
+}
+
+/**
+ * 推定の材料にする文章を集める。
+ *   FR-PROFILE-003  赤ちゃん度 … そのペルソナのバブル ＋ 赤ちゃんとしてのあやす
+ *   FR-PROFILE-004  お母さん度 … そのペルソナのお母さんとしてのあやす だけ
+ */
+function textsFor(personaId: string, kind: PersonaKind): readonly string[] {
+  const soothed = soothesOf(personaId).map((soothe) => soothe.body);
+  if (kind === "mother") {
+    return soothed;
+  }
+  return [...bubblesOf(personaId).map((bubble) => bubble.body), ...soothed];
 }
 
 /** あやすが どのバブルへのものか思い出すための抜粋。長い本文は途中で切る */
@@ -559,4 +579,67 @@ export async function deleteBubble(bubbleId: string): Promise<{ readonly ok: boo
 /** バブルを開いたことを覚えておく（S2 の未読／押下済の出しわけ用） */
 export function markRead(bubbleId: string): void {
   bubbles = bubbles.map((bubble) => (bubble.id === bubbleId ? { ...bubble, read: true } : bubble));
+}
+
+/*
+ * ────────────── S6 他人の公開プロフィール ──────────────
+ *
+ * 入口はペルソナ id ひとつだけ。ここから もう一方のペルソナへ辿る道を作らない
+ * （FR-PERSONA-004）。返す形にも、辿るための材料を置かない。
+ */
+
+/**
+ * S6 公開プロフィール（GET /api/personas/:id 相当、FR-PROFILE-005）。
+ *
+ * 返していないもの：生年月日、フォロー中の数と中身、フォロワーに関する一切、
+ * もう一方のペルソナ。どれも「画面で出さない」ではなく「応答に含めない」で落とす。
+ */
+export async function fetchPublicProfile(personaId: string): Promise<PublicProfile | null> {
+  const persona = PERSONA_BY_ID[personaId];
+  if (!persona) {
+    return null;
+  }
+  const status = await statusOf(textsFor(persona.id, persona.kind), persona.kind);
+  return {
+    persona,
+    status,
+    liked: following.has(persona.id),
+    isMe: persona.id === ME.baby.id || persona.id === ME.mother.id,
+  };
+}
+
+/** S6 の一覧。S8 と同じ組み立てを通す */
+export async function fetchPublicActivity(
+  personaId: string,
+  tab: ActivityTab,
+): Promise<readonly ActivityEntry[]> {
+  await sleep(MOCK_LATENCY_MS);
+  return activityOf(personaId, tab);
+}
+
+export type SetLikedResult = { readonly ok: boolean; readonly liked: boolean };
+
+/**
+ * 「大好き」の付け外し（＝フォロー。FR-FOLLOW-001/002）。
+ *
+ * ペルソナ単位で、一方向。相手の承認は要らない。
+ * 自分のペルソナには付けられない（画面にもボタンを出さないが、ここでも弾く）。
+ *
+ * ★ 相手側から「誰に大好きされたか」を引ける口は作らない（FR-FOLLOW-004、OUT-004）。
+ *   この関数が書き換えるのは、閲覧者本人の following だけ。
+ */
+export async function setLiked(personaId: string, liked: boolean): Promise<SetLikedResult> {
+  await sleep(MOCK_LATENCY_MS);
+  if (personaId === ME.baby.id || personaId === ME.mother.id) {
+    return { ok: false, liked: false };
+  }
+  if (!PERSONA_BY_ID[personaId]) {
+    return { ok: false, liked: false };
+  }
+  if (liked) {
+    following.add(personaId);
+  } else {
+    following.delete(personaId);
+  }
+  return { ok: true, liked: following.has(personaId) };
 }

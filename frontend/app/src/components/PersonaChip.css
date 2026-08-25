@@ -17,6 +17,14 @@
 .eg-persona__name {
   color: var(--ink);
   overflow-wrap: anywhere;
+  text-align: start;
+}
+
+/* S6 への入り口。下線は出しっぱなしにせず、狙ったときだけ出す */
+.eg-persona__name--link:hover,
+.eg-persona__name--link:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .eg-persona__meta {

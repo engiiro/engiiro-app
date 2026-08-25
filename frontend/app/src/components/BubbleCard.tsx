@@ -19,14 +19,21 @@ import "./BubbleCard.css";
 type BubbleCardProps = {
   readonly bubble: Bubble;
   readonly onOpen: (bubbleId: string) => void;
+  /** ニックネームから S6 公開プロフィールへ */
+  readonly onOpenProfile: (personaId: string) => void;
   readonly onReact: (bubbleId: string, reaction: ReactionType) => void;
 };
 
-export function BubbleCard({ bubble, onOpen, onReact }: BubbleCardProps) {
+export function BubbleCard({ bubble, onOpen, onOpenProfile, onReact }: BubbleCardProps) {
   return (
     <article className={cx("eg-card", bubble.read && "is-read")}>
       <header className="eg-card__head">
-        <PersonaChip persona={bubble.author} createdAt={bubble.createdAt} showRole={false} />
+        <PersonaChip
+          persona={bubble.author}
+          createdAt={bubble.createdAt}
+          showRole={false}
+          onOpenProfile={onOpenProfile}
+        />
         <span className={cx("eg-card__state", "t-label")}>
           {bubble.read ? (
             <span className="eg-card__read">よんだ</span>

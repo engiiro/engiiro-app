@@ -26,6 +26,12 @@
   min-width: 0;
 }
 
+/* 見出しの右端（大好きボタン）。名前が長くても押せる幅を残す */
+.eg-summary__action {
+  flex: none;
+  margin-inline-start: auto;
+}
+
 .eg-summary__text {
   display: flex;
   flex-direction: column;
@@ -46,11 +52,9 @@
 }
 
 .eg-summary__caption {
-  color: var(--muted);
+  color: var(--body);
 }
 
-.eg-summary__foot {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
+.eg-summary__note {
+  color: var(--muted);
 }

@@ -67,10 +67,6 @@
   justify-content: center;
 }
 
-.eg-myprofile__unavailable {
-  color: var(--muted);
-}
-
 /* 一段狭いところでは、横2枚を縦に折り返す（DESIGN.md §8.1） */
 @media (width < 560px) {
   .eg-myprofile__personas,

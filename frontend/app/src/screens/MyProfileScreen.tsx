@@ -1,20 +1,18 @@
 import { useState } from "react";
 
 import type {
-  MyActivityItem,
-  MyActivityTab,
+  ActivityEntry,
+  ActivityTab,
   MyProfile,
   MyProfileEntry,
   PersonaKind,
 } from "../data/types";
 import { birthdayText } from "../lib/birthday";
 import { cx } from "../lib/cx";
-import { MAX_MONTHS } from "../lib/mockAiEvaluate";
 import { ActivityItem } from "../components/ActivityItem";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
-import { Meter } from "../components/Meter";
 import { NoteBox } from "../components/NoteBox";
 import { PersonaSummaryCard } from "../components/PersonaSummaryCard";
 import { RowLink } from "../components/RowLink";
@@ -50,14 +48,14 @@ import "./MyProfileScreen.css";
  * プロフィールそのものは読めるままにする。
  */
 
-const TABS: readonly SegmentedTab<MyActivityTab>[] = [
+const TABS: readonly SegmentedTab<ActivityTab>[] = [
   // モックの「ポスト」「あやし」は、docs/specification.md §3.1 の用語では「バブル」「あやす」
   { value: "babyBubbles", label: "赤ちゃんの バブル" },
   { value: "babyAll", label: "赤ちゃんの バブルとあやす" },
   { value: "motherSoothes", label: "お母さんの あやす" },
 ];
 
-const EMPTY_LINES: Readonly<Record<MyActivityTab, readonly string[]>> = {
+const EMPTY_LINES: Readonly<Record<ActivityTab, readonly string[]>> = {
   babyBubbles: ["まだ バブルを かいていません。", "はじめの ひとことを だしてみる？"],
   babyAll: ["赤ちゃんとしての 記録は まだ ありません。"],
   motherSoothes: ["お母さんとして あやした ことばは まだ ありません。"],
@@ -68,11 +66,11 @@ const PAGE_SIZE = 5;
 
 type MyProfileScreenProps = {
   readonly profile: MyProfile | null;
-  readonly activity: readonly MyActivityItem[];
+  readonly activity: readonly ActivityEntry[];
   readonly loading: boolean;
   readonly activityLoading: boolean;
-  readonly tab: MyActivityTab;
-  readonly onTabChange: (tab: MyActivityTab) => void;
+  readonly tab: ActivityTab;
+  readonly onTabChange: (tab: ActivityTab) => void;
   readonly onOpenBubble: (bubbleId: string) => void;
   readonly onDeleteBubble: (bubbleId: string) => void;
   readonly onOpenFollowing: (kind: PersonaKind) => void;
@@ -116,12 +114,12 @@ export function MyProfileScreen({
               <PersonaSummaryCard
                 persona={profile.baby.persona}
                 caption={babyCaption(profile.baby)}
-                footer={statusFooter(profile.baby, "baby")}
+                note={axisNote(profile.baby)}
               />
               <PersonaSummaryCard
                 persona={profile.mother.persona}
                 caption={motherCaption(profile.mother)}
-                footer={statusFooter(profile.mother, "mother")}
+                note={axisNote(profile.mother)}
               />
             </div>
 
@@ -256,28 +254,15 @@ function motherCaption(entry: MyProfileEntry): string {
 }
 
 /**
- * カードの下に足すもの。
- * メーターはバーだけで伝えない決まりなので、軸の名前と数値を必ず添える（DESIGN.md §4 Meter）。
- * 評価が使えないときは、その旨だけを出す（NFR-002）。
+ * 推定の下に小さく添える、何を測ったのかの一行。
+ *
+ * 赤ちゃん度とお母さん度は別の軸で、同じ尺度の値ではない（FR-AI-EVAL-002）。
+ * 横に2枚並ぶので、軸の名前が無いと「どちらが大きい」と読めてしまう。
+ * 評価が使えないときは、その旨に置き換える（NFR-002）。
  */
-function statusFooter(entry: MyProfileEntry, kind: PersonaKind) {
+function axisNote(entry: MyProfileEntry): string {
   if (entry.status === null) {
-    return (
-      <p className={cx("eg-myprofile__unavailable", "t-caption")}>
-        いま、ことばの はかりは 使えません。しばらくしてから もう一度 ひらいてみてください。
-      </p>
-    );
+    return "いま、ことばの はかりは 使えません。しばらくしてから ひらいてみてください。";
   }
-  if (entry.status.sampleCount === 0) {
-    return <p className={cx("eg-myprofile__unavailable", "t-caption")}>{entry.status.axis}</p>;
-  }
-  return (
-    <Meter
-      kind={kind}
-      value={entry.status.months}
-      max={MAX_MONTHS}
-      label={entry.status.label}
-      axis={entry.status.axis}
-    />
-  );
+  return entry.status.axis;
 }
