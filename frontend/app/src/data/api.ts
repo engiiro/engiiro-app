@@ -3,7 +3,7 @@ import { AiUnavailableError } from "../lib/mockAiTransform";
 import { moderate } from "../lib/mockModeration";
 import { BUBBLE_MAX_LENGTH, REACTION_MAX_PER_USER, countChars } from "./constants";
 import { BUBBLE_SEEDS } from "./bubbles";
-import { BABY_PERSONAS, ME, MOTHER_PERSONAS, PERSONA_BY_ID } from "./personas";
+import { BABY_PERSONAS, ME, MOTHER_PERSONAS, PERSONA_BY_ID, setMe } from "./personas";
 import { isReactionAllowed } from "./reactions";
 import { SOOTHE_SEEDS } from "./soothes";
 import { STAMP_CATALOG } from "./stamps";
@@ -14,6 +14,8 @@ import type {
   CreateSootheInput,
   ActivityEntry,
   ActivityTab,
+  CreateAccountInput,
+  CreateAccountResult,
   Me,
   MyProfile,
   PersonaKind,
@@ -32,6 +34,7 @@ import type {
  *
  * 実 API に差し替えるときは、ここの各関数の中身を fetch に置き換える。画面側は触らない。
  * 対応する口は docs/design_doc.md §7：
+ *   createAccount      → POST /api/accounts（S1。設計書に未記載。FR-ACCOUNT-001/002 の受け皿）
  *   fetchMe            → GET  /api/profile/me
  *   fetchMyProfile      → GET  /api/profile/me（S8。両ペルソナのステータス付き）
  *   fetchMyActivity     → GET  /api/profile/me/activity（設計書に未記載）
@@ -670,4 +673,95 @@ export async function fetchLikedPersonas(): Promise<{
     baby: liked.filter((persona) => persona.kind === "baby"),
     mother: liked.filter((persona) => persona.kind === "mother"),
   };
+}
+
+/*
+ * ────────────── S1 アカウント登録 ──────────────
+ *
+ * ★ 認証・アカウント登録の仕様は未確定（Issue #7、status:needs-human）。
+ *   ここにある規則は、画面を動かすための仮置きで、正しさの根拠になるものではない。
+ *   本物の判定はすべて backend の担当（FR-MOD-004 と同じ立場）。
+ *   決まったら、この節と SignUpScreen の説明文をいっしょに直す。
+ */
+
+/** すでに使われている アカウントID（重複不可）。仮置きのダミー */
+const TAKEN_ACCOUNT_IDS: ReadonlySet<string> = new Set(["engiiro", "admin", "yowane", "test"]);
+
+/** 仮置き：半角の英小文字・数字・アンダースコアで 3〜20 文字 */
+const ACCOUNT_ID_PATTERN = /^[a-z0-9_]{3,20}$/;
+
+/** 仮置き：8 文字以上 */
+export const PASSWORD_MIN_LENGTH = 8;
+
+/** ニックネームの上限。仕様に無いので仮置き */
+export const NICKNAME_MAX_LENGTH = 20;
+
+export const ACCOUNT_ID_RULE_TEXT = "半角の 英小文字・数字・_ で 3〜20 文字";
+
+/**
+ * アカウントを作る（POST /api/accounts 相当）。
+ *
+ * FR-ACCOUNT-001：1回の登録で赤ちゃんとお母さんの2ペルソナが同時にできる。
+ * FR-ACCOUNT-002：ニックネームはそれぞれ設定できる。
+ * FR-ACCOUNT-003：認証情報は内部情報。戻り値に password を含めない。
+ *
+ * ★ ニックネームにもモデレーションをかけている（この判断は私のもの。要確認）。
+ *   仕様書 FR-MOD-001〜003 は「本文」を対象と書いていて、ニックネームには触れていない。
+ *   ただ、ニックネームは公開プロフィールに常に出るので、そこに電話番号や
+ *   外部アカウント名が入ると、本文を守っている意味がなくなる（FR-MOD-010 の趣旨）。
+ *
+ * ★ 2つのニックネームが完全に同じときも作らない（この判断も私のもの。要確認）。
+ *   同じ名前が両方に出ると、それだけで同一人物の手がかりになる（FR-PERSONA-003）。
+ */
+export async function createAccount(input: CreateAccountInput): Promise<CreateAccountResult> {
+  await sleep(MOCK_LATENCY_MS);
+
+  const accountId = input.accountId.trim();
+  if (!ACCOUNT_ID_PATTERN.test(accountId)) {
+    return { ok: false, reason: "account_id_invalid" };
+  }
+  if (TAKEN_ACCOUNT_IDS.has(accountId)) {
+    return { ok: false, reason: "account_id_taken" };
+  }
+  if (input.password.length < PASSWORD_MIN_LENGTH) {
+    return { ok: false, reason: "password_weak" };
+  }
+
+  const baby = input.babyNickname.trim();
+  const mother = input.motherNickname.trim();
+  if (baby.length === 0 || mother.length === 0) {
+    return { ok: false, reason: "nickname_empty" };
+  }
+  if (countChars(baby) > NICKNAME_MAX_LENGTH || countChars(mother) > NICKNAME_MAX_LENGTH) {
+    return { ok: false, reason: "nickname_too_long" };
+  }
+  if (baby === mother) {
+    return { ok: false, reason: "nickname_same" };
+  }
+  if (moderate(baby) === "violation" || moderate(mother) === "violation") {
+    return { ok: false, reason: "nickname_moderation" };
+  }
+
+  /*
+   * モックなので、閲覧者自身のペルソナの名前だけを差し替える。
+   * ペルソナ id は変えない。すでにあるバブル・あやすの表示名も合わせる。
+   * password はここで捨てる。どこにも持たない（FR-ACCOUNT-003）。
+   */
+  const next: Me = {
+    baby: { ...ME.baby, nickname: baby },
+    mother: { ...ME.mother, nickname: mother },
+  };
+  setMe(next);
+  PERSONA_BY_ID[next.baby.id] = next.baby;
+  PERSONA_BY_ID[next.mother.id] = next.mother;
+  bubbles = bubbles.map((bubble) =>
+    bubble.author.id === next.baby.id ? { ...bubble, author: next.baby } : bubble,
+  );
+  soothes = soothes.map((soothe) => {
+    if (soothe.author.id === next.baby.id) {
+      return { ...soothe, author: next.baby };
+    }
+    return soothe.author.id === next.mother.id ? { ...soothe, author: next.mother } : soothe;
+  });
+  return { ok: true, me: next };
 }

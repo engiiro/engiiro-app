@@ -27,10 +27,21 @@ export const MOTHER_PERSONAS: Readonly<Record<string, PublicPersona>> = {
  * 閲覧者自身。両ペルソナをまとめて持てるのは本人専用の文脈だけ（FR-PERSONA-005）。
  * 画面では、この2つのニックネームを同時に出さない（DESIGN.md §0.1-1）。
  */
-export const ME: Me = {
+export let ME: Me = {
   baby: { id: "bp_me", kind: "baby", nickname: "よわねだいおう" },
   mother: { id: "mp_me", kind: "mother", nickname: "そっとみまもり係" },
 };
+
+/**
+ * 登録（S1）でニックネームが決まったときだけ差し替える。
+ *
+ * モックなので、閲覧者自身は最初から居ることにしてある。
+ * 実 API に差し替えるときは、ログイン中のアカウントを保持する仕組みに置き換わる
+ * （認証は Issue #7 で未確定）。ペルソナ id は変えない。
+ */
+export function setMe(next: Me): void {
+  ME = next;
+}
 
 /**
  * id からペルソナを引く表。**data/api.ts（サーバ側の境界）からだけ使う。**
@@ -38,8 +49,10 @@ export const ME: Me = {
  * ME.baby と ME.mother が同じ表に並ぶが、これはサーバが内部で持っている状態の代わり。
  * 画面側からこの表を引かない。引けば「id を渡せば誰でも辿れる」形になり、
  * 非連結を守る責任が画面側へこぼれる（FR-PERSONA-003）。
+ *
+ * 登録でニックネームが決まったときに書き換わるので readonly にしていない。
  */
-export const PERSONA_BY_ID: Readonly<Record<string, PublicPersona>> = Object.fromEntries(
+export const PERSONA_BY_ID: Record<string, PublicPersona> = Object.fromEntries(
   [...Object.values(BABY_PERSONAS), ...Object.values(MOTHER_PERSONAS), ME.baby, ME.mother].map(
     (persona) => [persona.id, persona],
   ),

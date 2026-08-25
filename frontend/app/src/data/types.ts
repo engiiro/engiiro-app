@@ -200,3 +200,39 @@ export type PublicProfile = {
   /** 自分自身のペルソナか。大好きボタンを出すかどうかだけに使う */
   readonly isMe: boolean;
 };
+
+/**
+ * アカウント登録の入力（S1 / FR-ACCOUNT-001/002）。
+ *
+ * 1回の登録で赤ちゃんとお母さんの2ペルソナが同時にできる（FR-ACCOUNT-001）。
+ * ニックネームは別々に決める（FR-ACCOUNT-002）。
+ *
+ * ★ 認証情報はアカウントに紐づく内部情報。応答にも他の型にも持ち出さない（FR-ACCOUNT-003）。
+ *   この型は「送るもの」で、返ってくるものには password を含めない。
+ */
+export type CreateAccountInput = {
+  readonly accountId: string;
+  readonly password: string;
+  readonly babyNickname: string;
+  readonly motherNickname: string;
+};
+
+/**
+ * 登録の結果。
+ *
+ * 失敗の理由は、画面の出し分けに使う粗い区分だけ。
+ * どの規則に当たったかの内部情報は返さない（FR-MOD-034 / FR-PRIV-006 と同じ立場）。
+ */
+export type CreateAccountResult =
+  | { readonly ok: true; readonly me: Me }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "account_id_taken"
+        | "account_id_invalid"
+        | "password_weak"
+        | "nickname_empty"
+        | "nickname_too_long"
+        | "nickname_same"
+        | "nickname_moderation";
+    };

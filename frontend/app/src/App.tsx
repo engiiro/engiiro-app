@@ -31,7 +31,7 @@ import type {
 import { LeftRail } from "./components/LeftRail";
 import type { CenterView } from "./components/LeftRail";
 import { MockControls } from "./components/MockControls";
-import type { FeedMode } from "./components/MockControls";
+import type { EntryStage, FeedMode } from "./components/MockControls";
 import { RightRail } from "./components/RightRail";
 import { SkeletonFeed } from "./components/Skeleton";
 import { Toast } from "./components/Toast";
@@ -43,9 +43,11 @@ import { BubbleDetailScreen } from "./screens/BubbleDetailScreen";
 import { ComposePanel } from "./screens/ComposePanel";
 import type { ComposeMode } from "./screens/ComposePanel";
 import { FavoritesScreen } from "./screens/FavoritesScreen";
+import { IntroScreen } from "./screens/IntroScreen";
 import { MyProfileScreen } from "./screens/MyProfileScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
 import { PublicProfileScreen } from "./screens/PublicProfileScreen";
+import { SignUpScreen } from "./screens/SignUpScreen";
 import { TimelineScreen } from "./screens/TimelineScreen";
 import "./App.css";
 
@@ -72,6 +74,18 @@ export function App() {
   const [aiEvaluateAvailable, setAiEvaluateAvailable] = useState(true);
   const [aiTransformAvailable, setAiTransformAvailable] = useState(true);
   const [feedMode, setFeedMode] = useState<FeedMode>("normal");
+
+  /*
+   * 画面の入り口（人間の指示、2026-08-25）。
+   *   intro  … 登録の前に読む説明。サーバへ何も送らない
+   *   signup … S1 アカウント登録
+   *   app    … 本編
+   *
+   * モックなので既定は本編。説明と登録は操作帯の「入り口」から見る。
+   * 本物では、未登録なら intro から始まり、登録が済めば app にしか入らない
+   * （認証は Issue #7 で未確定）。
+   */
+  const [entry, setEntry] = useState<EntryStage>("app");
 
   const [view, setView] = useState<CenterView>("timeline");
   const [detailBubbleId, setDetailBubbleId] = useState<string | null>(null);
@@ -353,6 +367,44 @@ export function App() {
   const showPublicProfile = publicPersonaId !== null;
   const showTimeline = view === "timeline" && !showPublicProfile;
 
+  if (entry !== "app") {
+    return (
+      <div className="eg-app">
+        <MockControls
+          theme={theme}
+          onThemeChange={setTheme}
+          aiEvaluateAvailable={aiEvaluateAvailable}
+          onAiEvaluateChange={(available) => {
+            setAiEvaluateAvailable(available);
+            setAiEvaluateAvailability(available);
+          }}
+          aiTransformAvailable={aiTransformAvailable}
+          onAiTransformChange={setAiTransformAvailable}
+          feedMode={feedMode}
+          onFeedModeChange={(mode) => {
+            setFeedLoading(true);
+            setFeedMode(mode);
+          }}
+          entry={entry}
+          onEntryChange={setEntry}
+        />
+
+        {entry === "intro" ? (
+          <IntroScreen onStart={() => setEntry("signup")} onSkip={() => setEntry("signup")} />
+        ) : (
+          <SignUpScreen
+            onBack={() => setEntry("intro")}
+            onDone={(babyNickname) => {
+              setEntry("app");
+              navigate("timeline");
+              setToast(babyNickname + " として はじめました");
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={cx("eg-app", compose && "is-composing")}>
       <MockControls
@@ -371,6 +423,8 @@ export function App() {
           setFeedLoading(true);
           setFeedMode(mode);
         }}
+        entry={entry}
+        onEntryChange={setEntry}
       />
 
       <div className="eg-layout">

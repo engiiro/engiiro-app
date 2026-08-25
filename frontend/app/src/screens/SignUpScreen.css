@@ -1,0 +1,106 @@
+/* S1 アカウント登録 */
+
+.eg-signup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-lg) var(--gutter);
+  background: var(--canvas);
+}
+
+.eg-signup__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 520px;
+  padding: var(--space-lg);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+}
+
+.eg-signup__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.eg-signup__brand {
+  color: var(--accent-line);
+}
+
+.eg-signup__back {
+  margin-inline-start: auto;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-pill);
+  color: var(--muted);
+}
+
+.eg-signup__back:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
+/* パスワード欄と「みる」を横に並べる。ボタンは入力欄の高さに合わせる */
+.eg-signup__password {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-xs);
+}
+
+.eg-signup__password > .eg-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.eg-signup__peek {
+  flex: none;
+  min-height: var(--control-min-height);
+  padding: 0 var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.eg-signup__peek:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.eg-signup__names {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+}
+
+.eg-signup__legend {
+  padding: 0 var(--space-xxs);
+  color: var(--ink);
+}
+
+.eg-signup__legend-note {
+  color: var(--muted);
+}
+
+/* アバターを左に置いて、どちらの顔の名前かを色でも示す */
+.eg-signup__name {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.eg-signup__name > .eg-avatar {
+  margin-top: var(--space-lg);
+}
+
+.eg-signup__name > .eg-field {
+  flex: 1;
+  min-width: 0;
+}
