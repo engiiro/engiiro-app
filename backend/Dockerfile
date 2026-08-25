@@ -11,4 +11,4 @@ RUN deno cache main.ts
 
 EXPOSE 8000
 
-CMD ["run", "--allow-net", "--allow-env", "--unstable-kv", "main.ts"]
+CMD ["run", "--allow-net", "--allow-read", "--allow-env", "--allow-sys", "main.ts"]
