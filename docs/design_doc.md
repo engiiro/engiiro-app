@@ -413,6 +413,33 @@ create table reactions (
     )
 );
 
+-- 同一利用者・同一対象・同一種類のリアクションは5件まで（FR-REACT-010〜011）。
+-- 集計を伴う制約はCHECK制約単体では書けないため、INSERT前トリガーで検査する。
+create or replace function reactions_enforce_limit() returns trigger as $$
+declare
+    current_count integer;
+begin
+    select count(*) into current_count
+    from reactions
+    where reactor_account_id = new.reactor_account_id
+      and target_type = new.target_type
+      and target_post_id is not distinct from new.target_post_id
+      and target_comment_id is not distinct from new.target_comment_id
+      and type = new.type;
+
+    if current_count >= 5 then
+        raise exception 'reaction limit exceeded: max 5 per reactor/target/type (FR-REACT-011)';
+    end if;
+
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger reactions_limit_check
+    before insert on reactions
+    for each row
+    execute function reactions_enforce_limit();
+
 create table follows (
     id                   uuid primary key default gen_random_uuid(),
     follower_account_id  uuid        not null references accounts (id),
@@ -432,7 +459,7 @@ create table persona_age_estimates (
 );
 ```
 
-> `comments_persona_exclusive`・`reactions_target_exclusive`は「入力された値の組み合わせ」を検査するCHECK制約であり、6.1節で触れた「参照先テーブルの行の値に依存する制約」（例：`reply_to_comment_id`が指す行の`persona_type`が`'mother'`なら自分は`'baby'`でなければならない、リアクション対象のあやすが`mother`なら`type`は`babu`のみ、というFR-COMMENT-005〜007・FR-REACT-005〜007の制約）はCHECK制約だけでは書けない。これらはPostgreSQLのトリガー（`CREATE TRIGGER` + `CREATE FUNCTION`）またはアプリケーション層でのバリデーションで担保する（6.5節参照）。
+> `comments_persona_exclusive`・`reactions_target_exclusive`は「入力された値の組み合わせ」を検査するCHECK制約であり、6.1節で触れた「参照先テーブルの行の値に依存する制約」（例：`reply_to_comment_id`が指す行の`persona_type`が`'mother'`なら自分は`'baby'`でなければならない、リアクション対象のあやすが`mother`なら`type`は`babu`のみ、というFR-COMMENT-005〜007・FR-REACT-005〜007の制約）はCHECK制約だけでは書けない。これらはPostgreSQLのトリガー（`CREATE TRIGGER` + `CREATE FUNCTION`）またはアプリケーション層でのバリデーションで担保する（6.5節参照）。`reactions_enforce_limit`トリガーは、この種の「集計を伴う制約」（同一利用者・同一対象・同一種類は5件まで、FR-REACT-010〜011）をトリガーで実装する例である。
 
 ### 6.3 テーブル定義
 
