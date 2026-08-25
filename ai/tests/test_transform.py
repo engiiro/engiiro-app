@@ -74,7 +74,7 @@ def no_network(monkeypatch):
     ("今日は仕様書をレビューしました。", "allow", []),
     ("テストが全部落ちた。つらい。", "allow", []),
     ("React.js の index.ts が壊れた。", "allow", []),
-    ("まったく無能だ。", "rewrite_required", ["harsh_criticism"]),
+    ("まったく無能だ。", "block", ["harsh_criticism"]),
     ("きえろ。", "block", ["ng_word"]),
     ("消えたい。", "block", ["self_harm"]),
     ("殺してやる。", "block", ["harm_others"]),
@@ -101,22 +101,37 @@ def test_判定APIは空文字列をValueError(no_network):
             T.moderate(bad)
 
 
-def test_判定APIは自傷を必ずblockへ倒す(no_network, monkeypatch):
+@pytest.mark.parametrize("code", ["self_harm", "harm_others", "harsh_criticism"])
+def test_判定APIは必ず弾く理由コードでblockへ倒す(no_network, monkeypatch, code):
     """辞書側の設定が緩められても block になること。
 
-    人間監督の決定「自傷・他害は絶対に弾いてください」に対する二重の保険。
+    人間監督の決定に対する二重の保険。
+        「自傷・他害は絶対に弾いてください」
+        「マサカリは完全にブロックにしましょう。状況によって変えません」
     """
     monkeypatch.setattr(T, "check_rules",
                         lambda text: {"action": "rewrite_required",
-                                      "reasonCodes": ["self_harm"]})
+                                      "reasonCodes": [code]})
     assert T.moderate("なにか")["action"] == "block"
 
 
-def test_判定APIは辞書に無い理由コードでは倒さない(no_network, monkeypatch):
+def test_判定APIは必ず弾く対象でない理由コードでは倒さない(no_network, monkeypatch):
     monkeypatch.setattr(T, "check_rules",
                         lambda text: {"action": "rewrite_required",
-                                      "reasonCodes": ["harsh_criticism"]})
+                                      "reasonCodes": ["sexual_explicit"]})
     assert T.moderate("なにか")["action"] == "rewrite_required"
+
+
+def test_辞書はrewrite_requiredを返さなくなった(no_network):
+    """マサカリが block になったため、規則からは3状態のうち2つしか出ない。
+
+    仕様書 FR-AI-TRANS-002 は3状態を要求しているが、
+    判定APIが返すのは allow と block だけになった。
+    状態そのものを契約から外すかは人間監督の判断を待っている。
+    """
+    for text in ("今日は仕様書をレビューしました。", "まったく無能だ。",
+                 "消えたい。", "きえろ。", "殺してやる。"):
+        assert T.moderate(text)["action"] in ("allow", "block")
 
 
 # ============================================================
@@ -239,33 +254,69 @@ def test_変換後blockなら変換結果を返さない(calls):
     assert result["reasonCodes"] == ["ng_word"]
 
 
-def test_変換後のrewrite_requiredを捨てない(calls):
-    """変換前は allow、変換後だけ rewrite_required になった場合。
+def test_変換後のマサカリも弾く(calls):
+    """変換前は allow、変換によってマサカリ語が生じた場合。
 
-    以前はここを捨てていて allow / [] を返していた。
-    捨てると、変換後に判定する意味がなくなる。
+    後段の判定が効いていないと素通りする。
     """
     calls["script"].append("まったく無能なのー")
     result = T.transform("baby", "テストです", client=object())
 
-    assert result["action"] == "rewrite_required"
+    assert result["action"] == "block"
     assert result["reasonCodes"] == ["harsh_criticism"]
-    assert result["transformedText"] == "まったく無能なのー", \
+    assert result["transformedText"] is None
+
+
+def test_変換後のrewrite_requiredを捨てない(calls, monkeypatch):
+    """変換前は allow、変換後だけ rewrite_required になった場合。
+
+    以前はここを捨てていて allow / [] を返していた。
+    捨てると、変換後に判定する意味がなくなる。
+
+    いまの辞書は rewrite_required を返さないので、判定を差し替えて確かめる。
+    仕様書 FR-AI-TRANS-002 が3状態を要求しているため、
+    状態が復活したときに壊れていないようにしておく。
+    """
+    verdicts = iter([
+        {"action": "allow", "reasonCodes": []},
+        {"action": "rewrite_required", "reasonCodes": ["sexual_explicit"]},
+    ])
+    monkeypatch.setattr(T, "check_rules", lambda text: next(verdicts))
+
+    calls["script"].append("へんかんしたよ")
+    result = T.transform("baby", "テストです", client=object())
+
+    assert result["action"] == "rewrite_required"
+    assert result["reasonCodes"] == ["sexual_explicit"]
+    assert result["transformedText"] == "へんかんしたよ", \
         "block ではないので、変換結果は返す"
 
 
-def test_変換前と変換後の理由コードを合わせる(calls):
-    calls["script"].append("おまえなんてきえろ")
-    result = T.transform("baby", "まったく無能だ。", client=object())
-    assert result["reasonCodes"] == ["harsh_criticism", "ng_word"]
+def test_変換前と変換後の理由コードを合わせる(calls, monkeypatch):
+    verdicts = iter([
+        {"action": "rewrite_required", "reasonCodes": ["sexual_explicit"]},
+        {"action": "block", "reasonCodes": ["ng_word"]},
+    ])
+    monkeypatch.setattr(T, "check_rules", lambda text: next(verdicts))
+
+    calls["script"].append("へんかんしたよ")
+    result = T.transform("baby", "テストです", client=object())
+    assert result["action"] == "block"
+    assert result["reasonCodes"] == ["ng_word", "sexual_explicit"]
 
 
-def test_変換前rewrite_requiredは変換後allowでも残る(calls):
+def test_変換前rewrite_requiredは変換後allowでも残る(calls, monkeypatch):
+    verdicts = iter([
+        {"action": "rewrite_required", "reasonCodes": ["sexual_explicit"]},
+        {"action": "allow", "reasonCodes": []},
+    ])
+    monkeypatch.setattr(T, "check_rules", lambda text: next(verdicts))
+
     calls["script"].append("やさしいことばになったよ")
-    result = T.transform("baby", "まったく無能だ。", client=object())
+    result = T.transform("baby", "テストです", client=object())
     assert result["action"] == "rewrite_required", \
         "変換で表面が和らいでも、元の投稿への指摘は消えない"
-    assert result["reasonCodes"] == ["harsh_criticism"]
+    assert result["reasonCodes"] == ["sexual_explicit"]
 
 
 def test_変換後の判定も通信しない(calls, monkeypatch):
@@ -486,7 +537,8 @@ def test_LLM判定は形態素解析で拾えないマサカリを拾える(call
     calls["script"].append(json.dumps(
         {"action": "rewrite_required", "reasonCodes": ["harsh_criticism"]},
         ensure_ascii=False))
-    assert T.moderate_by_llm(masakari, client=object())["action"] == "rewrite_required"
+    assert T.moderate_by_llm(masakari, client=object())["action"] == "block", \
+        "LLM が rewrite_required と答えても、マサカリは block へ倒す"
 
 
 def test_LLM判定は規則でblockなら外部へ送らない(calls, monkeypatch):

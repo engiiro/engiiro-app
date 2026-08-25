@@ -90,10 +90,12 @@ def load_dictionary(name: str) -> dict:
 # 「無能」は「うまくいかなくて困っている」に言い換えられるが、
 # 「死ね」はやわらげようとすると中身が何も残らない。
 
-# どう言い換えても前向きな文章にならないもの
+# 露骨な侮辱語・差別語。理由コードは ng_word
 NG_WORDS_BLOCK = load_dictionary("block")
 
-# 言い換えれば愚痴や励ましになるもの（マサカリ寄りの語）
+# 他人を責める、能力や人格を否定する語（マサカリ）。理由コードは harsh_criticism。
+# 変数名とファイル名は以前の方針（言い換えを促す）の名残で、
+# いまは当たれば block になる。詳しくは HARSH_CRITICISM_ACTION の説明。
 NG_WORDS_REWRITE = load_dictionary("rewrite")
 
 # 「ゴミ」と「アホ」はここに入れない。
@@ -127,10 +129,16 @@ SELF_HARM_WORDS = load_dictionary("self_harm")
 # この種のものは LLM 側の判定に任せる。
 HARM_OTHERS_WORDS = load_dictionary("harm_others")
 
-# 自傷・他害を検出したときの扱い。人間監督の決定により block で固定。
+# 検出したときの扱い。すべて人間監督の決定により block で固定。
 # 設定値として残してあるが、AIの判断で変更しないこと。
 SELF_HARM_ACTION = "block"
 HARM_OTHERS_ACTION = "block"
+
+# マサカリも block。人間監督の決定：
+#   「マサカリは完全にブロックにしましょう。状況によって変えません。」
+# 以前は「言い換えれば愚痴や励ましになるなら rewrite_required」だったが、
+# 状況で変えない方針へ変わった。文脈を見て軽くすることはしない。
+HARSH_CRITICISM_ACTION = "block"
 
 
 # ============================================================
@@ -491,7 +499,7 @@ def check_rules(text: str) -> dict:
     elif hit_block or hit_personal:
         action = "block"
     elif hit_rewrite:
-        action = "rewrite_required"
+        action = HARSH_CRITICISM_ACTION
     else:
         action = "allow"
 

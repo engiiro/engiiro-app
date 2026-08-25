@@ -31,12 +31,14 @@ def test_弾くべきものを弾く(text):
     assert check_rules(text)["action"] == "block"
 
 
-@pytest.mark.parametrize("text", P.REWRITE, ids=_label)
-def test_マサカリ語をrewrite_requiredにする(text):
+@pytest.mark.parametrize("text", P.HARSH, ids=_label)
+def test_マサカリは必ず弾く(text):
     result = check_rules(text)
     if not tokenizer_available() and result["action"] == "allow":
         pytest.skip("形態素解析器が無いので品詞つきの語は調べない")
-    assert result["action"] == "rewrite_required", result["details"]
+    assert "harsh_criticism" in result["reasonCodes"], result["details"]
+    assert result["action"] == "block", \
+        "人間監督の決定によりマサカリは状況によらず block"
 
 
 @pytest.mark.parametrize("text", P.SELF_HARM, ids=_label)

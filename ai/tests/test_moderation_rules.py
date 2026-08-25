@@ -91,9 +91,14 @@ def test_NG語をblockする():
         assert "ng_word" in result["reasonCodes"]
 
 
-def test_マサカリ寄りの語をrewrite_requiredにする():
+def test_マサカリ語をblockにする():
+    """人間監督の決定により、状況によらず block。
+
+    「マサカリは完全にブロックにしましょう。状況によって変えません」
+    以前は rewrite_required だった。理由コードは harsh_criticism のまま。
+    """
     result = check_rules("あの人は無能だと思う。")
-    assert result["action"] == "rewrite_required"
+    assert result["action"] == "block"
     assert "harsh_criticism" in result["reasonCodes"]
 
 
