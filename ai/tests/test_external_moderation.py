@@ -18,7 +18,8 @@ import external_moderation as E
 def _clear_env(monkeypatch):
     """他のテストや実環境の設定を持ち込まない。"""
     for name in ("OPENAI_API_KEY", "AZURE_CONTENT_SAFETY_ENDPOINT",
-                 "AZURE_CONTENT_SAFETY_KEY", "GOOGLE_CLOUD_NL_API_KEY"):
+                 "AZURE_CONTENT_SAFETY_KEY", "GOOGLE_CLOUD_NL_API_KEY",
+                 "CHAKOSHI_API_KEY", "CHAKOSHI_GUARDRAIL_ID", "CHAKOSHI_API_URL"):
         monkeypatch.delenv(name, raising=False)
     E._warned.clear()
 
@@ -49,6 +50,7 @@ def test_設定が無ければ呼ばない(monkeypatch):
     assert E.check_openai("テスト") is None
     assert E.check_azure("テスト") is None
     assert E.check_google("テスト") is None
+    assert E.check_chakoshi("テスト") is None
 
 
 # ============================================================
@@ -330,3 +332,133 @@ def test_google_会話調のマサカリは拾えない(monkeypatch, google_env)
     拾えるようになったらこのテストが落ちるので、そのとき見直す。
     """
     assert _verdict_for(monkeypatch, "会話調のマサカリ")["action"] == "allow"
+
+
+# ============================================================
+# chakoshi（NTT）
+# ============================================================
+# レスポンス構造は nttcom/chakoshi-mcp-server のソースとREADMEから取った。
+# https://github.com/nttcom/chakoshi-mcp-server
+
+@pytest.fixture
+def chakoshi_env(monkeypatch):
+    monkeypatch.setenv("CHAKOSHI_API_KEY", "key")
+    monkeypatch.setenv("CHAKOSHI_GUARDRAIL_ID", "gr-test")
+
+
+def _chakoshi_response(categories=None, keyword_matched=False, unsafe_score=0.0):
+    return {
+        "guardrails": ["moderation", "keyword_filter"],
+        "user_input": "テスト",
+        "guardrails_result": {
+            "moderation": {
+                "unsafe_flag": unsafe_score > 0.5,
+                "unsafe_score": unsafe_score,
+                "categories": {
+                    name: {"enabled": True, "detected": detected}
+                    for name, detected in (categories or {}).items()
+                },
+            },
+            "keyword_filter": {
+                "matched": keyword_matched,
+                "matches": ["語"] if keyword_matched else [],
+                "original_text": "テスト",
+                "masked_input": "テスト",
+            },
+        },
+    }
+
+
+def test_chakoshi_暴力はblock(monkeypatch, chakoshi_env):
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_response({"violence": True}))
+    assert E.check_chakoshi("テスト") == {"action": "block",
+                                          "reasonCodes": ["harm_others"]}
+
+
+def test_chakoshi_嫌がらせはrewrite_required(monkeypatch, chakoshi_env):
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_response({"harassment": True}))
+    verdict = E.check_chakoshi("テスト")
+    assert verdict == {"action": "rewrite_required",
+                       "reasonCodes": ["harsh_criticism"]}
+
+
+def test_chakoshi_検出されていないカテゴリは拾わない(monkeypatch, chakoshi_env):
+    monkeypatch.setattr(E, "_post_json", lambda *a, **k: _chakoshi_response(
+        {"violence": False, "harassment": False}))
+    assert E.check_chakoshi("テスト") == {"action": "allow", "reasonCodes": []}
+
+
+def test_chakoshi_書き方の違いを吸収する(monkeypatch, chakoshi_env):
+    # self-harm と self_harm を同じものとして扱う
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_response({"self-harm": True}))
+    assert E.check_chakoshi("テスト") == {"action": "block",
+                                          "reasonCodes": ["self_harm"]}
+
+
+def test_chakoshi_知らないカテゴリは弾かずに警告する(monkeypatch, chakoshi_env, capsys):
+    """有効カテゴリは運用側が決めるので、知らない名前が来る。
+
+    勝手に block へ回すと意図しない拒否になるため、警告して無視する。
+    """
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_response({"謎のカテゴリ": True}))
+    verdict = E.check_chakoshi("テスト")
+    assert verdict["action"] == "allow", verdict
+    err = capsys.readouterr().err
+    assert "謎のカテゴリ" in err
+    assert "_CHAKOSHI_TO_REASON" in err
+
+
+def test_chakoshi_性的カテゴリは警告も出さず無視する(monkeypatch, chakoshi_env, capsys):
+    # 一律に禁止しない方針。意図して対応づけていないので警告も不要
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_response({"sexual": True}))
+    assert E.check_chakoshi("テスト")["action"] == "allow"
+    assert "sexual" not in capsys.readouterr().err
+
+
+def test_chakoshi_キーワード一致はblock(monkeypatch, chakoshi_env):
+    # 運用側が明示的に登録した語なので、当たれば弾く
+    monkeypatch.setattr(E, "_post_json",
+                        lambda *a, **k: _chakoshi_response(keyword_matched=True))
+    assert E.check_chakoshi("テスト") == {"action": "block",
+                                          "reasonCodes": ["ng_word"]}
+
+
+def test_chakoshi_リクエストの形を確認(monkeypatch, chakoshi_env):
+    called = {}
+
+    def capture(url, payload, headers):
+        called.update(url=url, payload=payload, headers=headers)
+        return _chakoshi_response()
+
+    monkeypatch.setattr(E, "_post_json", capture)
+    E.check_chakoshi("チェック対象のテキスト")
+    assert called["url"] == E.DEFAULT_CHAKOSHI_URL
+    assert called["payload"] == {"input": "チェック対象のテキスト",
+                                 "guardrail_id": "gr-test"}
+    assert called["headers"]["Authorization"] == "Bearer key"
+
+
+def test_chakoshi_URLを環境変数で上書きできる(monkeypatch, chakoshi_env):
+    # ベータのうちはエンドポイントが変わりうる
+    monkeypatch.setenv("CHAKOSHI_API_URL", "https://example.test/v9/apply")
+    called = {}
+
+    def capture(url, payload, headers):
+        called["url"] = url
+        return _chakoshi_response()
+
+    monkeypatch.setattr(E, "_post_json", capture)
+    E.check_chakoshi("テスト")
+    assert called["url"] == "https://example.test/v9/apply"
+
+
+def test_chakoshi_キーだけではだめ(monkeypatch):
+    # guardrail_id が無いと呼べない
+    monkeypatch.setenv("CHAKOSHI_API_KEY", "key")
+    assert E.chakoshi_available() is False
+    assert E.check_chakoshi("テスト") is None

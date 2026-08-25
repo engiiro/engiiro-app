@@ -25,6 +25,14 @@ Google Cloud Natural Language（無料枠 月5万ユニット。100文字で1ユ
     ※ AI Studio のキーとは別。GCPプロジェクトで
       Cloud Natural Language API を有効にして発行する
 
+chakoshi（NTT。パブリックβで無料。日本語のニュアンスに強い）
+    CHAKOSHI_API_KEY=...
+    CHAKOSHI_GUARDRAIL_ID=...
+    CHAKOSHI_API_URL=...  （任意。既定は下の DEFAULT_CHAKOSHI_URL）
+    ※ キーだけでは呼べない。管理画面でポリシーを設定して
+      ガードレールIDを発行する必要がある
+    ※ ベータ版のため、NTTは本番環境での使用を推奨していない
+
 ## 個人情報は送らない
 
 呼び出し元（transform_api.moderate）は、規則で personal_data を検出した時点で
@@ -69,6 +77,9 @@ UNMAPPED = {
         "Politics", "Finance", "Legal", "War & Conflict",
         "Firearms & Weapons", "Public Safety", "Illicit Drugs", "Sexual",
     ],
+    # chakoshi は管理画面で有効化したカテゴリだけが返る。
+    # ここに挙げたものは「意図して対応づけない」もので、警告も出さない。
+    "chakoshi": ["sexual", "adult", "sexual_content"],
 }
 
 # 各サービスのカテゴリを、えんじいろの理由コードへ対応づける。
@@ -136,8 +147,37 @@ _GOOGLE_TO_REASON = {
     "Profanity": "harsh_criticism",
 }
 
+# chakoshi の既定エンドポイント。ベータのうちは変わりうるので環境変数で上書きできる。
+DEFAULT_CHAKOSHI_URL = "https://api.beta.chakoshi.ntt.com/v1/guardrails/apply"
+
+# chakoshi のカテゴリ名を、えんじいろの理由コードへ対応づける。
+#
+# 他のサービスと違い、chakoshi は「どのカテゴリを有効にするか」を
+# 管理画面のポリシー設定で決める。つまり返ってくる名前は運用側が決める。
+# ここに無い名前が detected で返ってきた場合は、警告を出して無視する。
+# 知らない名前を勝手に block へ回すと、意図しない拒否になるため。
+#
+# 性的な内容は対応づけない。一律に禁止しない方針なので、
+# 文脈判断が要る。LLM側に任せる。
+_CHAKOSHI_TO_REASON = {
+    "violence": "harm_others",
+    "weapon": "harm_others",
+    "weapons": "harm_others",
+    "self_harm": "self_harm",
+    "suicide": "self_harm",
+    "harassment": "harsh_criticism",
+    "insult": "harsh_criticism",
+    "abuse": "harsh_criticism",
+    "hate": "ng_word",
+    "hate_speech": "ng_word",
+    "discrimination": "ng_word",
+    "personal_information": "personal_data",
+    "privacy": "personal_data",
+}
+
 # どの理由コードなら block か。自傷・他害は人間監督の決定により必ず block。
-_BLOCK_REASONS = {"self_harm", "harm_others", "ng_word", "sexual_explicit"}
+_BLOCK_REASONS = {"self_harm", "harm_others", "ng_word", "sexual_explicit",
+                  "personal_data"}
 
 _warned: set[str] = set()
 
@@ -276,6 +316,71 @@ def check_google(text: str) -> dict | None:
 
 
 # ============================================================
+# chakoshi（NTT）
+# ============================================================
+
+def chakoshi_available() -> bool:
+    return bool(os.getenv("CHAKOSHI_API_KEY") and os.getenv("CHAKOSHI_GUARDRAIL_ID"))
+
+
+def _normalize_category(name: str) -> str:
+    """カテゴリ名の書き方の違いを吸収する（self-harm と self_harm など）。"""
+    return (name or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def check_chakoshi(text: str) -> dict | None:
+    """chakoshi に見てもらう。設定が無ければ None。
+
+    有効なカテゴリは管理画面のポリシー設定で決まるため、
+    こちらで一覧を先に決めきれない。知らない名前が来たら警告して無視する。
+    """
+    api_key = os.getenv("CHAKOSHI_API_KEY")
+    guardrail_id = os.getenv("CHAKOSHI_GUARDRAIL_ID")
+    if not api_key or not guardrail_id:
+        return None
+
+    url = os.getenv("CHAKOSHI_API_URL") or DEFAULT_CHAKOSHI_URL
+    try:
+        result = _post_json(
+            url,
+            {"input": text, "guardrail_id": guardrail_id},
+            {"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+        )
+    except Exception as exc:
+        _warn_once("chakoshi", f"chakoshi に問い合わせできませんでした: {exc}")
+        return None
+
+    outcome = result.get("guardrails_result") or {}
+    reasons = []
+    unknown = []
+
+    moderation = outcome.get("moderation") or {}
+    for name, detail in (moderation.get("categories") or {}).items():
+        if not (detail or {}).get("detected"):
+            continue
+        key = _normalize_category(name)
+        if key in _CHAKOSHI_TO_REASON:
+            reasons.append(_CHAKOSHI_TO_REASON[key])
+        elif key not in UNMAPPED["chakoshi"]:
+            unknown.append(name)
+
+    if unknown:
+        _warn_once(
+            "chakoshi-unknown",
+            "対応づけていないカテゴリが検出されました: "
+            f"{sorted(set(unknown))}。"
+            "external_moderation.py の _CHAKOSHI_TO_REASON へ追加してください。"
+            "いまは無視しています。",
+        )
+
+    # キーワードフィルタは運用側が明示的に登録した語なので、当たれば弾く
+    if (outcome.get("keyword_filter") or {}).get("matched"):
+        reasons.append("ng_word")
+
+    return _to_verdict(reasons)
+
+
+# ============================================================
 # まとめ
 # ============================================================
 
@@ -283,6 +388,7 @@ PROVIDERS = {
     "openai": (openai_available, check_openai),
     "azure": (azure_available, check_azure),
     "google": (google_available, check_google),
+    "chakoshi": (chakoshi_available, check_chakoshi),
 }
 
 
