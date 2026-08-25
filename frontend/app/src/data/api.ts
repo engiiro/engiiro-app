@@ -35,6 +35,7 @@ import type {
  * 実 API に差し替えるときは、ここの各関数の中身を fetch に置き換える。画面側は触らない。
  * 対応する口は docs/design_doc.md §7：
  *   createAccount      → POST /api/accounts（S1。設計書に未記載。FR-ACCOUNT-001/002 の受け皿）
+ *   login / logout     → POST /api/sessions / DELETE /api/sessions（同）
  *   fetchMe            → GET  /api/profile/me
  *   fetchMyProfile      → GET  /api/profile/me（S8。両ペルソナのステータス付き）
  *   fetchMyActivity     → GET  /api/profile/me/activity（設計書に未記載）
@@ -764,4 +765,29 @@ export async function createAccount(input: CreateAccountInput): Promise<CreateAc
     return soothe.author.id === next.mother.id ? { ...soothe, author: next.mother } : soothe;
   });
   return { ok: true, me: next };
+}
+
+export type LoginResult =
+  | { readonly ok: true; readonly me: Me }
+  | { readonly ok: false; readonly reason: "invalid" };
+
+/**
+ * ログイン（POST /api/sessions 相当）。
+ *
+ * ★ 仮置き。ID とパスワードの形だけを見て通している（Issue #7、status:needs-human）。
+ *   本物は backend の担当で、失敗の理由を細かく返さないのは変わらない。
+ *   「ID が無い」と「パスワードが違う」を区別して返すと、
+ *   どの ID が存在するかを外から数えられる。
+ */
+export async function login(accountId: string, password: string): Promise<LoginResult> {
+  await sleep(MOCK_LATENCY_MS);
+  if (!ACCOUNT_ID_PATTERN.test(accountId.trim()) || password.length < PASSWORD_MIN_LENGTH) {
+    return { ok: false, reason: "invalid" };
+  }
+  return { ok: true, me: ME };
+}
+
+/** ログアウト（DELETE /api/sessions 相当）。モックでは持っている状態が無いので何もしない */
+export async function logout(): Promise<void> {
+  await sleep(MOCK_LATENCY_MS);
 }

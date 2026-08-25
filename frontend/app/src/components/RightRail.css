@@ -46,3 +46,32 @@
 .eg-right-rail__skeleton--short {
   width: 64%;
 }
+
+/* よみものの上のログイン欄 */
+.eg-right-rail__session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.eg-right-rail__session-title {
+  color: var(--ink);
+}
+
+/* 出すのは赤ちゃんの顔だけ。両方を並べない（DESIGN.md §0.1-1） */
+.eg-right-rail__who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.eg-right-rail__nickname {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* この欄の中では、注記の上余白を詰める */
+.eg-right-rail__session .eg-right-rail__note {
+  margin-top: 0;
+}

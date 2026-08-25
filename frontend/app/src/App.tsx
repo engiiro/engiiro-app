@@ -11,6 +11,7 @@ import {
   fetchMyProfile,
   fetchPublicActivity,
   fetchPublicProfile,
+  logout,
   markRead,
   setAiEvaluateAvailability,
   setLiked,
@@ -30,6 +31,8 @@ import type {
 } from "./data/types";
 import { LeftRail } from "./components/LeftRail";
 import type { CenterView } from "./components/LeftRail";
+import { LoginPrompt } from "./components/LoginPrompt";
+import type { GuestAction } from "./components/LoginPrompt";
 import { MockControls } from "./components/MockControls";
 import type { EntryStage, FeedMode } from "./components/MockControls";
 import { RightRail } from "./components/RightRail";
@@ -44,6 +47,7 @@ import { ComposePanel } from "./screens/ComposePanel";
 import type { ComposeMode } from "./screens/ComposePanel";
 import { FavoritesScreen } from "./screens/FavoritesScreen";
 import { IntroScreen } from "./screens/IntroScreen";
+import { LoginScreen } from "./screens/LoginScreen";
 import { MyProfileScreen } from "./screens/MyProfileScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
 import { PublicProfileScreen } from "./screens/PublicProfileScreen";
@@ -86,6 +90,22 @@ export function App() {
    * （認証は Issue #7 で未確定）。
    */
   const [entry, setEntry] = useState<EntryStage>("app");
+
+  /*
+   * ログインしているかどうか（人間の指示、2026-08-26）。
+   *
+   * えんじいろは、アカウントが無くても読める。
+   * アカウントが要るのは、書く・反応する・大好きにする、および本人専用の画面
+   * （FR-AUTH-001/002 の線引き）。
+   *
+   * ★ ゲストのときにボタンを消したり disabled にしたりしない。
+   *   押せるままにして、押したら「なぜ要るのか」を出す。
+   *   何ができないのかを、押す前から想像させない。
+   *
+   * 判定は下の guard に集約する。画面ごとに if を書かない。
+   */
+  const [isGuest, setIsGuest] = useState(false);
+  const [gate, setGate] = useState<GuestAction | null>(null);
 
   const [view, setView] = useState<CenterView>("timeline");
   const [detailBubbleId, setDetailBubbleId] = useState<string | null>(null);
@@ -161,6 +181,43 @@ export function App() {
     setProfile(await fetchMyProfile());
     setProfileLoading(false);
   }, []);
+
+  /**
+   * ゲストなら止めて、理由を出す。ログイン中ならそのまま通す。
+   *
+   * 止めた操作を覚えておいて、ログイン後に代わりに実行することはしない。
+   * 本人が押していない操作が、あとから勝手に起きるのを避ける
+   * （リアクションは取り消せない）。
+   *
+   * ここはあくまで画面側の入口。本物は backend が同じ判定をする（FR-AUTH-001）。
+   */
+  /** ログアウトして、読むだけの状態に戻る */
+  const leave = useCallback(async () => {
+    await logout();
+    setIsGuest(true);
+    setCompose(null);
+    setToast("ログアウトしました。よむのは つづけられます");
+    // 本人専用の画面を開いたままにしない（FR-PERSONA-005 / FR-FOLLOW-003）
+    setProfile(null);
+    setLikedBaby([]);
+    setLikedMother([]);
+    setView("timeline");
+    setDetailBubbleId(null);
+    setDetail(null);
+    setPublicPersonaId(null);
+    setPublicProfile(null);
+  }, []);
+
+  const guard = useCallback(
+    (action: GuestAction, run: () => void) => {
+      if (isGuest) {
+        setGate(action);
+        return;
+      }
+      run();
+    },
+    [isGuest],
+  );
 
   const loadLiked = useCallback(async () => {
     setLikedLoading(true);
@@ -250,6 +307,11 @@ export function App() {
 
   const navigate = useCallback(
     (next: CenterView) => {
+      // 本人専用の画面（FR-FOLLOW-003 / FR-PERSONA-005）はゲストでは開かない
+      if (isGuest && (next === "profile" || next === "favorites")) {
+        setGate(next);
+        return;
+      }
       setView(next);
       setDetailBubbleId(null);
       setDetail(null);
@@ -268,7 +330,7 @@ export function App() {
         void loadLiked();
       }
     },
-    [activityTab, feedMode, loadActivity, loadFeed, loadLiked, loadProfile],
+    [activityTab, feedMode, isGuest, loadActivity, loadFeed, loadLiked, loadProfile],
   );
 
   const refresh = useCallback(async () => {
@@ -354,9 +416,30 @@ export function App() {
     [closeProfile, openBubble],
   );
 
-  const openReply = useCallback((target: SootheTarget) => {
-    setCompose({ kind: "reply", target });
-  }, []);
+  const openReply = useCallback(
+    (target: SootheTarget) => {
+      guard("soothe", () => setCompose({ kind: "reply", target }));
+    },
+    [guard],
+  );
+
+  const startBubble = useCallback(() => {
+    guard("bubble", () => setCompose({ kind: "bubble" }));
+  }, [guard]);
+
+  const reactToBubbleGuarded = useCallback(
+    (bubbleId: string, reaction: ReactionType) => {
+      guard("react", () => void reactToBubble(bubbleId, reaction));
+    },
+    [guard, reactToBubble],
+  );
+
+  const reactToSootheGuarded = useCallback(
+    (sootheId: string, authorKind: PersonaKind, reaction: ReactionType) => {
+      guard("react", () => void reactToSoothe(sootheId, authorKind, reaction));
+    },
+    [guard, reactToSoothe],
+  );
 
   // 画面を入れ替えたら中央を先頭へ戻す
   useEffect(() => {
@@ -391,16 +474,39 @@ export function App() {
 
         {entry === "intro" ? (
           <IntroScreen onStart={() => setEntry("signup")} onSkip={() => setEntry("signup")} />
-        ) : (
+        ) : null}
+
+        {entry === "login" ? (
+          <LoginScreen
+            onSignUp={() => setEntry("intro")}
+            onGuest={() => {
+              setIsGuest(true);
+              setEntry("app");
+            }}
+            onDone={() => {
+              setIsGuest(false);
+              setEntry("app");
+              setToast("おかえりなさい");
+            }}
+          />
+        ) : null}
+
+        {entry === "signup" ? (
           <SignUpScreen
             onBack={() => setEntry("intro")}
+            onLogin={() => setEntry("login")}
+            onGuest={() => {
+              setIsGuest(true);
+              setEntry("app");
+            }}
             onDone={(babyNickname) => {
+              setIsGuest(false);
               setEntry("app");
               navigate("timeline");
               setToast(babyNickname + " として はじめました");
             }}
           />
-        )}
+        ) : null}
       </div>
     );
   }
@@ -435,7 +541,16 @@ export function App() {
         <main className="eg-center">
           {showPublicProfile ? (
             <PublicProfileScreen
-              profile={publicProfile}
+              /*
+                ゲストには「大好き済み」も「これは自分」も無い。
+                サーバは閲覧者ごとに違う値を返すが、モックは1人ぶんしか持っていないので、
+                ここで落としておく（本物では応答がそもそもこうなる）。
+              */
+              profile={
+                publicProfile && isGuest
+                  ? { ...publicProfile, liked: false, isMe: false }
+                  : publicProfile
+              }
               activity={publicActivity}
               loading={publicLoading}
               activityLoading={publicActivityLoading}
@@ -447,7 +562,7 @@ export function App() {
                   void loadPublicActivity(publicPersonaId, next);
                 }
               }}
-              onToggleLike={(next) => void toggleLike(next)}
+              onToggleLike={(next) => guard("like", () => void toggleLike(next))}
               onOpenBubble={openBubbleFromProfile}
               onBack={() => {
                 closeProfile();
@@ -487,7 +602,7 @@ export function App() {
               onOpenFollowing={() => {
                 navigate("favorites");
               }}
-              onCompose={() => setCompose({ kind: "bubble" })}
+              onCompose={() => startBubble()}
             />
           ) : null}
 
@@ -501,8 +616,8 @@ export function App() {
                 setFeedLoading(true);
                 void loadFeed();
               }}
-              onReact={(bubbleId, reaction) => void reactToBubble(bubbleId, reaction)}
-              onCompose={() => setCompose({ kind: "bubble" })}
+              onReact={(bubbleId, reaction) => reactToBubbleGuarded(bubbleId, reaction)}
+              onCompose={() => startBubble()}
             />
           ) : null}
 
@@ -516,9 +631,9 @@ export function App() {
                 detail={detail}
                 onBack={backToTimeline}
                 onOpenProfile={(personaId) => void openProfile(personaId)}
-                onReactToBubble={(bubbleId, reaction) => void reactToBubble(bubbleId, reaction)}
+                onReactToBubble={(bubbleId, reaction) => reactToBubbleGuarded(bubbleId, reaction)}
                 onReactToSoothe={(sootheId, authorKind, reaction) =>
-                  void reactToSoothe(sootheId, authorKind, reaction)
+                  reactToSootheGuarded(sootheId, authorKind, reaction)
                 }
                 onOpenSoothe={openReply}
                 onDelete={(bubbleId) => void removeBubble(bubbleId)}
@@ -535,7 +650,7 @@ export function App() {
               <button
                 type="button"
                 className={cx("eg-bubble-fab", "t-button")}
-                onClick={() => setCompose({ kind: "bubble" })}
+                onClick={() => startBubble()}
               >
                 <IconPen />
                 バブる
@@ -559,10 +674,30 @@ export function App() {
               }}
             />
           ) : (
-            <RightRail />
+            <RightRail
+              isGuest={isGuest}
+              babyNickname={ME.baby.nickname}
+              onLogin={() => setEntry("login")}
+              onLogout={() => void leave()}
+            />
           )}
         </div>
       </div>
+
+      {gate ? (
+        <LoginPrompt
+          action={gate}
+          onLogin={() => {
+            setGate(null);
+            setEntry("login");
+          }}
+          onSignUp={() => {
+            setGate(null);
+            setEntry("intro");
+          }}
+          onClose={() => setGate(null)}
+        />
+      ) : null}
 
       {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
     </div>

@@ -51,9 +51,12 @@ type SignUpScreenProps = {
   /** 登録できたら、決まったニックネームを渡して本編へ */
   readonly onDone: (babyNickname: string) => void;
   readonly onBack: () => void;
+  readonly onLogin: () => void;
+  /** ログインせずに読むのに戻る（人間の指示、2026-08-26） */
+  readonly onGuest: () => void;
 };
 
-export function SignUpScreen({ onDone, onBack }: SignUpScreenProps) {
+export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenProps) {
   const [accountId, setAccountId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -171,6 +174,14 @@ export function SignUpScreen({ onDone, onBack }: SignUpScreenProps) {
         <Button type="submit" fullWidth disabled={!filled || sending}>
           {sending ? "つくっています…" : "はじめる"}
         </Button>
+
+        <button type="button" className={cx("eg-signup__switch", "t-label")} onClick={onLogin}>
+          もう アカウントが ある？ ログインする
+        </button>
+
+        <button type="button" className={cx("eg-signup__stay", "t-label")} onClick={onGuest}>
+          いまは つくらずに よむ
+        </button>
       </form>
     </div>
   );

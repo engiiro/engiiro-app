@@ -89,6 +89,31 @@
   color: var(--muted);
 }
 
+/* ログインとの行き来。行き止まりに見せない */
+.eg-signup__switch {
+  align-self: center;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-pill);
+  color: var(--accent-line);
+}
+
+.eg-signup__switch:hover {
+  background: var(--accent-soft);
+}
+
+/* アカウントを作らずに読むほうへ。押しやすくはするが、主役にはしない */
+.eg-signup__stay {
+  align-self: center;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-pill);
+  color: var(--muted);
+}
+
+.eg-signup__stay:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
 /* アバターを左に置いて、どちらの顔の名前かを色でも示す */
 .eg-signup__name {
   display: flex;

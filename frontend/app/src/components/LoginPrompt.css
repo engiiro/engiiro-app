@@ -1,0 +1,100 @@
+/* ゲストが「読む」以外をしようとしたときの画面 */
+
+.eg-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gutter);
+  animation: eg-fade-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+.eg-gate.is-leaving {
+  animation: eg-fade-out var(--duration-quick) var(--ease-smooth-out) both;
+}
+
+/* 地の部分そのものが「とじる」ボタン。読むのに戻るのを一番かんたんにする */
+.eg-gate__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  cursor: default;
+}
+
+.eg-gate__sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: calc(var(--feed-max-width) - var(--space-xxl) * 2);
+  padding: var(--space-lg);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+  box-shadow: var(--elevation-modal);
+  text-align: center;
+  animation: eg-modal-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+.eg-gate.is-leaving .eg-gate__sheet {
+  animation: eg-modal-out var(--duration-quick) var(--ease-smooth-out) both;
+}
+
+.eg-gate__close {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  display: grid;
+  place-items: center;
+  border-radius: var(--rounded-pill);
+  color: var(--muted);
+}
+
+.eg-gate__close:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.eg-gate__faces {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xxs);
+}
+
+.eg-gate__title {
+  color: var(--ink);
+}
+
+.eg-gate__body {
+  color: var(--body);
+}
+
+.eg-gate__note {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rounded-xs);
+  background: var(--accent-soft);
+  color: var(--accent-line);
+}
+
+.eg-gate__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  width: 100%;
+  margin-top: var(--space-xs);
+}
+
+.eg-gate__stay {
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-pill);
+  color: var(--muted);
+}
+
+.eg-gate__stay:hover {
+  background: var(--card);
+  color: var(--ink);
+}

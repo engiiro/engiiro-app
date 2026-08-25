@@ -19,12 +19,19 @@ import "./MockControls.css";
 
 export type FeedMode = "normal" | "loading" | "empty";
 
-/** 画面の入り口。intro → signup → app の順に進む */
-export type EntryStage = "intro" | "signup" | "app";
+/**
+ * 画面の入り口。
+ *   intro  … 登録の前に読む説明
+ *   signup … S1 アカウント登録
+ *   login  … ログイン
+ *   app    … 本編（ゲストでもここに入れる）
+ */
+export type EntryStage = "intro" | "signup" | "login" | "app";
 
 const ENTRY_STAGES: readonly { readonly value: EntryStage; readonly label: string }[] = [
   { value: "intro", label: "説明" },
   { value: "signup", label: "登録" },
+  { value: "login", label: "ログイン" },
   { value: "app", label: "本編" },
 ];
 
