@@ -50,7 +50,6 @@ def calls(monkeypatch):
     monkeypatch.setattr(T, "_call_api", fake)
     # 外部モデレーションは環境変数が無ければ何もしないが、明示的に止める
     monkeypatch.setattr(T.external_moderation, "check", lambda text: [])
-    log.append  # noqa: B018  （下の script が使う）
     return {"log": log, "script": scripted}
 
 
@@ -96,10 +95,10 @@ def test_APIキーが無ければRuntimeError(monkeypatch):
     assert "GOOGLE_API_KEY" in str(err.value)
 
 
-def test_APIキーが無いときclientを渡していれば動く(calls, monkeypatch):
-    """判定だけなら規則で完結する経路もあるが、変換はclientが要る。
+def test_APIキーが無くてもclientを渡せば動く(calls, monkeypatch):
+    """client を明示で渡した場合、build_client を経由しない。
 
-    client を明示で渡した場合、build_client は呼ばれない。
+    テストと Colab がキーの有無に関係なく動かせるようにするため。
     """
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     calls["script"].extend([_allow(), "へんかんしたよ", _allow()])
