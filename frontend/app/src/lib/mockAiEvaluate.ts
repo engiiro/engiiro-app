@@ -112,4 +112,4 @@ function monthsToLabel(months: number): string {
   return rest === 0 ? String(years) + "歳" : String(years) + "歳" + String(rest) + "か月";
 }
 
-export { MAX_MONTHS };
+export { MAX_MONTHS, monthsToLabel };

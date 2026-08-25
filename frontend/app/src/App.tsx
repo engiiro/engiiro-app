@@ -6,13 +6,22 @@ import {
   fetchBubbleDetail,
   fetchEmptyFeed,
   fetchFeed,
+  fetchMyActivity,
+  fetchMyProfile,
   markRead,
   setAiEvaluateAvailability,
 } from "./data/api";
 import type { FeedResult } from "./data/api";
 import { ME } from "./data/personas";
 import { reactionTargetOfSoothe } from "./data/reactions";
-import type { BubbleDetail, PersonaKind, ReactionType } from "./data/types";
+import type {
+  BubbleDetail,
+  MyActivityItem,
+  MyActivityTab,
+  MyProfile,
+  PersonaKind,
+  ReactionType,
+} from "./data/types";
 import { LeftRail } from "./components/LeftRail";
 import type { CenterView } from "./components/LeftRail";
 import { MockControls } from "./components/MockControls";
@@ -27,6 +36,7 @@ import { useTheme } from "./lib/useTheme";
 import { BubbleDetailScreen } from "./screens/BubbleDetailScreen";
 import { ComposePanel } from "./screens/ComposePanel";
 import type { ComposeMode } from "./screens/ComposePanel";
+import { MyProfileScreen } from "./screens/MyProfileScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
 import { TimelineScreen } from "./screens/TimelineScreen";
 import "./App.css";
@@ -64,6 +74,18 @@ export function App() {
   const [compose, setCompose] = useState<ComposeMode | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  /*
+   * S8 本人専用プロフィール。
+   *
+   * 両ペルソナが入った MyProfile を持てるのは、この画面を出しているときだけ。
+   * フィードや詳細の描画にこの状態を混ぜない（FR-PERSONA-005）。
+   */
+  const [profile, setProfile] = useState<MyProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [activityTab, setActivityTab] = useState<MyActivityTab>("babyBubbles");
+  const [activity, setActivity] = useState<readonly MyActivityItem[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+
   const loadFeed = useCallback(async () => {
     const result = feedMode === "empty" ? await fetchEmptyFeed() : await fetchFeed();
     setFeed(result);
@@ -85,6 +107,18 @@ export function App() {
     const result = await fetchBubbleDetail(bubbleId);
     setDetail(result);
     setDetailLoading(false);
+  }, []);
+
+  const loadProfile = useCallback(async () => {
+    setProfileLoading(true);
+    setProfile(await fetchMyProfile());
+    setProfileLoading(false);
+  }, []);
+
+  const loadActivity = useCallback(async (tab: MyActivityTab) => {
+    setActivityLoading(true);
+    setActivity(await fetchMyActivity(tab));
+    setActivityLoading(false);
   }, []);
 
   const openBubble = useCallback(
@@ -114,17 +148,26 @@ export function App() {
         setFeedLoading(true);
         void loadFeed();
       }
+      if (next === "profile") {
+        // 評価が落ちている／戻った直後でもその時点の状態を出したいので、開くたびに引き直す
+        void loadProfile();
+        void loadActivity(activityTab);
+      }
     },
-    [feedMode, loadFeed],
+    [activityTab, feedMode, loadActivity, loadFeed, loadProfile],
   );
 
   const refresh = useCallback(async () => {
+    if (view === "profile") {
+      await Promise.all([loadProfile(), loadActivity(activityTab)]);
+      return;
+    }
     if (detailBubbleId) {
       await loadDetail(detailBubbleId);
     } else if (feedMode !== "loading") {
       await loadFeed();
     }
-  }, [detailBubbleId, feedMode, loadDetail, loadFeed]);
+  }, [activityTab, detailBubbleId, feedMode, loadActivity, loadDetail, loadFeed, loadProfile, view]);
 
   const reactToBubble = useCallback(
     async (bubbleId: string, reaction: ReactionType) => {
@@ -155,9 +198,23 @@ export function App() {
     async (bubbleId: string) => {
       await deleteBubble(bubbleId);
       setToast("バブルを けしました");
+      if (view === "profile") {
+        // S8 からの削除では画面を移さない。消えたことがその場で分かるように引き直すだけ
+        await Promise.all([loadProfile(), loadActivity(activityTab)]);
+        return;
+      }
       backToTimeline();
     },
-    [backToTimeline],
+    [activityTab, backToTimeline, loadActivity, loadProfile, view],
+  );
+
+  /** S8 の一覧からバブルを開く。詳細はタイムライン側の画面なので、そちらへ移る */
+  const openBubbleFromProfile = useCallback(
+    (bubbleId: string) => {
+      setView("timeline");
+      openBubble(bubbleId);
+    },
+    [openBubble],
   );
 
   const openReply = useCallback((target: SootheTarget) => {
@@ -197,7 +254,28 @@ export function App() {
         </div>
 
         <main className="eg-center">
-          {!showTimeline ? <PlaceholderScreen view={view} /> : null}
+          {!showTimeline && view !== "profile" ? <PlaceholderScreen view={view} /> : null}
+
+          {view === "profile" ? (
+            <MyProfileScreen
+              profile={profile}
+              activity={activity}
+              loading={profileLoading}
+              activityLoading={activityLoading}
+              tab={activityTab}
+              onTabChange={(next) => {
+                setActivityTab(next);
+                void loadActivity(next);
+              }}
+              onOpenBubble={openBubbleFromProfile}
+              onDeleteBubble={(bubbleId) => void removeBubble(bubbleId)}
+              onOpenFollowing={() => {
+                // S7 フォロー中一覧はこれから。押した先が無いことを黙って隠さない
+                setToast("フォロー中の 一覧は これから つくります");
+              }}
+              onCompose={() => setCompose({ kind: "bubble" })}
+            />
+          ) : null}
 
           {showTimeline && detailBubbleId === null ? (
             <TimelineScreen

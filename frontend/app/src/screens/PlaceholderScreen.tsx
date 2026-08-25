@@ -5,13 +5,11 @@ import { cx } from "../lib/cx";
 /*
  * 準備中の画面。
  *
- * 左サイドの「さがす」「おしらせ」「おきにいり」「プロフィール」「せってい」は、
+ * 左サイドの「さがす」「おしらせ」「おきにいり」「せってい」は、
  * docs/design_doc.md §4.1 の画面一覧（S1〜S8）に無い。
  * 中身を勝手に決めず、場所だけ取っておく。
  *
- * プロフィールについては、S8（本人専用プロフィール）が
- * 「両ペルソナのステータスを同時に見せてよい唯一の画面」（FR-PERSONA-005）なので、
- * 中身を作るときは非連結の扱いに注意が要る。ここでは何も出さない。
+ * プロフィール（S8）はここから外れて MyProfileScreen になった。
  */
 
 const COPY: Readonly<Record<string, { readonly title: string; readonly lines: readonly string[] }>> =
@@ -30,13 +28,6 @@ const COPY: Readonly<Record<string, { readonly title: string; readonly lines: re
     favorites: {
       title: "おきにいり",
       lines: ["おきにいりは これから つくります。", "なにを ためておけるかは まだ決まっていません。"],
-    },
-    profile: {
-      title: "プロフィール",
-      lines: [
-        "プロフィールは これから つくります。",
-        "自分の2つのペルソナを まとめて見られる、ただ1つの画面になります。",
-      ],
     },
     settings: {
       title: "せってい",

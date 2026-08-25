@@ -1,0 +1,80 @@
+/* S8 本人専用プロフィール */
+
+.eg-myprofile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-top: var(--space-md);
+  padding-bottom: var(--space-xl);
+}
+
+/*
+ * 赤ちゃんカードとお母さんカードを横に2枚（モックの並び）。
+ * 中央の列は 600px のまま広げない（DESIGN.md §5.2）ので、
+ * 狭くなったら縦に折り返す。
+ */
+.eg-myprofile__personas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.eg-myprofile__birthday {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.eg-myprofile__birthday-icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.eg-myprofile__birthday-label {
+  color: var(--ink);
+}
+
+.eg-myprofile__birthday-value {
+  margin-inline-start: auto;
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+
+.eg-myprofile__follows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.eg-myprofile__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.eg-myprofile__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.eg-myprofile__more {
+  display: flex;
+  justify-content: center;
+}
+
+.eg-myprofile__unavailable {
+  color: var(--muted);
+}
+
+/* 一段狭いところでは、横2枚を縦に折り返す（DESIGN.md §8.1） */
+@media (width < 560px) {
+  .eg-myprofile__personas,
+  .eg-myprofile__follows {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

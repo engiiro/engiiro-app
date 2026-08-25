@@ -1,0 +1,76 @@
+/* プロフィールの一覧に並ぶ1件（S8 ほか） */
+
+.eg-activity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+}
+
+.eg-activity__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.eg-activity__name {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.eg-activity__kind {
+  flex: none;
+  padding: 0 var(--space-xs);
+  border-radius: var(--rounded-pill);
+}
+
+.eg-activity__kind.is-baby {
+  color: var(--baby);
+  background: var(--baby-soft);
+}
+
+.eg-activity__kind.is-mother {
+  color: var(--mother);
+  background: var(--mother-soft);
+}
+
+/* 時刻から右は端に寄せる */
+.eg-activity__time {
+  margin-inline-start: auto;
+  flex: none;
+  color: var(--muted);
+}
+
+.eg-activity__delete {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border-radius: var(--rounded-xs);
+}
+
+.eg-activity__delete:hover {
+  color: var(--accent-line);
+}
+
+.eg-activity__to {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.eg-activity__open {
+  display: block;
+  width: 100%;
+  text-align: start;
+  border-radius: var(--rounded-xs);
+}
+
+/* button の中では span で描いているので、ブロックとして流す */
+.eg-activity__body {
+  display: block;
+  color: var(--body);
+}

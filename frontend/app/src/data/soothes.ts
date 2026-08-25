@@ -1,4 +1,4 @@
-import { BABY_PERSONAS, MOTHER_PERSONAS } from "./personas";
+import { BABY_PERSONAS, ME, MOTHER_PERSONAS } from "./personas";
 import type { PublicPersona, ReactionState } from "./types";
 
 /*
@@ -79,5 +79,29 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     body: "ごはん たべて…！ ぼくも わすれる。",
     minutesAgo: 40,
     reactions: { counts: { ogya: 0, yoshiyoshi: 1, manma: 3 }, mine: {} },
+  },
+  {
+    id: "soothe_08",
+    bubbleId: "bubble_03",
+    author: ME.baby,
+    body: "ぼくも おなじ。うごかない ときは、ねると なおることが ある。",
+    minutesAgo: 5,
+    reactions: { counts: { ogya: 0, yoshiyoshi: 2, manma: 3 }, mine: {} },
+  },
+  {
+    id: "soothe_09",
+    bubbleId: "bubble_05",
+    author: ME.mother,
+    body: "おなかが いたいのは、ちゃんと 向きあってる しるしだよ。すこし よこに なろうね。",
+    minutesAgo: 120,
+    reactions: { counts: { babu: 5 }, mine: {} },
+  },
+  {
+    id: "soothe_10",
+    bubbleId: "bubble_07",
+    author: ME.mother,
+    body: "なれても いいんだよ。なれたって、しんどいのは かわらないから。",
+    minutesAgo: 480,
+    reactions: { counts: { babu: 2 }, mine: {} },
   },
 ];

@@ -1,9 +1,9 @@
-import { mockAiEvaluate } from "../lib/mockAiEvaluate";
+import { mockAiEvaluate, monthsToLabel } from "../lib/mockAiEvaluate";
 import { AiUnavailableError } from "../lib/mockAiTransform";
 import { moderate } from "../lib/mockModeration";
 import { BUBBLE_MAX_LENGTH, REACTION_MAX_PER_USER, countChars } from "./constants";
 import { BUBBLE_SEEDS } from "./bubbles";
-import { ME } from "./personas";
+import { BABY_PERSONAS, ME, MOTHER_PERSONAS, PERSONA_BIOS, PERSONA_BY_ID } from "./personas";
 import { isReactionAllowed } from "./reactions";
 import { SOOTHE_SEEDS } from "./soothes";
 import { STAMP_CATALOG } from "./stamps";
@@ -13,7 +13,11 @@ import type {
   CreateBubbleInput,
   CreateSootheInput,
   Me,
+  MyActivityItem,
+  MyActivityTab,
+  MyProfile,
   PersonaKind,
+  PersonaStatus,
   PublicPersona,
   ReactionState,
   ReactionTargetKind,
@@ -28,6 +32,9 @@ import type {
  * 実 API に差し替えるときは、ここの各関数の中身を fetch に置き換える。画面側は触らない。
  * 対応する口は docs/design_doc.md §7：
  *   fetchMe            → GET  /api/profile/me
+ *   fetchMyProfile     → GET  /api/profile/me（S8。両ペルソナのステータス付き）
+ *   fetchPublicProfile → GET  /api/personas/:id（S6。設計書に未記載。FR-PROFILE-005 の受け皿）
+ *   setFollow          → POST / DELETE /api/personas/:id/follow
  *   fetchFeed          → GET  /api/posts/feed
  *   fetchBubbleDetail  → GET  /api/posts/:id（+ あやす一覧。読み取り系は Issue #8 で未確定）
  *   createBubble       → POST /api/posts
@@ -98,7 +105,8 @@ let soothes: Soothe[] = SOOTHE_SEEDS.map((seed) => ({
   body: seed.body,
   createdAt: isoMinutesAgo(seed.minutesAgo),
   reactions: seed.reactions,
-  isMine: false,
+  // 自分のあやすには自分でリアクションできない。判定に使うだけの真偽値で、識別子ではない
+  isMine: seed.author.id === ME.baby.id || seed.author.id === ME.mother.id,
   replyToSootheId: seed.replyToSootheId,
 }));
 
@@ -165,6 +173,157 @@ export async function fetchBubbleDetail(bubbleId: string): Promise<BubbleDetail 
 /** 本人専用。両ペルソナをまとめて返すのはこの口だけ（FR-PERSONA-005） */
 export async function fetchMe(): Promise<Me> {
   return ME;
+}
+
+/*
+ * ────────────── S8 本人専用プロフィール ──────────────
+ *
+ * ここから下は「本人が自分を見る」ときだけ通る口。
+ * 両ペルソナが同じ戻り値に入るのはここだけで、公開系の口へ持ち出さない（FR-PERSONA-005）。
+ */
+
+/** 生年月日。仕様書に項目が無い（人間の指示、2026-08-25 のモック）ので固定値 */
+const MY_BIRTHDAY = "2023-04-15";
+
+/**
+ * フォロー「中」のペルソナ。本人だけが引ける（FR-FOLLOW-003）。
+ *
+ * ★ 「誰が自分をフォローしているか」を持つ入れ物は、この先も作らない。
+ *   フォロワー一覧もフォロワー数も、本人を含む誰にも出さない（FR-FOLLOW-004/005、OUT-004）。
+ */
+const following = new Set<string>([
+  BABY_PERSONAS.sheep.id,
+  BABY_PERSONAS.taputapu.id,
+  BABY_PERSONAS.yowane.id,
+  BABY_PERSONAS.puni.id,
+  MOTHER_PERSONAS.okan.id,
+  MOTHER_PERSONAS.yoshiyoshi.id,
+]);
+
+/**
+ * S8 本人専用プロフィール（GET /api/profile/me 相当）。
+ *
+ * 赤ちゃん度と お母さん度は、材料にする文章が違う：
+ *   FR-PROFILE-003  赤ちゃん度 … 本人のバブル ＋ 赤ちゃんとしてのあやす
+ *   FR-PROFILE-004  お母さん度 … 本人のお母さんとしてのあやす だけ
+ * お母さんとしてのあやすだけを投稿しても赤ちゃん度が動かないのは、この分け方で担保する。
+ *
+ * FR-AI-EVAL-002：2つは別の軸。同じ尺度の値として足したり比べたりしない。
+ * NFR-002：評価が使えないときは status を null にして、その旨を画面に出させる。
+ *          プロフィールそのものは読めるままにする。
+ */
+export async function fetchMyProfile(): Promise<MyProfile> {
+  const babyTexts = [
+    ...myBubbles().map((bubble) => bubble.body),
+    ...mySoothes("baby").map((soothe) => soothe.body),
+  ];
+  const motherTexts = mySoothes("mother").map((soothe) => soothe.body);
+
+  const [baby, mother] = await Promise.all([
+    statusOf(babyTexts, "baby"),
+    statusOf(motherTexts, "mother"),
+  ]);
+
+  return {
+    baby: { persona: ME.baby, bio: PERSONA_BIOS[ME.baby.id], status: baby },
+    mother: { persona: ME.mother, bio: PERSONA_BIOS[ME.mother.id], status: mother },
+    birthday: MY_BIRTHDAY,
+    followingBabyCount: countFollowing("baby"),
+    followingMotherCount: countFollowing("mother"),
+  };
+}
+
+/**
+ * S8 の一覧。3つの切り替えは、どれも本人の行動しか含まない。
+ * 新しい順に並べる（自分の記録なので、ここは新着順でよい。FR-FEED-002 はタイムラインの要件）。
+ */
+export async function fetchMyActivity(tab: MyActivityTab): Promise<readonly MyActivityItem[]> {
+  await sleep(MOCK_LATENCY_MS);
+
+  const items: MyActivityItem[] = [];
+  if (tab === "babyBubbles" || tab === "babyAll") {
+    for (const bubble of myBubbles()) {
+      items.push({ kind: "bubble", bubble });
+    }
+  }
+  if (tab === "babyAll" || tab === "motherSoothes") {
+    const kind: PersonaKind = tab === "motherSoothes" ? "mother" : "baby";
+    for (const soothe of mySoothes(kind)) {
+      items.push({ kind: "soothe", soothe, toBubbleExcerpt: excerptOf(soothe.bubbleId) });
+    }
+  }
+
+  items.sort((a, b) => timeOf(b) - timeOf(a));
+  return items;
+}
+
+function timeOf(item: MyActivityItem): number {
+  const iso = item.kind === "bubble" ? item.bubble.createdAt : item.soothe.createdAt;
+  return new Date(iso).getTime();
+}
+
+function myBubbles(): readonly Bubble[] {
+  return bubbles.filter((bubble) => bubble.author.id === ME.baby.id);
+}
+
+function mySoothes(kind: PersonaKind): readonly Soothe[] {
+  const meId = kind === "mother" ? ME.mother.id : ME.baby.id;
+  return soothes.filter((soothe) => soothe.author.id === meId);
+}
+
+/** あやすが どのバブルへのものか思い出すための抜粋。長い本文は途中で切る */
+const EXCERPT_MAX = 24;
+
+function excerptOf(bubbleId: string): string {
+  const target = bubbles.find((bubble) => bubble.id === bubbleId);
+  if (!target) {
+    return "けされた バブル";
+  }
+  const chars = [...target.body];
+  return chars.length <= EXCERPT_MAX ? target.body : chars.slice(0, EXCERPT_MAX).join("") + "…";
+}
+
+function countFollowing(kind: PersonaKind): number {
+  let count = 0;
+  for (const id of following) {
+    if (PERSONA_BY_ID[id]?.kind === kind) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * 集めた文章から ステータスを1つ作る。
+ *
+ * 1件ずつ評価して平均を取る。文章をつないで1回で評価すると、
+ * 長い1件が全体を引っぱるため。実際の算出は backend / ai 側の担当で、ここは形だけ。
+ */
+async function statusOf(
+  texts: readonly string[],
+  personaKind: PersonaKind,
+): Promise<PersonaStatus | null> {
+  const axis =
+    personaKind === "baby" ? "赤ちゃん度（文章の幼さ）" : "お母さん度（向けている相手の年齢）";
+  if (texts.length === 0) {
+    // まだ材料が無い。0歳として断定せず、件数 0 のまま返して画面に判断させる
+    return { months: 0, label: "まだ わからない", axis, sampleCount: 0 };
+  }
+  try {
+    const results = await Promise.all(
+      texts.map((text) => mockAiEvaluate(text, personaKind, { available: evaluateAvailable })),
+    );
+    const months = Math.round(
+      results.reduce((sum, result) => sum + result.months, 0) / results.length,
+    );
+    return { months, label: monthsToLabel(months), axis, sampleCount: texts.length };
+  } catch (error) {
+    if (error instanceof AiUnavailableError) {
+      // NFR-002：使えないことを伝える。プロフィールは読めるままにする
+      return null;
+    }
+    throw error;
+  }
 }
 
 export type CreateBubbleResult =

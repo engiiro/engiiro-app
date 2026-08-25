@@ -103,3 +103,76 @@ export type CreateSootheInput = {
   readonly body: string;
   readonly replyToSootheId?: string;
 };
+
+/**
+ * ペルソナのステータス（赤ちゃん度・お母さん度。FR-PROFILE-001/002）。
+ * AI 文章評価の結果をまとめたもので、赤ちゃんとお母さんでは軸の意味が違う
+ * （FR-AI-EVAL-002）。同じ尺度の値として並べて比べない。
+ */
+export type PersonaStatus = {
+  /** 何か月相当か */
+  readonly months: number;
+  /** 画面に出す文字。バーだけで伝えないため（DESIGN.md §4 Meter） */
+  readonly label: string;
+  /** 軸の名前。赤ちゃんとお母さんで意味が違うことを画面でも示す */
+  readonly axis: string;
+  /** 算出のもとにした本文の件数。0 のときはまだ材料が無い */
+  readonly sampleCount: number;
+};
+
+/** 本人専用プロフィール（S8）の1ペルソナぶん */
+export type MyProfileEntry = {
+  readonly persona: PublicPersona;
+  readonly bio?: string;
+  /**
+   * AI 文章評価が使えないときは null（NFR-002）。
+   * ここが null でも他の機能は止めない。プロフィールは読めるままにする。
+   */
+  readonly status: PersonaStatus | null;
+};
+
+/**
+ * 本人専用プロフィール（S8 / GET /api/profile/me 相当）。
+ *
+ * 両ペルソナのステータスをまとめて持てるのはここだけ（FR-PERSONA-005）。
+ * この型を公開系の画面・応答で使わない。
+ */
+export type MyProfile = {
+  readonly baby: MyProfileEntry;
+  readonly mother: MyProfileEntry;
+  /**
+   * 生年月日（ISO8601 の日付）。**S8 でしか出さない。**
+   *
+   * 仕様書に項目が無い（人間の指示、2026-08-25 のモック）。
+   * 公開プロフィールに出すと、両ペルソナを突き合わせる材料になるので、
+   * S6（他人の公開プロフィール）側の型には、この項目そのものを持たせない（FR-PRIV-004）。
+   */
+  readonly birthday: string;
+  /**
+   * フォロー「中」の数。本人だけが見られる（FR-FOLLOW-003）。
+   * フォロー「されている」数ではない。そちらは誰にも出さない（FR-FOLLOW-004/005、OUT-004）。
+   */
+  readonly followingBabyCount: number;
+  readonly followingMotherCount: number;
+};
+
+/**
+ * S8 の一覧の切り替え（人間の指示、2026-08-25 のモック）。
+ *
+ *   babyBubbles    … 赤ちゃんとして書いたバブルだけ
+ *   babyAll        … 赤ちゃんとしてのバブルとあやすの両方
+ *   motherSoothes  … お母さんとしてのあやすだけ
+ *
+ * この3つは本人の行動しか含まない。他人の行動が混ざる口にしない。
+ */
+export type MyActivityTab = "babyBubbles" | "babyAll" | "motherSoothes";
+
+/** S8 の一覧に並ぶ1件。バブルとあやすが混ざるので種別を持つ */
+export type MyActivityItem =
+  | { readonly kind: "bubble"; readonly bubble: Bubble }
+  | {
+      readonly kind: "soothe";
+      readonly soothe: Soothe;
+      /** どのバブルへのあやすかを思い出すための短い抜粋。本文そのものではない */
+      readonly toBubbleExcerpt: string;
+    };

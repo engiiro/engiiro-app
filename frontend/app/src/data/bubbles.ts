@@ -59,7 +59,7 @@ export const BUBBLE_SEEDS: readonly BubbleSeed[] = [
     isMine: false,
     read: false,
     affinity: 0.41,
-    sootheCount: 0,
+    sootheCount: 1,
   },
   {
     id: "bubble_04",
@@ -81,7 +81,7 @@ export const BUBBLE_SEEDS: readonly BubbleSeed[] = [
     isMine: false,
     read: false,
     affinity: 0.79,
-    sootheCount: 0,
+    sootheCount: 1,
   },
   {
     id: "bubble_06",
@@ -103,6 +103,6 @@ export const BUBBLE_SEEDS: readonly BubbleSeed[] = [
     isMine: false,
     read: true,
     affinity: 0.35,
-    sootheCount: 0,
+    sootheCount: 1,
   },
 ];

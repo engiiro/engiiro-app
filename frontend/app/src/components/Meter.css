@@ -1,0 +1,61 @@
+/* DESIGN.md §4 Meter（赤ちゃん度・お母さん度） */
+
+.eg-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.eg-meter__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.eg-meter__value.is-baby {
+  color: var(--baby);
+}
+
+.eg-meter__value.is-mother {
+  color: var(--mother);
+}
+
+.eg-meter__axis {
+  color: var(--muted);
+}
+
+.eg-meter__track {
+  height: var(--meter-height);
+  border-radius: var(--rounded-pill);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.eg-meter__fill {
+  display: block;
+  block-size: 100%;
+  border-radius: var(--rounded-pill);
+  /* 数値が変わったときだけ伸びる。開いた瞬間の演出には使わない（DESIGN.md §7.2） */
+  transition: inline-size var(--duration-slow) var(--ease-smooth-out);
+}
+
+.eg-meter__track.is-baby .eg-meter__fill {
+  background: var(--baby);
+}
+
+.eg-meter__track.is-mother .eg-meter__fill {
+  background: var(--mother-fill);
+}
+
+/* 園児UI：高さ 12px ＋ 枠線（DESIGN.md §4 Meter） */
+:root[data-theme="kid"] .eg-meter__track {
+  height: 12px;
+  border: var(--border-width) solid var(--hairline);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-meter__fill {
+    transition: none;
+  }
+}
