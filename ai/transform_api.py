@@ -602,11 +602,31 @@ def moderate(text: str, client=None) -> dict:
     return verdict
 
 
+# 判定の重さ。変換前と変換後で違う結論が出たとき、重いほうを採る。
+SEVERITY = {"allow": 0, "rewrite_required": 1, "block": 2}
+
+
+def severer(first: str, second: str) -> str:
+    """2つの判定のうち重いほうを返す。"""
+    return first if SEVERITY[first] >= SEVERITY[second] else second
+
+
 def transform(mode: Mode, text: str, client=None) -> dict:
     """判定してから変換する。仕様書 v0.3 の /api/ai/transform に対応する形で返す。
 
     設計書の「モデレーションは変換前と変換後の2回行う」に従い、
     変換によって新たにNG表現が生じていないかを再検査する。
+
+    変換前と変換後で結論が違うときは、重いほうを返す。
+    理由コードは両方を合わせる。変換後 block なら変換結果は返さない。
+
+    変換後だけが rewrite_required になった場合、ここでは
+    rewrite_required として返すだけで、変換のやり直しはしない。
+    やり直すかどうかは仕様の決めごとなので、このモジュールでは決めない。
+
+    Gemini を呼ぶ回数は、規則で block が確定した場合を除き
+    最低3回（変換前判定・変換・変換後判定）である。
+    150文字を超えて作り直した場合は4回になる。
 
     Returns:
         {"action": ..., "transformedText": str | None, "reasonCodes": [...]}
@@ -632,8 +652,14 @@ def transform(mode: Mode, text: str, client=None) -> dict:
             "reasonCodes": sorted(set(before["reasonCodes"] + after["reasonCodes"])),
         }
 
-    action = "rewrite_required" if before["action"] == "rewrite_required" else "allow"
-    return {"action": action, "transformedText": converted, "reasonCodes": before["reasonCodes"]}
+    # 変換前と変換後で重いほうを採り、理由コードは両方を合わせる。
+    # 変換後に出た指摘を捨ててはいけない。捨てると、変換によって
+    # 新しくNG表現が生じていないかを見る意味がなくなる。
+    return {
+        "action": severer(before["action"], after["action"]),
+        "transformedText": converted,
+        "reasonCodes": sorted(set(before["reasonCodes"] + after["reasonCodes"])),
+    }
 
 
 # ============================================================
