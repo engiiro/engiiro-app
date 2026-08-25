@@ -1,14 +1,7 @@
 import type { ReactElement } from "react";
 
 import { cx } from "../lib/cx";
-import {
-  IconBell,
-  IconGear,
-  IconHome,
-  IconPerson,
-  IconSearch,
-  IconStar,
-} from "./icons";
+import { IconBell, IconGear, IconHeart, IconHome, IconPerson, IconSearch } from "./icons";
 import "./LeftRail.css";
 
 /*
@@ -16,12 +9,16 @@ import "./LeftRail.css";
  *
  * どれを押しても中央の列が差し替わる。右サイドは動かない。
  *
- * ホームとプロフィール以外は docs/design_doc.md §4.1 の画面一覧（S1〜S8）に無い画面で、
+ * ホーム・おきにいり・プロフィール以外は docs/design_doc.md §4.1 の画面一覧（S1〜S8）に
+ * 無い画面で、
  * 今は「準備中」を出すだけのプレースホルダ。設計書の画面一覧の更新は
  * backend / 設計担当の領域なので、こちらでは触っていない。
  *
  * プロフィールは S8（本人専用プロフィール）。両ペルソナを同時に出してよい唯一の画面
  * （FR-PERSONA-005）なので、他の画面から同じ中身を出さない。
+ *
+ * おきにいりは S7（大好きな人の一覧＝フォロー中一覧、FR-FOLLOW-003）。
+ * 本人だけが見られる。「大好きされた側」の一覧はここにも作らない（OUT-004）。
  *
  * 置いていないもの：DM の入口（OUT-001）、フォロワー関係（OUT-004）。
  */
@@ -46,7 +43,7 @@ const RAIL_ITEMS: readonly RailItem[] = [
   { view: "timeline", label: "ホーム", icon: IconHome, ready: true },
   { view: "search", label: "さがす", icon: IconSearch, ready: false },
   { view: "notifications", label: "おしらせ", icon: IconBell, ready: false },
-  { view: "favorites", label: "おきにいり", icon: IconStar, ready: false },
+  { view: "favorites", label: "おきにいり", icon: IconHeart, ready: true },
   { view: "profile", label: "プロフィール", icon: IconPerson, ready: true },
   { view: "settings", label: "せってい", icon: IconGear, ready: false },
 ];

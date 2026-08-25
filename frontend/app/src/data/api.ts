@@ -37,6 +37,7 @@ import type {
  *   fetchMyActivity     → GET  /api/profile/me/activity（設計書に未記載）
  *   fetchPublicProfile  → GET  /api/personas/:id（S6。設計書に未記載。FR-PROFILE-005 の受け皿）
  *   fetchPublicActivity → GET  /api/personas/:id/activity（同）
+ *   fetchLikedPersonas  → GET  /api/profile/me/following（S7。本人だけが引ける）
  *   setLiked            → POST / DELETE /api/personas/:id/follow
  *   fetchFeed          → GET  /api/posts/feed
  *   fetchBubbleDetail  → GET  /api/posts/:id（+ あやす一覧。読み取り系は Issue #8 で未確定）
@@ -642,4 +643,31 @@ export async function setLiked(personaId: string, liked: boolean): Promise<SetLi
     following.delete(personaId);
   }
   return { ok: true, liked: following.has(personaId) };
+}
+
+/**
+ * S7 大好きな人の一覧（GET /api/profile/me/following 相当、FR-FOLLOW-003）。
+ *
+ * ★ 本人だけが引ける。「誰が自分を大好きにしているか」を返す口は、この先も作らない
+ *   （FR-FOLLOW-004/005、OUT-004）。
+ *
+ * 赤ちゃんとお母さんを別々の配列で返す。1つに混ぜると、画面側が
+ * 種類ごとに出し分けるために毎回 kind を見ることになる。
+ */
+export async function fetchLikedPersonas(): Promise<{
+  readonly baby: readonly PublicPersona[];
+  readonly mother: readonly PublicPersona[];
+}> {
+  await sleep(MOCK_LATENCY_MS);
+  const liked: PublicPersona[] = [];
+  for (const id of following) {
+    const persona = PERSONA_BY_ID[id];
+    if (persona) {
+      liked.push(persona);
+    }
+  }
+  return {
+    baby: liked.filter((persona) => persona.kind === "baby"),
+    mother: liked.filter((persona) => persona.kind === "mother"),
+  };
 }

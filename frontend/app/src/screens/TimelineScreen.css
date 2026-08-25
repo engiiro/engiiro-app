@@ -46,3 +46,52 @@
 .eg-placeholder {
   padding: var(--space-lg) 0;
 }
+
+/* 見出しの右の「あたらしくする」 */
+.eg-timeline__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs) var(--space-xs);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-pill);
+  background: var(--surface);
+  color: var(--muted);
+  white-space: nowrap;
+  transition: background-color var(--duration-quick) var(--ease-in-out);
+}
+
+.eg-timeline__refresh:hover:not(:disabled) {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.eg-timeline__refresh:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+}
+
+.eg-timeline__refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 読み込み中だけ回す。処理中であることを示す（NFR-006・DESIGN.md §7.4） */
+.eg-timeline__refresh-icon.is-spinning {
+  animation: eg-spin var(--duration-very-slow) var(--ease-linear) infinite;
+}
+
+@keyframes eg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-timeline__refresh {
+    transition: none;
+  }
+
+  .eg-timeline__refresh-icon.is-spinning {
+    animation: none;
+  }
+}

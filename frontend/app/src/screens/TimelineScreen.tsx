@@ -6,6 +6,7 @@ import { Button } from "../components/Button";
 import { EmptyState } from "../components/EmptyState";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { SkeletonFeed } from "../components/Skeleton";
+import { IconRefresh } from "../components/icons";
 import "./TimelineScreen.css";
 
 /*
@@ -17,6 +18,9 @@ import "./TimelineScreen.css";
  * 上に「おなじくらい つかれてる子」の帯を置いているのは、単純な新着順にしないため
  * （FR-FEED-002）。並べ替えの判断は data/api.ts の fetchFeed が持っている。
  *
+ * 見出しの右に「あたらしくする」。読み込み中は押せなくして、アイコンを回す（NFR-006）。
+ * 自動で入れ替えない。読んでいる途中で並びが変わると、どこを読んでいたか分からなくなる。
+ *
  * 状態は4つ：未読／押下済（カードごと）、読み込み中（skeleton）、空。
  * 置いていないもの：フォロワー数、通報、DM、絶対時刻、本文の自動リンク化。
  */
@@ -26,6 +30,8 @@ type TimelineScreenProps = {
   readonly loading: boolean;
   readonly onOpenBubble: (bubbleId: string) => void;
   readonly onOpenProfile: (personaId: string) => void;
+  /** 読み込み直し（人間の指示、2026-08-25） */
+  readonly onRefresh: () => void;
   readonly onReact: (bubbleId: string, reaction: ReactionType) => void;
   readonly onCompose: () => void;
 };
@@ -35,6 +41,7 @@ export function TimelineScreen({
   loading,
   onOpenBubble,
   onOpenProfile,
+  onRefresh,
   onReact,
   onCompose,
 }: TimelineScreenProps) {
@@ -42,7 +49,20 @@ export function TimelineScreen({
 
   return (
     <>
-      <ScreenHeader title="ホーム" />
+      <ScreenHeader
+        title="ホーム"
+        aside={
+          <button
+            type="button"
+            className={cx("eg-timeline__refresh", "eg-touch", "t-label")}
+            onClick={onRefresh}
+            disabled={loading}
+          >
+            <IconRefresh className={cx("eg-timeline__refresh-icon", loading && "is-spinning")} />
+            あたらしくする
+          </button>
+        }
+      />
 
       <div className={cx("eg-column", "eg-timeline")}>
         {loading || feed === null ? <SkeletonFeed count={3} /> : null}

@@ -5,11 +5,12 @@ import { cx } from "../lib/cx";
 /*
  * 準備中の画面。
  *
- * 左サイドの「さがす」「おしらせ」「おきにいり」「せってい」は、
+ * 左サイドの「さがす」「おしらせ」「せってい」は、
  * docs/design_doc.md §4.1 の画面一覧（S1〜S8）に無い。
  * 中身を勝手に決めず、場所だけ取っておく。
  *
- * プロフィール（S8）はここから外れて MyProfileScreen になった。
+ * プロフィール（S8）と おきにいり（S7）はここから外れて、
+ * MyProfileScreen / FavoritesScreen になった。
  */
 
 const COPY: Readonly<Record<string, { readonly title: string; readonly lines: readonly string[] }>> =
@@ -24,10 +25,6 @@ const COPY: Readonly<Record<string, { readonly title: string; readonly lines: re
         "おしらせは これから つくります。",
         "いまは 投稿できたことを 画面の下で お知らせしています。",
       ],
-    },
-    favorites: {
-      title: "おきにいり",
-      lines: ["おきにいりは これから つくります。", "なにを ためておけるかは まだ決まっていません。"],
     },
     settings: {
       title: "せってい",

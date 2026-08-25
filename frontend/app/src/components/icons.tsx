@@ -175,15 +175,6 @@ export function IconBell({ className }: IconProps) {
   );
 }
 
-/** おきにいり */
-export function IconStar({ className }: IconProps) {
-  return (
-    <svg {...BASE_PROPS} className={className}>
-      <path d="m8 2.2 1.8 3.7 4 .6-2.9 2.8.7 4L8 11.4l-3.6 1.9.7-4L2.2 6.5l4-.6z" />
-    </svg>
-  );
-}
-
 /** じぶん */
 export function IconPerson({ className }: IconProps) {
   return (
@@ -269,6 +260,16 @@ export function IconCalendar({ className }: IconProps) {
     <svg {...BASE_PROPS} className={className}>
       <rect x="2.2" y="3.4" width="11.6" height="10.4" rx="1.6" />
       <path d="M2.2 6.6h11.6M5.4 1.9v2.4M10.6 1.9v2.4" />
+    </svg>
+  );
+}
+
+/** あたらしくする：タイムラインの読み込み直し */
+export function IconRefresh({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.7" />
+      <path d="M13.4 2.4v2.9h-2.9" />
     </svg>
   );
 }

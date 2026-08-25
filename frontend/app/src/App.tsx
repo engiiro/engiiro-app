@@ -6,6 +6,7 @@ import {
   fetchBubbleDetail,
   fetchEmptyFeed,
   fetchFeed,
+  fetchLikedPersonas,
   fetchMyActivity,
   fetchMyProfile,
   fetchPublicActivity,
@@ -23,6 +24,7 @@ import type {
   ActivityTab,
   MyProfile,
   PersonaKind,
+  PublicPersona,
   PublicProfile,
   ReactionType,
 } from "./data/types";
@@ -40,6 +42,7 @@ import { useTheme } from "./lib/useTheme";
 import { BubbleDetailScreen } from "./screens/BubbleDetailScreen";
 import { ComposePanel } from "./screens/ComposePanel";
 import type { ComposeMode } from "./screens/ComposePanel";
+import { FavoritesScreen } from "./screens/FavoritesScreen";
 import { MyProfileScreen } from "./screens/MyProfileScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
 import { PublicProfileScreen } from "./screens/PublicProfileScreen";
@@ -107,6 +110,15 @@ export function App() {
   /** S6 を閉じたときに戻る先 */
   const [publicBackTo, setPublicBackTo] = useState<CenterView>("timeline");
 
+  /*
+   * S7 おきにいり ＝ 大好きな人の一覧（FR-FOLLOW-003）。
+   * 「大好きにした人」だけを持つ。された側の状態は置かない（FR-FOLLOW-004/005）。
+   */
+  const [likedBaby, setLikedBaby] = useState<readonly PublicPersona[]>([]);
+  const [likedMother, setLikedMother] = useState<readonly PublicPersona[]>([]);
+  const [likedLoading, setLikedLoading] = useState(true);
+  const [unlikingId, setUnlikingId] = useState<string | null>(null);
+
   const loadFeed = useCallback(async () => {
     const result = feedMode === "empty" ? await fetchEmptyFeed() : await fetchFeed();
     setFeed(result);
@@ -135,6 +147,24 @@ export function App() {
     setProfile(await fetchMyProfile());
     setProfileLoading(false);
   }, []);
+
+  const loadLiked = useCallback(async () => {
+    setLikedLoading(true);
+    const result = await fetchLikedPersonas();
+    setLikedBaby(result.baby);
+    setLikedMother(result.mother);
+    setLikedLoading(false);
+  }, []);
+
+  const unlike = useCallback(
+    async (personaId: string) => {
+      setUnlikingId(personaId);
+      await setLiked(personaId, false);
+      setUnlikingId(null);
+      await loadLiked();
+    },
+    [loadLiked],
+  );
 
   const loadActivity = useCallback(async (tab: ActivityTab) => {
     setActivityLoading(true);
@@ -220,8 +250,11 @@ export function App() {
         void loadProfile();
         void loadActivity(activityTab);
       }
+      if (next === "favorites") {
+        void loadLiked();
+      }
     },
-    [activityTab, feedMode, loadActivity, loadFeed, loadProfile],
+    [activityTab, feedMode, loadActivity, loadFeed, loadLiked, loadProfile],
   );
 
   const refresh = useCallback(async () => {
@@ -291,8 +324,10 @@ export function App() {
         return;
       }
       setPublicProfile((current) => (current ? { ...current, liked: result.liked } : current));
+      // おきにいりの一覧を開いたときに古いままにならないよう、ここで合わせておく
+      await loadLiked();
     },
-    [publicPersonaId],
+    [loadLiked, publicPersonaId],
   );
 
   /** プロフィールの一覧からバブルを開く。詳細はタイムライン側の画面なので、そちらへ移る */
@@ -367,7 +402,18 @@ export function App() {
             />
           ) : null}
 
-          {!showPublicProfile && !showTimeline && view !== "profile" ? (
+          {!showPublicProfile && view === "favorites" ? (
+            <FavoritesScreen
+              baby={likedBaby}
+              mother={likedMother}
+              loading={likedLoading}
+              pendingId={unlikingId}
+              onOpenProfile={(personaId) => void openProfile(personaId)}
+              onUnlike={(personaId) => void unlike(personaId)}
+            />
+          ) : null}
+
+          {!showPublicProfile && !showTimeline && view !== "profile" && view !== "favorites" ? (
             <PlaceholderScreen view={view} />
           ) : null}
 
@@ -385,8 +431,7 @@ export function App() {
               onOpenBubble={openBubbleFromProfile}
               onDeleteBubble={(bubbleId) => void removeBubble(bubbleId)}
               onOpenFollowing={() => {
-                // S7 フォロー中一覧はこれから。押した先が無いことを黙って隠さない
-                setToast("フォロー中の 一覧は これから つくります");
+                navigate("favorites");
               }}
               onCompose={() => setCompose({ kind: "bubble" })}
             />
@@ -398,6 +443,10 @@ export function App() {
               loading={showFeedSkeleton}
               onOpenBubble={openBubble}
               onOpenProfile={(personaId) => void openProfile(personaId)}
+              onRefresh={() => {
+                setFeedLoading(true);
+                void loadFeed();
+              }}
               onReact={(bubbleId, reaction) => void reactToBubble(bubbleId, reaction)}
               onCompose={() => setCompose({ kind: "bubble" })}
             />

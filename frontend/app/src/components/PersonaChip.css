@@ -7,6 +7,39 @@
   min-width: 0;
 }
 
+/*
+ * S6 への入り口。チップ全体が当たり判定になる（人間の指示、2026-08-25）。
+ * 押せることは、狙ったときの下線とアバターの縁で示す。
+ * ふだんから下線を引くと、フィードが読み物でなくリンクの列に見える。
+ */
+.eg-persona--link {
+  padding: var(--space-xxs);
+  margin: calc(var(--space-xxs) * -1);
+  border-radius: var(--rounded-md);
+  text-align: start;
+  transition: background-color var(--duration-quick) var(--ease-in-out);
+}
+
+.eg-persona--link:hover {
+  background: var(--card);
+}
+
+.eg-persona--link:hover .eg-persona__name,
+.eg-persona--link:focus-visible .eg-persona__name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.eg-persona--link:active {
+  transform: scale(var(--press-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-persona--link {
+    transition: none;
+  }
+}
+
 .eg-persona__text {
   display: flex;
   flex-direction: column;
@@ -18,13 +51,6 @@
   color: var(--ink);
   overflow-wrap: anywhere;
   text-align: start;
-}
-
-/* S6 への入り口。下線は出しっぱなしにせず、狙ったときだけ出す */
-.eg-persona__name--link:hover,
-.eg-persona__name--link:focus-visible {
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .eg-persona__meta {
