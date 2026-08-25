@@ -29,7 +29,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
+import time
 from typing import Any, Literal
 
 from moderation_rules import check_rules, merge_verdicts
@@ -40,6 +42,17 @@ MAX_INPUT_CHARS = 500
 MAX_OUTPUT_CHARS = 150
 TEMPERATURE = 0.6
 USE_FEWSHOT = True
+
+# ===== レート制限への対応 =====
+# 無料枠は1分あたりの回数が少なく、まとめて処理するとすぐ 429 になる。
+# 429 が返ったら待って呼び直す。ただし Issue #15 の「無限リトライ禁止」に従い、
+# 回数と合計時間に上限を置く。上限に達したら諦めて例外にする。
+
+MIN_INTERVAL_SECONDS = 0.0      # 呼び出しの最短間隔。0なら間隔を空けない
+MAX_RETRY_ATTEMPTS = 8          # 429で待ち直す回数の上限
+MAX_TOTAL_WAIT_SECONDS = 600    # 待ち時間の合計上限。ここを超えたら諦める
+DEFAULT_WAIT_SECONDS = 20.0     # APIが待ち時間を教えてくれない場合の初期値
+MAX_WAIT_PER_ATTEMPT = 120.0    # 1回あたりの待ち時間の上限
 
 Mode = Literal["baby", "mother"]
 
@@ -237,6 +250,9 @@ def _describe(response) -> str:
 
 
 def _raise_readable(exc: Exception):
+    # call_with_retry が投げたものは、すでに読める形にしてあるので包み直さない
+    if isinstance(exc, RuntimeError):
+        raise exc
     message = str(exc)
     if "429" in message or "RESOURCE_EXHAUSTED" in message:
         raise RuntimeError("APIレート制限に達しました。しばらく待ってから再試行してください。") from exc
@@ -247,6 +263,98 @@ def _raise_readable(exc: Exception):
     if "timeout" in message.lower() or "DEADLINE" in message:
         raise RuntimeError("APIリクエストがタイムアウトしました。") from exc
     raise RuntimeError(f"API呼び出しエラー: {exc}") from exc
+
+
+# ============================================================
+# レート制限（429）の待機
+# ============================================================
+
+_last_call_at = 0.0
+
+# エラー文に埋め込まれた待ち時間。'retryDelay': '31s' のような形で入る。
+_RETRY_DELAY = re.compile(
+    r"retry[_\-]?delay[\"']?\s*[:=]\s*[\"']?(\d+(?:\.\d+)?)\s*s?", re.IGNORECASE
+)
+
+
+def is_rate_limit(message: str) -> bool:
+    return "429" in message or "RESOURCE_EXHAUSTED" in message
+
+
+def is_daily_quota(message: str) -> bool:
+    """1日あたりの上限かどうか。これは待っても当日中は回復しない。"""
+    lowered = message.lower()
+    return "perday" in lowered or "per day" in lowered or "requests per day" in lowered
+
+
+def suggested_wait(message: str) -> float | None:
+    """APIが「何秒待て」と言っている場合、その秒数を取り出す。"""
+    found = _RETRY_DELAY.search(message)
+    return float(found.group(1)) if found else None
+
+
+def _throttle():
+    """呼び出しの間隔を空ける。429になる前に減らすための予防。"""
+    global _last_call_at
+    if MIN_INTERVAL_SECONDS <= 0:
+        return
+    elapsed = time.monotonic() - _last_call_at
+    if elapsed < MIN_INTERVAL_SECONDS:
+        time.sleep(MIN_INTERVAL_SECONDS - elapsed)
+    _last_call_at = time.monotonic()
+
+
+def _notify_wait(attempt: int, pause: float, waited_total: float):
+    """待っている間、黙って止まって見えないように知らせる。"""
+    print(
+        f"  レート制限中。{pause:.0f}秒待って再試行します"
+        f"（{attempt}回目 / これまで合計 {waited_total:.0f}秒）",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+def call_with_retry(client, system_instruction, contents, *, json_mode=False, on_wait=None):
+    """APIを呼ぶ。429なら待って呼び直す。
+
+    待ち時間は、APIが教えてくれればその値を、なければ20秒から倍々にする。
+    MAX_RETRY_ATTEMPTS 回または合計 MAX_TOTAL_WAIT_SECONDS 秒で打ち切る。
+    1日あたりの上限に当たった場合は、待っても回復しないので即座に諦める。
+    """
+    notify = on_wait or _notify_wait
+    wait = DEFAULT_WAIT_SECONDS
+    waited_total = 0.0
+
+    for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
+        _throttle()
+        try:
+            return _call_api(client, system_instruction, contents, json_mode=json_mode)
+        except Exception as exc:
+            message = str(exc)
+            if not is_rate_limit(message):
+                raise
+
+            if is_daily_quota(message):
+                raise RuntimeError(
+                    "1日あたりの利用上限に達しました。待っても当日中は回復しません。"
+                ) from exc
+
+            pause = min(suggested_wait(message) or wait, MAX_WAIT_PER_ATTEMPT)
+
+            if attempt >= MAX_RETRY_ATTEMPTS or waited_total + pause > MAX_TOTAL_WAIT_SECONDS:
+                raise RuntimeError(
+                    f"レート制限が解除されませんでした。"
+                    f"{attempt}回待機、合計{waited_total:.0f}秒で諦めました。"
+                    f"（上限: {MAX_RETRY_ATTEMPTS}回 / {MAX_TOTAL_WAIT_SECONDS}秒。"
+                    f"変えたい場合は MAX_RETRY_ATTEMPTS と MAX_TOTAL_WAIT_SECONDS を調整してください）"
+                ) from exc
+
+            notify(attempt, pause, waited_total)
+            time.sleep(pause)
+            waited_total += pause
+            wait = min(wait * 2, MAX_WAIT_PER_ATTEMPT)
+
+    raise RuntimeError("到達しない想定の分岐です。")
 
 
 # ============================================================
@@ -300,7 +408,7 @@ def transform_text(mode: Mode, text: str, retry: bool = False, client=None) -> s
     client = client or build_client()
 
     try:
-        response = _call_api(client, INSTRUCTIONS[mode], build_contents(mode, text, retry))
+        response = call_with_retry(client, INSTRUCTIONS[mode], build_contents(mode, text, retry))
     except Exception as exc:
         _raise_readable(exc)
 
@@ -333,7 +441,7 @@ def moderate(text: str, client=None) -> dict:
     client = client or build_client()
     contents = [{"role": "user", "parts": [{"text": text}]}]
     try:
-        response = _call_api(client, MODERATION_INSTRUCTION, contents, json_mode=True)
+        response = call_with_retry(client, MODERATION_INSTRUCTION, contents, json_mode=True)
     except Exception as exc:
         _raise_readable(exc)
 
@@ -399,32 +507,78 @@ def transform(mode: Mode, text: str, client=None) -> dict:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="えんじいろの文章変換を1件試します。APIキーは環境変数 GOOGLE_API_KEY から読みます。"
+        description=(
+            "えんじいろの文章変換を試します。"
+            "APIキーは環境変数 GOOGLE_API_KEY から読みます。"
+        )
     )
     parser.add_argument("--mode", choices=("baby", "mother"), required=True,
                         help="変換のスタイル。")
-    parser.add_argument("--text", required=True,
-                        help="変換したい文章。")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--text", help="変換したい文章を1件。")
+    source.add_argument("--file", type=argparse.FileType("r", encoding="utf-8"),
+                        help="1行1件のテキストファイル。空行と # で始まる行は飛ばします。")
     parser.add_argument("--no-moderation", action="store_true",
                         help="判定を行わず、変換だけを試します。")
+    parser.add_argument("--min-interval", type=float, default=MIN_INTERVAL_SECONDS,
+                        help=(
+                            "API呼び出しの最短間隔（秒）。"
+                            "無料枠でまとめて処理するとすぐレート制限に当たるため、"
+                            "4 くらいを入れておくと待ち時間が減ります。既定は0。"
+                        ))
     return parser.parse_args()
 
 
+def _run_one(mode: str, text: str, *, skip_moderation: bool, client) -> dict:
+    if skip_moderation:
+        return {
+            "action": "allow",
+            "transformedText": transform_text(mode, text, client=client),
+            "reasonCodes": [],
+        }
+    return transform(mode, text, client=client)
+
+
 def main() -> int:
+    global MIN_INTERVAL_SECONDS
     args = parse_args()
+    MIN_INTERVAL_SECONDS = args.min_interval
+
+    if args.file:
+        with args.file as handle:
+            texts = [
+                line.strip() for line in handle
+                if line.strip() and not line.lstrip().startswith("#")
+            ]
+    else:
+        texts = [args.text]
+
     try:
-        if args.no_moderation:
-            result = {"action": "allow",
-                      "transformedText": transform_text(args.mode, args.text),
-                      "reasonCodes": []}
-        else:
-            result = transform(args.mode, args.text)
-    except (ValueError, RuntimeError) as exc:
+        client = build_client()
+    except RuntimeError as exc:
         print(f"エラー: {exc}", file=sys.stderr)
         return 1
 
-    print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0
+    results = []
+    failed = 0
+    for index, text in enumerate(texts, 1):
+        if len(texts) > 1:
+            print(f"[{index}/{len(texts)}] {text}", file=sys.stderr, flush=True)
+        try:
+            results.append(_run_one(args.mode, text,
+                                    skip_moderation=args.no_moderation, client=client))
+        except (ValueError, RuntimeError) as exc:
+            # 1件失敗しても、残りは続ける。途中で止まると待った時間が無駄になる
+            print(f"  エラー: {exc}", file=sys.stderr, flush=True)
+            results.append({"action": None, "transformedText": None,
+                            "reasonCodes": [], "error": str(exc), "input": text})
+            failed += 1
+
+    print(json.dumps(results if len(texts) > 1 else results[0],
+                     ensure_ascii=False, indent=2))
+    if failed:
+        print(f"{failed}/{len(texts)} 件が失敗しました。", file=sys.stderr)
+    return 1 if failed == len(texts) else 0
 
 
 if __name__ == "__main__":
