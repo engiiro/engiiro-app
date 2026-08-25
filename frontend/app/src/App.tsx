@@ -15,6 +15,7 @@ import {
   markRead,
   setAiEvaluateAvailability,
   setLiked,
+  setSessionGuest,
 } from "./data/api";
 import type { FeedResult } from "./data/api";
 import { ME } from "./data/personas";
@@ -103,8 +104,12 @@ export function App() {
    *   何ができないのかを、押す前から想像させない。
    *
    * 判定は下の guard に集約する。画面ごとに if を書かない。
+   *
+   * 既定はゲスト（人間の指示、2026-08-26）。初めて来た人と同じ状態から始める。
    */
-  const [isGuest, setIsGuest] = useState(false);
+  const [isGuest, setIsGuest] = useState(true);
+
+
   const [gate, setGate] = useState<GuestAction | null>(null);
 
   const [view, setView] = useState<CenterView>("timeline");
@@ -191,10 +196,22 @@ export function App() {
    *
    * ここはあくまで画面側の入口。本物は backend が同じ判定をする（FR-AUTH-001）。
    */
+  /*
+   * ログインの状態を切り替える。
+   *
+   * サーバ側にもその場で伝える。isMine は閲覧者ごとに変わる値で、
+   * ゲストには「自分のバブル」も「自分のあやす」も無い。
+   * effect にすると、切り替えた直後の読み込みが古い状態のまま走ることがある。
+   */
+  const applySession = useCallback((guest: boolean) => {
+    setIsGuest(guest);
+    setSessionGuest(guest);
+  }, []);
+
   /** ログアウトして、読むだけの状態に戻る */
   const leave = useCallback(async () => {
     await logout();
-    setIsGuest(true);
+    applySession(true);
     setCompose(null);
     setToast("ログアウトしました。よむのは つづけられます");
     // 本人専用の画面を開いたままにしない（FR-PERSONA-005 / FR-FOLLOW-003）
@@ -206,7 +223,10 @@ export function App() {
     setDetail(null);
     setPublicPersonaId(null);
     setPublicProfile(null);
-  }, []);
+    // 「自分のバブル」の印が残らないよう、閲覧者が変わったら読み直す
+    setFeedLoading(true);
+    await loadFeed();
+  }, [applySession, loadFeed]);
 
   const guard = useCallback(
     (action: GuestAction, run: () => void) => {
@@ -480,12 +500,13 @@ export function App() {
           <LoginScreen
             onSignUp={() => setEntry("intro")}
             onGuest={() => {
-              setIsGuest(true);
+              applySession(true);
               setEntry("app");
             }}
             onDone={() => {
-              setIsGuest(false);
+              applySession(false);
               setEntry("app");
+              navigate("timeline");
               setToast("おかえりなさい");
             }}
           />
@@ -496,11 +517,11 @@ export function App() {
             onBack={() => setEntry("intro")}
             onLogin={() => setEntry("login")}
             onGuest={() => {
-              setIsGuest(true);
+              applySession(true);
               setEntry("app");
             }}
             onDone={(babyNickname) => {
-              setIsGuest(false);
+              applySession(false);
               setEntry("app");
               navigate("timeline");
               setToast(babyNickname + " として はじめました");

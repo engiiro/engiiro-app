@@ -72,6 +72,26 @@ const MOCK_LATENCY_MS = 520;
  */
 let evaluateAvailable = true;
 
+/*
+ * 閲覧者がログインしているかどうか。
+ *
+ * isMine は「閲覧者にとって自分のものか」なので、誰が見ているかで変わる。
+ * ゲストには自分のバブルもあやすも無い。サーバなら閲覧者ごとに計算して返すところを、
+ * モックでは1人ぶんしか持っていないので、返す直前に落とす。
+ *
+ * 既定はゲスト（人間の指示、2026-08-26）。App の初期値と合わせてある。
+ */
+let viewerIsGuest = true;
+
+export function setSessionGuest(guest: boolean): void {
+  viewerIsGuest = guest;
+}
+
+/** 閲覧者から見た形にして返す。ゲストには「自分のもの」が無い */
+function asViewer<T extends { readonly isMine: boolean }>(item: T): T {
+  return viewerIsGuest ? { ...item, isMine: false } : item;
+}
+
 export function setAiEvaluateAvailability(available: boolean): void {
   evaluateAvailable = available;
 }
@@ -155,8 +175,10 @@ export async function fetchFeed(): Promise<FeedResult> {
   const bandIds = new Set(band.map((entry) => entry.bubble.id));
 
   return {
-    recommended: band.map((entry) => entry.bubble),
-    rest: scored.filter((entry) => !bandIds.has(entry.bubble.id)).map((entry) => entry.bubble),
+    recommended: band.map((entry) => asViewer(entry.bubble)),
+    rest: scored
+      .filter((entry) => !bandIds.has(entry.bubble.id))
+      .map((entry) => asViewer(entry.bubble)),
   };
 }
 
@@ -173,8 +195,8 @@ export async function fetchBubbleDetail(bubbleId: string): Promise<BubbleDetail 
     return null;
   }
   return {
-    bubble,
-    soothes: soothes.filter((item) => item.bubbleId === bubbleId),
+    bubble: asViewer(bubble),
+    soothes: soothes.filter((item) => item.bubbleId === bubbleId).map(asViewer),
   };
 }
 
