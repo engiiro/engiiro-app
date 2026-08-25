@@ -226,36 +226,244 @@ flowchart TD
 
 ## 6. データ設計（PostgreSQL）
 
-6章時点でDBはPostgreSQL（RDB）を前提とする。エンティティ間の関係をER図で示したうえで、テーブルごとの主要カラムと制約の方針を示す。値の型・インデックスの詳細な確定は実装フェーズ（詳細設計書）で行い、ここでは全体設計として最低限の構造を示す（カラム・キー制約の詳細な記法は`docs/design_doc.md`の後続の更新で拡充する）。
+6章時点でDBはPostgreSQL（RDB）を前提とする。エンティティ間の関係と、各テーブルのカラム・主キー（PK）・外部キー（FK）・一意制約（UK）・NOT NULL制約をER図で示す。値の詳細な型・インデックス設計は実装フェーズ（詳細設計書）で確定し、ここでは全体設計として必要な制約を示す。
 
 ### 6.1 ER図
 
+`PK`＝主キー、`FK`＝外部キー、`UK`＝一意制約（UNIQUE）。属性のコメント欄にNOT NULLや排他制約などの補足を記す（コメントがないカラムはNULL許容）。テーブル間の関係線は「行を持つかどうか」というデータベース上の参照関係（`has`）のみを示し、業務上の意味（誰が投稿する・誰が返信するといった振る舞い）はここには書かない。CHECK制約や「参照先の値に依存する制約」（例：あやすの`persona_type`とリアクションの対象種別の対応）はER図の記法だけでは表現しきれないため、6.2節のDDLと6.3節の文章で補足する。
+
 ```mermaid
 erDiagram
-    ACCOUNTS ||--|| BABY_PERSONAS : "1対1で内部所有（非公開）"
-    ACCOUNTS ||--|| MOTHER_PERSONAS : "1対1で内部所有（非公開）"
-    BABY_PERSONAS ||--o{ POSTS : "投稿する"
-    POSTS ||--o{ POST_STAMPS : "スタンプを挿入"
-    STAMPS ||--o{ POST_STAMPS : "カタログ参照"
-    POSTS ||--o{ COMMENTS : "あやすを受ける"
-    BABY_PERSONAS ||--o{ COMMENTS : "赤ちゃんとしてあやす"
-    MOTHER_PERSONAS ||--o{ COMMENTS : "お母さんとしてあやす"
-    COMMENTS ||--o{ COMMENTS : "お母さんへの返信は赤ちゃんのみ"
-    ACCOUNTS ||--o{ REACTIONS : "リアクションする"
-    POSTS ||--o{ REACTIONS : "対象になる"
-    COMMENTS ||--o{ REACTIONS : "対象になる"
-    ACCOUNTS ||--o{ FOLLOWS : "フォローする"
-    BABY_PERSONAS ||--o{ FOLLOWS : "フォローされる（対象）"
-    MOTHER_PERSONAS ||--o{ FOLLOWS : "フォローされる（対象）"
-    BABY_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "推定年齢を持つ"
-    MOTHER_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "推定対象年齢を持つ"
+    ACCOUNTS {
+        uuid id PK
+        string login_id UK "NOT NULL. ログイン用ID（内部idとは別物）"
+        string password_hash "NOT NULL"
+        date birth_date "NOT NULL. 非公開（本人専用プロフィールにのみ表示）"
+        timestamptz created_at "NOT NULL"
+    }
+    BABY_PERSONAS {
+        uuid id PK
+        uuid account_id FK "NOT NULL, UNIQUE（1アカウントにつき1行）"
+        string nickname "NOT NULL"
+        string bio
+        timestamptz created_at "NOT NULL"
+    }
+    MOTHER_PERSONAS {
+        uuid id PK
+        uuid account_id FK "NOT NULL, UNIQUE（1アカウントにつき1行）"
+        string nickname "NOT NULL"
+        string bio
+        timestamptz created_at "NOT NULL"
+    }
+    STAMPS {
+        uuid id PK
+        string name "NOT NULL"
+        string image_url "NOT NULL"
+        timestamptz created_at "NOT NULL"
+    }
+    POSTS {
+        uuid id PK
+        uuid baby_persona_id FK "NOT NULL"
+        string body "NOT NULL. 150文字以内（FR-POST-002）"
+        timestamptz deleted_at "論理削除用。未削除ならNULL"
+        timestamptz created_at "NOT NULL"
+    }
+    POST_STAMPS {
+        uuid id PK
+        uuid post_id FK "NOT NULL"
+        uuid stamp_id FK "NOT NULL"
+        int position "本文中の挿入位置。省略時はNULL"
+    }
+    COMMENTS {
+        uuid id PK
+        uuid post_id FK "NOT NULL"
+        string persona_type "NOT NULL. 'baby' or 'mother'"
+        uuid baby_persona_id FK "persona_type='baby'のときのみNOT NULL"
+        uuid mother_persona_id FK "persona_type='mother'のときのみNOT NULL"
+        uuid reply_to_comment_id FK "お母さんへの返信時のみ設定。それ以外はNULL"
+        string body "NOT NULL"
+        timestamptz deleted_at "論理削除用。未削除ならNULL"
+        timestamptz created_at "NOT NULL"
+    }
+    REACTIONS {
+        uuid id PK
+        string target_type "NOT NULL. 'post' or 'comment'"
+        uuid target_post_id FK "target_type='post'のときのみNOT NULL"
+        uuid target_comment_id FK "target_type='comment'のときのみNOT NULL"
+        uuid reactor_account_id FK "NOT NULL"
+        string type "NOT NULL. 'ogya'|'yoshiyoshi'|'manma'|'babu'"
+        timestamptz created_at "NOT NULL"
+    }
+    FOLLOWS {
+        uuid id PK
+        uuid follower_account_id FK "NOT NULL"
+        string target_persona_type "NOT NULL. 'baby' or 'mother'"
+        uuid target_persona_id "NOT NULL. UNIQUE(follower_account_id, target_persona_type, target_persona_id)"
+        timestamptz created_at "NOT NULL"
+    }
+    PERSONA_AGE_ESTIMATES {
+        string persona_type PK "'baby' or 'mother'"
+        uuid persona_id PK
+        numeric estimated_age "未評価時はNULL"
+        int sample_count "NOT NULL, デフォルト0"
+        timestamptz updated_at "NOT NULL"
+    }
+
+    ACCOUNTS ||--|| BABY_PERSONAS : "has"
+    ACCOUNTS ||--|| MOTHER_PERSONAS : "has"
+    BABY_PERSONAS ||--o{ POSTS : "has"
+    POSTS ||--o{ POST_STAMPS : "has"
+    STAMPS ||--o{ POST_STAMPS : "has"
+    POSTS ||--o{ COMMENTS : "has"
+    BABY_PERSONAS ||--o{ COMMENTS : "has"
+    MOTHER_PERSONAS ||--o{ COMMENTS : "has"
+    COMMENTS ||--o{ COMMENTS : "replies to"
+    ACCOUNTS ||--o{ REACTIONS : "has"
+    POSTS ||--o{ REACTIONS : "has"
+    COMMENTS ||--o{ REACTIONS : "has"
+    ACCOUNTS ||--o{ FOLLOWS : "has"
+    BABY_PERSONAS ||--o{ FOLLOWS : "has"
+    MOTHER_PERSONAS ||--o{ FOLLOWS : "has"
+    BABY_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "has"
+    MOTHER_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "has"
 ```
 
-> ER図にPK・FK・UNIQUE・NOT NULL等の制約を明記した詳細版は6.3節で扱う（別ブランチでの更新予定）。
+### 6.2 DDL（PostgreSQL CREATE TABLE文）
 
-### 6.2 テーブル定義
+6.1節のER図をそのままPostgreSQLのDDLに落としたもの。主キー・外部キー・一意制約・NOT NULL制約・CHECK制約をSQLとして確定させ、このDDLをそのまま実行すればスキーマを再現できる状態にする。列の型・桁数（`varchar`の長さ等）は実装フェーズで調整可能な仮の値とする。
 
-3.2節の通り、1アカウントは赤ちゃんペルソナ／お母さんペルソナという2つの公開アイデンティティを持つ。`accounts.id`は内部でこの2つを紐づけるためだけに使い、外部レスポンスには含めない（FR-COMMON-005、FR-PRIV-004）。
+```sql
+create extension if not exists pgcrypto; -- gen_random_uuid() を使うため
+
+create table accounts (
+    id            uuid primary key default gen_random_uuid(),
+    login_id      varchar(50)  not null unique,
+    password_hash varchar(255) not null,
+    birth_date    date         not null,
+    created_at    timestamptz  not null default now()
+);
+
+create table baby_personas (
+    id         uuid primary key default gen_random_uuid(),
+    account_id uuid         not null unique references accounts (id),
+    nickname   varchar(50)  not null,
+    bio        text,
+    created_at timestamptz  not null default now()
+);
+
+create table mother_personas (
+    id         uuid primary key default gen_random_uuid(),
+    account_id uuid         not null unique references accounts (id),
+    nickname   varchar(50)  not null,
+    bio        text,
+    created_at timestamptz  not null default now()
+);
+
+create table stamps (
+    id         uuid primary key default gen_random_uuid(),
+    name       varchar(50) not null,
+    image_url  text        not null,
+    created_at timestamptz not null default now()
+);
+
+create table posts (
+    id              uuid primary key default gen_random_uuid(),
+    baby_persona_id uuid        not null references baby_personas (id),
+    body            varchar(150) not null,
+    deleted_at      timestamptz,
+    created_at      timestamptz not null default now()
+);
+
+create table post_stamps (
+    id       uuid primary key default gen_random_uuid(),
+    post_id  uuid    not null references posts (id),
+    stamp_id uuid    not null references stamps (id),
+    position integer
+);
+
+create table comments (
+    id                  uuid primary key default gen_random_uuid(),
+    post_id             uuid        not null references posts (id),
+    persona_type        varchar(6)  not null check (persona_type in ('baby', 'mother')),
+    baby_persona_id     uuid references baby_personas (id),
+    mother_persona_id   uuid references mother_personas (id),
+    reply_to_comment_id uuid references comments (id),
+    body                text        not null,
+    deleted_at          timestamptz,
+    created_at          timestamptz not null default now(),
+    -- persona_type='baby' なら baby_persona_id のみ、'mother' なら mother_persona_id のみが埋まる
+    constraint comments_persona_exclusive check (
+        (persona_type = 'baby'   and baby_persona_id   is not null and mother_persona_id is null) or
+        (persona_type = 'mother' and mother_persona_id is not null and baby_persona_id   is null)
+    )
+);
+
+create table reactions (
+    id                 uuid primary key default gen_random_uuid(),
+    target_type        varchar(7)  not null check (target_type in ('post', 'comment')),
+    target_post_id     uuid references posts (id),
+    target_comment_id  uuid references comments (id),
+    reactor_account_id uuid        not null references accounts (id),
+    type               varchar(10) not null check (type in ('ogya', 'yoshiyoshi', 'manma', 'babu')),
+    created_at         timestamptz not null default now(),
+    -- target_type='post' なら target_post_id のみ、'comment' なら target_comment_id のみが埋まる
+    constraint reactions_target_exclusive check (
+        (target_type = 'post'    and target_post_id    is not null and target_comment_id is null) or
+        (target_type = 'comment' and target_comment_id is not null and target_post_id    is null)
+    )
+);
+
+-- 同一利用者・同一対象・同一種類のリアクションは5件まで（FR-REACT-010〜011）。
+-- 集計を伴う制約はCHECK制約単体では書けないため、INSERT前トリガーで検査する。
+create or replace function reactions_enforce_limit() returns trigger as $$
+declare
+    current_count integer;
+begin
+    select count(*) into current_count
+    from reactions
+    where reactor_account_id = new.reactor_account_id
+      and target_type = new.target_type
+      and target_post_id is not distinct from new.target_post_id
+      and target_comment_id is not distinct from new.target_comment_id
+      and type = new.type;
+
+    if current_count >= 5 then
+        raise exception 'reaction limit exceeded: max 5 per reactor/target/type (FR-REACT-011)';
+    end if;
+
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger reactions_limit_check
+    before insert on reactions
+    for each row
+    execute function reactions_enforce_limit();
+
+create table follows (
+    id                   uuid primary key default gen_random_uuid(),
+    follower_account_id  uuid        not null references accounts (id),
+    target_persona_type  varchar(6)  not null check (target_persona_type in ('baby', 'mother')),
+    target_persona_id    uuid        not null,
+    created_at           timestamptz not null default now(),
+    unique (follower_account_id, target_persona_type, target_persona_id)
+);
+
+create table persona_age_estimates (
+    persona_type  varchar(6)   not null check (persona_type in ('baby', 'mother')),
+    persona_id    uuid         not null,
+    estimated_age numeric(4,1),
+    sample_count  integer      not null default 0,
+    updated_at    timestamptz  not null default now(),
+    primary key (persona_type, persona_id)
+);
+```
+
+> `comments_persona_exclusive`・`reactions_target_exclusive`は「入力された値の組み合わせ」を検査するCHECK制約であり、6.1節で触れた「参照先テーブルの行の値に依存する制約」（例：`reply_to_comment_id`が指す行の`persona_type`が`'mother'`なら自分は`'baby'`でなければならない、リアクション対象のあやすが`mother`なら`type`は`babu`のみ、というFR-COMMENT-005〜007・FR-REACT-005〜007の制約）はCHECK制約だけでは書けない。これらはPostgreSQLのトリガー（`CREATE TRIGGER` + `CREATE FUNCTION`）またはアプリケーション層でのバリデーションで担保する（6.5節参照）。`reactions_enforce_limit`トリガーは、この種の「集計を伴う制約」（同一利用者・同一対象・同一種類は5件まで、FR-REACT-010〜011）をトリガーで実装する例である。
+
+### 6.3 テーブル定義
+
+3.2節の通り、1アカウントは赤ちゃんペルソナ／お母さんペルソナという2つの公開アイデンティティを持つ。`accounts.id`は内部でこの2つを紐づけるためだけに使い、外部レスポンスには含めない（FR-COMMON-005、FR-PRIV-004）。6.2節のDDLと対応させながら、各テーブルの意図と仕様IDとの対応を示す。
 
 | テーブル                 | 主なカラム                                                                                                    | 制約・備考                                                                                                                                                 |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -266,11 +474,11 @@ erDiagram
 | `posts`（バブル）        | `id (PK)`, `baby_persona_id (FK -> baby_personas.id)`, `body (最終的に150文字以内, FR-POST-002)`, `deleted_at`, `created_at` | `deleted_at`は論理削除用（FR-POST-006、FR-POST-007、FR-FEED-004）。常に赤ちゃんペルソナからの投稿のみを許可する（FR-POST-003、アプリ層＋外部キー制約で担保）。 |
 | `post_stamps`            | `id (PK)`, `post_id (FK -> posts.id)`, `stamp_id (FK -> stamps.id)`, `position`                                 | バブル本文とスタンプの中間テーブル。画像本体を投稿ごとに複製しない（FR-POST-005）。                                                                          |
 | `comments`（あやす）     | `id (PK)`, `post_id (FK -> posts.id)`, `persona_type ('baby'|'mother')`, `baby_persona_id (FK, nullable)`, `mother_persona_id (FK, nullable)`, `reply_to_comment_id (FK -> comments.id, nullable)`, `body`, `deleted_at`, `created_at` | `persona_type`に応じて`baby_persona_id`／`mother_persona_id`のどちらか一方だけがNOT NULLになるようCHECK制約で排他にする。`reply_to_comment_id`が指す先が`persona_type='mother'`の行の場合、自分自身の`persona_type`は必ず`'baby'`でなければならない（FR-COMMENT-005〜007）。この参照先カラムをまたぐ制約はDBのCHECK制約だけでは表現できないため、トリガーまたはアプリ層での検証と併用する。 |
-| `reactions`              | `id (PK)`, `target_type ('post'|'comment')`, `target_post_id (FK, nullable)`, `target_comment_id (FK, nullable)`, `reactor_account_id (FK -> accounts.id)`, `type ('ogya'|'yoshiyoshi'|'manma'|'babu')`, `created_at` | `target_type`に応じて`target_post_id`／`target_comment_id`のどちらか一方だけがNOT NULLになるようCHECK制約で排他にする。**対象によって許可される`type`が異なる**（9.1参照）：バブルおよび`persona_type='baby'`のあやす → `ogya`／`yoshiyoshi`／`manma`のみ、`persona_type='mother'`のあやす → `babu`のみ。この対象種別をまたぐ制約もDBのCHECK制約だけでは完結しないため、保存前にアプリ層で必ず検証する（FR-REACT-007）。同一人物・同一対象・同一`type`の行を複数保存できるようにし、件数（最大5件、FR-REACT-010）で上限を判定する（詳細は別ブランチでの更新予定）。 |
+| `reactions`              | `id (PK)`, `target_type ('post'|'comment')`, `target_post_id (FK, nullable)`, `target_comment_id (FK, nullable)`, `reactor_account_id (FK -> accounts.id)`, `type ('ogya'|'yoshiyoshi'|'manma'|'babu')`, `created_at` | `target_type`に応じて`target_post_id`／`target_comment_id`のどちらか一方だけがNOT NULLになるようCHECK制約で排他にする。**対象によって許可される`type`が異なる**（9.1参照）：バブルおよび`persona_type='baby'`のあやす → `ogya`／`yoshiyoshi`／`manma`のみ、`persona_type='mother'`のあやす → `babu`のみ。この対象種別をまたぐ制約もDBのCHECK制約だけでは完結しないため、保存前にアプリ層で必ず検証する（FR-REACT-007）。同一人物・同一対象・同一`type`の行を1回のリアクションにつき1行として複数保存できるようにし、`(reactor_account_id, target_type, target_post_id, target_comment_id, type)`ごとの行数（最大5件、FR-REACT-010〜011）で上限を判定する。取り消し（FR-REACT-013）は該当する行を1件削除する形で実装する。 |
 | `follows`                | `id (PK)`, `follower_account_id (FK -> accounts.id)`, `target_persona_type ('baby'|'mother')`, `target_persona_id`, `created_at` | `UNIQUE (follower_account_id, target_persona_type, target_persona_id)`。**被フォロー側からフォロワーを逆引きするAPI・クエリは提供しない**という設計上の割り切り（FR-FOLLOW-004、FR-FOLLOW-005）。DB上は技術的に可能でも、アプリケーション層で意図的に提供しない。 |
 | `persona_age_estimates`  | `persona_type ('baby'|'mother')`, `persona_id`, `estimated_age`, `sample_count`, `updated_at`                   | プロフィール画面表示用の集計値。複合主キー`(persona_type, persona_id)`。赤ちゃん度・お母さん度はそれぞれ対応するペルソナの発言のみから算出する（FR-PROFILE-003〜004）。 |
 
-### 6.3 認証・セッションの持ち方
+### 6.4 認証・セッションの持ち方
 
 認証には**JWT（署名付きトークン）**を採用する。
 
@@ -279,11 +487,11 @@ erDiagram
 - **JWTはステートレスであるため、DBにセッション行を持たない。** ログアウト（`DELETE /api/sessions`）はサーバ側でのトークン失効を伴わず、クライアント側がトークンを破棄するだけの操作になる。トークンは有効期限が切れるまで技術的には有効なままである点を踏まえ、有効期限は短めに設定する方針とする（具体的な期間は10章のオープンイシュー）。
 - JWTのペイロードに含まれる`accountId`はランダムなUUIDであり、それ単体を読んでも赤ちゃん／お母さんペルソナの紐づけ（3.2節の非連結の原則）は分からない。ただし署名は改ざん防止のためのものであり、ペイロードの内容そのものは暗号化されず誰でも読めることを踏まえ、`accountId`以外の情報をペイロードに載せない。
 
-### 6.4 設計方針
+### 6.5 設計方針
 
 - KVのキー構造による非正規化ではなく、外部キー制約と正規化されたテーブルでエンティティ間の整合性をDB側でも保証する。ただし「対象によってリアクション種別が異なる」「お母さんへの返信は赤ちゃんのみ」といった**参照先の値に依存する制約**は、PostgreSQLのCHECK制約単体では完結しないため、トリガーまたはアプリケーション層のバリデーションを併用する方針とする（実装方式の詳細は各担当の裁量）。
 - 一覧取得（あるペルソナのバブル一覧、自分がフォローしているペルソナ一覧など）は、外部キーにインデックスを張った通常のSQLクエリ（`WHERE` + `ORDER BY` + ページング）で実現する。
-- `follows`テーブルは技術的には対象側からフォロワーを引けるが、「誰が自分をフォローしているか」を可視化しないための内部設計上の割り切りとして、そのためのAPI・クエリを一切提供しない（6.2参照）。
+- `follows`テーブルは技術的には対象側からフォロワーを引けるが、「誰が自分をフォローしているか」を可視化しないための内部設計上の割り切りとして、そのためのAPI・クエリを一切提供しない（6.3参照）。
 - 赤ちゃんペルソナ・お母さんペルソナが同一`account_id`に紐づくという情報は、本人が自分のプロフィールを見るとき（`GET /api/profile/me`、7章参照）以外では組み合わせて返さないことを設計上の原則とする。
 - 禁止内容を検出した本文（モデレーション違反として拒否された原文）は、恒久的なレコードとして`posts`・`comments`テーブルに保存しない（FR-PRIV-002）。一時的な検査処理の入力としてのみ扱い、永続化しない。
 - 値のスキーマは実装フェーズで柔軟に調整可能とし、ここでは最低限のカラムのみ定義する（アジャイルのため厳密な型定義・インデックス設計は各スプリントで確定）。
@@ -294,7 +502,7 @@ erDiagram
 
 エンドポイントごとに**引数（リクエスト）と戻り値（レスポンス）のJSON形式のみ**を定義する。内部の処理ロジック（レコメンドアルゴリズムやAI連携の詳細）はあえて抽象的なままにし、実装フェーズで詰める。
 
-認証が必要なエンドポイントは、リクエストボディに`accountId`・`babyPersonaId`・`reactorAccountId`等の身元情報を含めない。代わりに`Authorization: Bearer <JWT>`ヘッダーで送られたトークンから、サーバー側で操作主体（アカウント・該当ペルソナ）を解決する（6.3参照）。未認証で認証必須のエンドポイントを呼んだ場合は拒否する（FR-COMMON-001）。
+認証が必要なエンドポイントは、リクエストボディに`accountId`・`babyPersonaId`・`reactorAccountId`等の身元情報を含めない。代わりに`Authorization: Bearer <JWT>`ヘッダーで送られたトークンから、サーバー側で操作主体（アカウント・該当ペルソナ）を解決する（6.4参照）。未認証で認証必須のエンドポイントを呼んだ場合は拒否する（FR-COMMON-001）。
 
 | エンドポイント                                                | 概要                                                                                                             | 認証 |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --- |
@@ -310,8 +518,10 @@ erDiagram
 | `DELETE /api/posts/:id`                                        | 自分のバブルの削除（論理削除）。他人のバブルへの削除要求は拒否する                                                 | 必要 |
 | `POST /api/posts/:id/comments`                                 | バブルへのあやすの作成（赤ちゃん／お母さんペルソナを選択。お母さんへの返信の場合は赤ちゃんペルソナのみ許可）        | 必要 |
 | `GET /api/posts/:id/comments`                                  | バブルに対するあやす一覧の取得                                                                                    | 不要 |
-| `POST /api/posts/:id/reactions`                                | バブルへのリアクション（おぎゃー／よしよし／まんま）                                                              | 必要 |
-| `POST /api/comments/:id/reactions`                             | あやすへのリアクション（対象が赤ちゃんとしてのあやすなら3種、お母さんとしてのあやすなら`ばぶー`のみ）             | 必要 |
+| `POST /api/posts/:id/reactions`                                | バブルへのリアクション（おぎゃー／よしよし／まんま）。同一種類は1人5回まで                                        | 必要 |
+| `DELETE /api/posts/:id/reactions/:type`                        | バブルへのリアクションを1回分取り消す                                                                             | 必要 |
+| `POST /api/comments/:id/reactions`                             | あやすへのリアクション（対象が赤ちゃんとしてのあやすなら3種、お母さんとしてのあやすなら`ばぶー`のみ）。同一種類は1人5回まで | 必要 |
+| `DELETE /api/comments/:id/reactions/:type`                     | あやすへのリアクションを1回分取り消す                                                                             | 必要 |
 | `POST /api/follows`                                            | ペルソナ（赤ちゃん or お母さん）をフォロー                                                                        | 必要 |
 | `GET /api/follows/me`                                          | 自分がフォローしているペルソナ一覧の取得（本人のみ参照可。フォロワー一覧・人数を返すAPIは提供しない）             | 必要 |
 | `POST /api/ai/evaluate`                                        | 文章の「赤ちゃん度／お母さん度」を年齢の目安としてAIが評価                                                        | 必要 |
@@ -339,7 +549,7 @@ erDiagram
 }
 ```
 
-> `loginId`はユーザーが指定するログイン用のID、サーバ内部の管理用ID（`accountId`）とは別物であり、レスポンスにも`accountId`は含めない（6.3参照）。以降の認証必須のAPI呼び出しは、リクエストボディにIDを含めず`Authorization: Bearer <token>`ヘッダーで行う。
+> `loginId`はユーザーが指定するログイン用のID、サーバ内部の管理用ID（`accountId`）とは別物であり、レスポンスにも`accountId`は含めない（6.4参照）。以降の認証必須のAPI呼び出しは、リクエストボディにIDを含めず`Authorization: Bearer <token>`ヘッダーで行う。
 >
 > **未確定**：`loginId`・`password`のバリデーション規則（文字種・長さ）、パスワードのハッシュ化方式、生年月日のバリデーション（未来日付や極端な高齢の扱い）、トークンの具体的な有効期限は未確定（10章）。
 
@@ -519,14 +729,38 @@ erDiagram
 {
   "type": "ogya | yoshiyoshi | manma"
 }
-// Response
+// Response（保存できた場合）
 {
   "id": "string",
-  "createdAt": "string (ISO8601)"
+  "createdAt": "string (ISO8601)",
+  "counts": {
+    "ogya": { "total": "number", "mine": "number" },
+    "yoshiyoshi": { "total": "number", "mine": "number" },
+    "manma": { "total": "number", "mine": "number" }
+  }
+}
+// Response（同一種類で自分の送信回数が5回に達している場合）
+{
+  "error": "string（上限に達している旨のメッセージ）"
 }
 ```
 
-> リアクションを送った利用者はトークンから解決するため、リクエストボディに`reactorAccountId`は含めない。バブルに対しては通常リアクション3種（おぎゃー／よしよし／まんま）のみを受け付ける。`babu`を指定した場合は保存しない（FR-REACT-003〜004、FR-REACT-007）。
+> リアクションを送った利用者はトークンから解決するため、リクエストボディに`reactorAccountId`は含めない。バブルに対しては通常リアクション3種（おぎゃー／よしよし／まんま）のみを受け付ける。`babu`を指定した場合は保存しない（FR-REACT-003〜004、FR-REACT-007）。同一利用者・同一種類のリアクションは5回まで送信でき、6回目は保存しない（FR-REACT-010〜011）。応答の`counts`は、種類ごとの全利用者の合計送信回数（`total`）と自分の送信回数（`mine`）を含む（FR-REACT-012）。
+
+**`DELETE /api/posts/:id/reactions/:type`（バブルへのリアクションを1回分取り消す）**
+
+```json
+// Response
+{
+  "counts": {
+    "ogya": { "total": "number", "mine": "number" },
+    "yoshiyoshi": { "total": "number", "mine": "number" },
+    "manma": { "total": "number", "mine": "number" }
+  }
+}
+```
+
+> 自分が送信した`:type`のリアクションのうち1回分を取り消す。自分の送信回数が0の場合は何も起きない（FR-REACT-013）。
 
 **`POST /api/comments/:id/reactions`（あやすへのやさしいリアクション）**
 
@@ -535,14 +769,32 @@ erDiagram
 {
   "type": "ogya | yoshiyoshi | manma | babu"
 }
-// Response
+// Response（保存できた場合）
 {
   "id": "string",
-  "createdAt": "string (ISO8601)"
+  "createdAt": "string (ISO8601)",
+  "counts": {
+    "type": "number (total)",
+    "mine": "number"
+  }
 }
 ```
 
-> 対象のあやすが赤ちゃんとしてのものなら`ogya`／`yoshiyoshi`／`manma`のみ、お母さんとしてのものなら`babu`のみを受け付ける。対象と種別の組み合わせが許可されていない場合は、クライアントの申告に関わらずサーバ側で保存を拒否する（FR-REACT-005〜007）。
+> 対象のあやすが赤ちゃんとしてのものなら`ogya`／`yoshiyoshi`／`manma`のみ、お母さんとしてのものなら`babu`のみを受け付ける。対象と種別の組み合わせが許可されていない場合は、クライアントの申告に関わらずサーバ側で保存を拒否する（FR-REACT-005〜007）。同一利用者・同一種類のリアクションは5回まで送信でき、6回目は保存しない（FR-REACT-010〜011）。
+
+**`DELETE /api/comments/:id/reactions/:type`（あやすへのリアクションを1回分取り消す）**
+
+```json
+// Response
+{
+  "counts": {
+    "type": "number (total)",
+    "mine": "number"
+  }
+}
+```
+
+> 自分が送信した`:type`のリアクションのうち1回分を取り消す（FR-REACT-013）。
 
 **`POST /api/follows`（ペルソナをフォロー、一方向）**
 
@@ -581,11 +833,11 @@ erDiagram
 // Response
 {
   "estimatedAge": "number（何歳児相当かの目安。赤ちゃんペルソナの場合は文章自体の幼さ、お母さんペルソナの場合はあやすが向いている相手の年齢の目安）",
-  "passesThreshold": "boolean（この評価結果が保存を許可する閾値を満たすか。FR-AI-EVAL-007）"
+  "passesThreshold": "boolean（この評価結果が保存を許可する閾値を満たすか。FR-AI-EVAL-007〜008）"
 }
 ```
 
-> 処理概要：バブル・あやすの保存時に必ず呼び出し、`passesThreshold`が`false`の場合は保存を拒否する（FR-AI-EVAL-007、NFR-003）。AI評価自体が利用できない場合も、閾値判定ができない以上は保存を止める（NFR-003）。閾値はバックエンドのみが保持し、フロントエンドには渡さない。プロフィール画面の集計値更新時にも呼び出す想定。具体的な評価モデル・閾値の初期値は実装フェーズで検討する。
+> 処理概要：バブル・あやすの保存時に必ず呼び出し、`passesThreshold`が`false`の場合は保存を拒否する（FR-AI-EVAL-007、NFR-003）。AI評価自体が利用できない場合も、閾値判定ができない以上は保存を止める（NFR-003）。閾値はバックエンドのみが保持し、フロントエンドには渡さない（FR-AI-EVAL-008）。フロントエンドはこの合否を受け取り、送信前に「このまま投稿できます／できません」を表示できる（Issue #19）。プロフィール画面の集計値更新時にも呼び出す想定。具体的な評価モデル・閾値の初期値は実装フェーズで検討する。
 
 **`POST /api/ai/transform`（文章を赤ちゃん言葉／お母さん言葉に変換）**
 
@@ -639,7 +891,8 @@ erDiagram
 
 - 上記以外の組み合わせ（例：お母さんとしてのあやすに`おぎゃー`）は、画面上の選択肢を非表示にするだけでなく、サーバ側の保存処理でも必ず拒否する（FR-REACT-007）。
 - 攻撃的・否定的なリアクションは設計上作らない（FR-REACT-008、OUT-003）。
-- リアクションの回数上限・取り消し機能の詳細は別ブランチでの更新予定（Issue #19）。
+- 同一利用者は、同一対象・同一種類のリアクションを最大5回まで送信できる（人間決定、2026-08-25、FR-REACT-010〜011、Issue #19）。6回目以降の要求は保存しない。件数は「全利用者の合計」と「自分の送信回数」の両方を表示できるようにする（FR-REACT-012、7章参照）。
+- 自分が送信したリアクションは取り消せる（FR-REACT-013）。
 
 ### 9.2 モデレーション
 
@@ -647,6 +900,7 @@ erDiagram
 
 - **検査の実施点**：AI文章変換の変換前入力・変換後出力、およびバブル・あやすの保存時の本文、という3つの時点で必ずモデレーションを行う（FR-MOD-001〜003）。保存時はクライアントが「検査済み」と申告してきても信用せず、サーバ側で必ず再検査する（FR-MOD-004〜005）。
 - **禁止内容の判定基準**：「その内容から個人を特定・連絡・現実世界で接触できるか」を基準とし、本人の情報か第三者の情報かを問わず禁止する（FR-MOD-010〜011）。実名、住所・建物名・部屋番号・郵便番号・詳細な現在地・勤務先／通学先、電話番号・メールアドレス、外部サービスのアカウントID・招待コード、外部での連絡や現実世界での接触・待ち合わせを誘導する内容などが該当する（FR-MOD-012〜020）。MVPではURLの掲載も禁止する（FR-MOD-021、OUT-008）。一方、「会社で疲れた」「学校が大変」のような、個人を特定・連絡・接触できない抽象的な表現は禁止しない（FR-MOD-022）。
+- **マサカリ表現の扱い**：攻撃的・否定的な表現（マサカリ表現。例：「なんでこんなコード書いたの、ありえないんだけど」）を検出した場合も`block`とし、利用可能な変換文は返さない（FR-MOD-023）。個人情報の検出時と同じ`block`の扱いに統一し、やわらげた変換案を提示して通す`rewrite_required`は用いない。
 - **検出時の挙動**：禁止内容を検出した場合は原則として`block`とし、利用可能な変換文は返さない（FR-MOD-030）。禁止内容を伏せ字にして自動保存することはしない（FR-MOD-031）。安全な書き換え案を提示する場合も、利用者の確認なしに保存はしない（FR-MOD-032）。拒否時の表示は、匿名性の保護を理由とすることが伝わる説明にし、判定の内部情報（NGワードの内容や判定コード）は含めない（FR-MOD-033〜034）。
 - **原文の非保存**：禁止内容を検出した原文は、恒久的な記録として保存しない（FR-PRIV-002）。
 
@@ -678,7 +932,6 @@ erDiagram
 - 生成AI処理（評価・変換）を外部API（Gemini API等）に任せるか、ローカル／自前学習モデルを使うか、どのモデルを使うかは、`ai/`配下で検証中であり未確定（`ai/README.md`参照）。
 - AI評価の閾値（FR-AI-EVAL-007）の具体的な初期値、および閾値判定ロジックの詳細。
 - モデレーションの具体的な実装（NGワード辞書、正規表現、伏字回避の正規化、マサカリ表現の判定ロジック）。
-- リアクションの回数上限・取り消し機能の詳細仕様（別ブランチでの更新予定）。
 - フロントエンドの技術選定（HTML/CSS/JS か React+TypeScript+Vite
   か）は担当エンジニアが決定。
 - 未ログインユーザーに興味関心・技術領域を入力させてタイムラインをレコメンドする拡張機能（3.6参照）の詳細。
