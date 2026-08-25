@@ -5,7 +5,7 @@ import type { PublicPersona, ReactionState } from "./types";
  * 静的ダミーのあやす。赤ちゃんとしてのものと、お母さんとしてのものを両方含む。
  *
  * リアクションの中身が対象で変わるのを見るためのデータ：
- *   赤ちゃんとしてのあやす → おぎゃー／よしよし／わかるわぁ
+ *   赤ちゃんとしてのあやす → おぎゃー／よしよし／まんま
  *   お母さんとしてのあやす → ばぶー だけ（counts に他の種類を持たせない。FR-REACT-005/006）
  *
  * bubble_04 は閲覧者自身のバブルなので、あやすの発信者に閲覧者自身の
@@ -29,7 +29,7 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: BABY_PERSONAS.taputapu,
     body: "わかるよぉ。ぼくも きのう おなじだった。30こは おおすぎるよぉ。",
     minutesAgo: 18,
-    reactions: { counts: { ogya: 2, yoshiyoshi: 5, wakaruwa: 9 }, mine: {} },
+    reactions: { counts: { ogya: 2, yoshiyoshi: 5, manma: 9 }, mine: {} },
   },
   {
     id: "soothe_02",
@@ -45,7 +45,7 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: BABY_PERSONAS.yowane,
     body: "ばれても だいじょうぶ。ぼくも ばれてるもん。",
     minutesAgo: 9,
-    reactions: { counts: { ogya: 1, yoshiyoshi: 3, wakaruwa: 4 }, mine: { wakaruwa: 5 } },
+    reactions: { counts: { ogya: 1, yoshiyoshi: 3, manma: 4 }, mine: { manma: 5 } },
     replyToSootheId: "soothe_02",
   },
   {
@@ -70,7 +70,7 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: BABY_PERSONAS.babubabu,
     body: "ぼくも おなじ。いっしょに ねよ。",
     minutesAgo: 63,
-    reactions: { counts: { ogya: 4, yoshiyoshi: 2, wakaruwa: 6 }, mine: {} },
+    reactions: { counts: { ogya: 4, yoshiyoshi: 2, manma: 6 }, mine: {} },
   },
   {
     id: "soothe_07",
@@ -78,6 +78,6 @@ export const SOOTHE_SEEDS: readonly SootheSeed[] = [
     author: BABY_PERSONAS.puni,
     body: "ごはん たべて…！ ぼくも わすれる。",
     minutesAgo: 40,
-    reactions: { counts: { ogya: 0, yoshiyoshi: 1, wakaruwa: 3 }, mine: {} },
+    reactions: { counts: { ogya: 0, yoshiyoshi: 1, manma: 3 }, mine: {} },
   },
 ];

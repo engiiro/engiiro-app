@@ -8,21 +8,23 @@ import type { PersonaKind, ReactionTargetKind, ReactionType } from "./types";
  */
 
 export const REACTIONS_BY_TARGET: Readonly<Record<ReactionTargetKind, readonly ReactionType[]>> = {
-  bubble: ["ogya", "yoshiyoshi", "wakaruwa"],
-  babySoothe: ["ogya", "yoshiyoshi", "wakaruwa"],
+  bubble: ["ogya", "yoshiyoshi", "manma"],
+  babySoothe: ["ogya", "yoshiyoshi", "manma"],
   // FR-REACT-005：ばぶー の1種のみ。3種は選択肢に現れない
   motherSoothe: ["babu"],
 };
 
 /**
  * 表示ラベル。
- * `wakaruwa` のラベルは「わかるわぁ」で、哺乳瓶はそのアイコン。
- * 「哺乳瓶」という別のリアクションを作らない（FR-REACT-009）。
+ *
+ * 3種目は「まんま」に統一された（docs/specification.md §3.1・§9.1、2026-08-25 の PO 決定）。
+ * それ以前の「わかるわぁ」「哺乳瓶」は同じ1つのリアクションの旧称で、
+ * 別のリアクションとして増やさない（FR-REACT-009）。
  */
 export const REACTION_LABEL: Readonly<Record<ReactionType, string>> = {
   ogya: "おぎゃー",
   yoshiyoshi: "よしよし",
-  wakaruwa: "わかるわぁ",
+  manma: "まんま",
   babu: "ばぶー",
 };
 

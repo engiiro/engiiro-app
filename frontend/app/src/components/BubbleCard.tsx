@@ -42,15 +42,7 @@ export function BubbleCard({ bubble, onOpen, onReact }: BubbleCardProps) {
       {/* カード内で focus できる主役はこの1つ。中身は phrasing content だけにしてある */}
       <button type="button" className="eg-card__open" onClick={() => onOpen(bubble.id)}>
         <span className={cx("eg-card__body", "t-bubble-body", "eg-prose")}>{bubble.body}</span>
-        {/* タグとあやす件数は同じ行に置く。1行ぶんの高さがカード2.5枚の密度に効く */}
         <span className="eg-card__meta">
-          <span className="eg-card__tags">
-            {bubble.tags.map((tag) => (
-              <span key={tag} className={cx("eg-tag", "t-label")}>
-                {tag}
-              </span>
-            ))}
-          </span>
           <span className={cx("eg-card__more", "t-caption")}>
             {bubble.sootheCount > 0 ? "あやす " + String(bubble.sootheCount) : "まだ あやされてない"}
           </span>

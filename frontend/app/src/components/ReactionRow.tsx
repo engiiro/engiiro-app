@@ -4,7 +4,7 @@ import { REACTION_MAX_PER_USER } from "../data/constants";
 import { REACTION_LABEL, REACTIONS_BY_TARGET } from "../data/reactions";
 import type { ReactionState, ReactionTargetKind, ReactionType } from "../data/types";
 import { cx } from "../lib/cx";
-import { IconBabu, IconOgya, IconWakaruwa, IconYoshiyoshi } from "./icons";
+import { IconBabu, IconOgya, IconManma, IconYoshiyoshi } from "./icons";
 import "./ReactionRow.css";
 
 /*
@@ -13,7 +13,7 @@ import "./ReactionRow.css";
  * ★ 対象の種類を props に取り、ボタンの数が 3 か 1 に変わる1つのコンポーネント。
  *   画面ごとにボタンを並べ直さない。出すボタンは data/reactions.ts の表だけが決める。
  *
- *   バブル / 赤ちゃんとしてのあやす → おぎゃー・よしよし・わかるわぁ の3種
+ *   バブル / 赤ちゃんとしてのあやす → おぎゃー・よしよし・まんま の3種
  *   お母さんとしてのあやす        → ばぶー の1種のみ（FR-REACT-005/006）
  *
  * リアクションにペルソナの要素は無い（人間の決定、2026-08-24）。
@@ -30,7 +30,7 @@ import "./ReactionRow.css";
 const REACTION_ICON = {
   ogya: IconOgya,
   yoshiyoshi: IconYoshiyoshi,
-  wakaruwa: IconWakaruwa,
+  manma: IconManma,
   babu: IconBabu,
 } as const;
 

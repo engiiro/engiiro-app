@@ -10,7 +10,8 @@ import { AiUnavailableError } from "./mockAiTransform";
  *   FR-AI-EVAL-003  赤ちゃんの評価は、その文章自体の幼さ
  *   FR-AI-EVAL-004  お母さんの評価は、その文章が向けられている相手の年齢
  *   FR-AI-EVAL-005  評価は変換を行わない。結果に変換後の文章を含めない
- *   FR-AI-EVAL-006  評価の結果で投稿の可否を判定しない（呼び出し側の責務）
+ *   FR-AI-EVAL-007  閾値を超えなかったバブル・あやすは投稿できない（2026-08-25 の PO 改訂）
+ *   NFR-003         評価が使えない場合は投稿を妨げる（同上。以前とは逆）
  *
  * 中身は差し替え前提のプレースホルダー。ai/src/evaluate.py と同じ立場。
  */
@@ -18,6 +19,8 @@ import { AiUnavailableError } from "./mockAiTransform";
 export type AiEvaluateResult = {
   /** 何歳何か月相当か。0〜72 か月の範囲に収める */
   readonly months: number;
+  /** 閾値を満たしたか。false のものは投稿できない（FR-AI-EVAL-007） */
+  readonly passed: boolean;
   /** 画面に出す文字。バーだけで伝えないための数値（DESIGN.md §4 Meter） */
   readonly label: string;
   /** 軸の名前。赤ちゃんとお母さんで意味が違うことを画面でも示す */
@@ -26,6 +29,16 @@ export type AiEvaluateResult = {
 
 const MAX_MONTHS = 72;
 const MOCK_THINKING_MS = 800;
+
+/**
+ * 投稿を許す上限の月齢（仮の値）。
+ *
+ * FR-AI-EVAL-007 は「ある一定の閾値」としか書いておらず、値が決まっていない。
+ * 赤ちゃんは文章自体の幼さ、お母さんは向けている相手の年齢なので、
+ * どちらも「低いほど それらしい」。3歳（36か月）以下を通す仮置き。
+ * backend と揃えるべき数値なので、決まったらここだけ直す。
+ */
+export const EVALUATE_PASS_MAX_MONTHS = 36;
 
 export async function mockAiEvaluate(
   text: string,
@@ -39,10 +52,10 @@ export async function mockAiEvaluate(
     setTimeout(resolve, MOCK_THINKING_MS);
   });
 
-  const months =
-    personaKind === "baby" ? babyMonths(text) : motherTargetMonths(text);
+  const months = personaKind === "baby" ? babyMonths(text) : motherTargetMonths(text);
   return {
     months,
+    passed: months <= EVALUATE_PASS_MAX_MONTHS,
     label: monthsToLabel(months),
     axis: personaKind === "baby" ? "赤ちゃん度（文章の幼さ）" : "お母さん度（向けている相手の年齢）",
   };

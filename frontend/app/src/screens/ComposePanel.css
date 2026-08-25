@@ -150,25 +150,6 @@
   border-color: var(--accent-line);
 }
 
-.eg-tag-choice__item {
-  padding: var(--space-xs) var(--space-sm);
-  border: var(--border-width) solid var(--hairline);
-  border-radius: var(--rounded-pill);
-  background: var(--card);
-  color: var(--muted);
-  transition:
-    background-color var(--duration-quick) var(--ease-smooth-out),
-    color var(--duration-quick) var(--ease-smooth-out),
-    border-color var(--duration-quick) var(--ease-smooth-out);
-}
-
-.eg-tag-choice__item.is-selected {
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
-  color: var(--accent-line);
-  font-weight: 700;
-}
-
 
 .eg-compose__body {
   flex: 1;
@@ -182,12 +163,6 @@
 .eg-compose__body .eg-textarea {
   min-height: calc(var(--space-xxl) * 3);
   resize: none;
-}
-
-.eg-compose__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
 }
 
 .eg-compose__mock {
@@ -351,6 +326,25 @@
 /* 塗り専用の値を使う。文字には使わない（DESIGN.md §2.1） */
 .eg-meter__fill.is-mother {
   background: var(--mother-fill);
+}
+
+.eg-evaluate__verdict {
+  display: block;
+  margin-top: var(--space-xs);
+}
+
+.eg-evaluate__verdict.is-pass {
+  color: var(--mother);
+}
+
+.eg-evaluate__verdict.is-fail {
+  color: var(--accent-line);
+}
+
+.eg-compose__gate {
+  margin-top: var(--space-xs);
+  color: var(--accent-line);
+  text-align: end;
 }
 
 .eg-evaluate__note {

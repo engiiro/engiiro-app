@@ -65,15 +65,6 @@ export function BubbleDetailScreen({
         <article className="eg-detail__bubble">
           <PersonaChip persona={bubble.author} createdAt={bubble.createdAt} showRole={false} />
           <BubbleBody body={bubble.body} className="eg-detail__body" />
-          {bubble.tags.length > 0 ? (
-            <div className="eg-detail__tags">
-              {bubble.tags.map((tag) => (
-                <span key={tag} className={cx("eg-tag", "t-label")}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
           <div className="eg-detail__reactions">
             <ReactionRow
               targetKind="bubble"

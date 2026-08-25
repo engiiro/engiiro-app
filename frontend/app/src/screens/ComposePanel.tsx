@@ -4,7 +4,6 @@ import { createBubble, createSoothe } from "../data/api";
 import { isOverLimit } from "../data/constants";
 import { BLOCK_DEMO_INPUT, REWRITE_DEMO_INPUT } from "../data/moderationSamples";
 import { STAMP_CATALOG } from "../data/stamps";
-import { TAG_CATALOG } from "../data/tags";
 import type { Me, PersonaKind } from "../data/types";
 import { cx } from "../lib/cx";
 import { AiUnavailableError, mockAiTransform } from "../lib/mockAiTransform";
@@ -47,9 +46,8 @@ import "./ComposePanel.css";
  *   ふつうの返信         … 押せる
  *   お母さんへの返信     … ボタンを出さない（FR-COMMENT-005、人間の決定 2026-08-25）
  *
- * 指定には無いが残しているもの：
- *   タグ（FR-POST-004）と投稿ガイドライン（FR-PRIV-001）。どちらも仕様の要求なので、
- *   外すと満たせなくなる。不要なら外す。
+ * タグは外した。FR-POST-004 が 2026-08-25 の PO レビューでコメントアウトされたため。
+ * 投稿ガイドライン（FR-PRIV-001）は仕様に残っているので置いている。
  */
 
 type ComposeMode =
@@ -72,7 +70,6 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
 
   const [persona, setPersona] = useState<PersonaKind>("baby");
   const [body, setBody] = useState("");
-  const [tags, setTags] = useState<readonly string[]>([]);
   const [drawer, setDrawer] = useState<DrawerKind>("none");
   const [ai, setAi] = useState<AiPanelState>({ kind: "idle" });
   const [evaluation, setEvaluation] = useState<AiEvaluateResult | null>(null);
@@ -86,7 +83,14 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
 
   const isBubble = mode.kind === "bubble";
   const over = isBubble && isOverLimit(body);
-  const canSend = body.trim().length > 0 && !over && !submitting;
+  /*
+   * 投稿には AI 評価の合格が要る（FR-AI-EVAL-007。2026-08-25 の PO 改訂）。
+   * 合否は保存時に data/api.ts が判定するので、ここで先に「はかる」ことは求めない。
+   * 押してから理由が分かる形にして、書くたびに1手増えるのを避けている。
+   *
+   * 評価そのものが使えないときだけ、押す前に止める（NFR-003。以前とは逆の規定）。
+   */
+  const canSend = body.trim().length > 0 && !over && !submitting && aiAvailable;
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -106,6 +110,13 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [close, onClose]);
+
+  /** 本文を変えたら、前の評価は当てにならないので捨てる */
+  function changeBody(next: string) {
+    setBody(next);
+    setEvaluation(null);
+    setEvaluateFailed(false);
+  }
 
   function toggleDrawer(next: DrawerKind) {
     setDrawer((current) => (current === next ? "none" : next));
@@ -144,11 +155,11 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
     }
   }
 
-  const submit = useCallback(async () => {
+  async function submit() {
     setSubmitting(true);
     setRejected(false);
     const result = isBubble
-      ? await createBubble({ body, tags })
+      ? await createBubble({ body })
       : await createSoothe({
           bubbleId: mode.kind === "reply" ? mode.target.bubbleId : "",
           personaKind: persona,
@@ -165,7 +176,16 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
       // 入力内容は消さない。書き直せる状態で残す（DESIGN.md §4 拒否バナー）
       setRejected(true);
     }
-  }, [body, close, isBubble, mode, onPosted, persona, tags]);
+    if (result.reason === "evaluation") {
+      // 閾値に届かなかった。なぜ届かなかったのかを引き出しで見せる
+      setDrawer("evaluate");
+      void runEvaluate();
+    }
+    if (result.reason === "ai_unavailable") {
+      setEvaluateFailed(true);
+      setDrawer("evaluate");
+    }
+  }
 
   const activePersona = persona === "mother" ? me.mother : me.baby;
 
@@ -251,33 +271,11 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
           className={cx("eg-textarea", "t-input", over && "is-over")}
           value={body}
           placeholder="なにがあった？ ぜんぶ そのままで いいよ。"
-          onChange={(event) => setBody(event.target.value)}
+          onChange={(event) => changeBody(event.target.value)}
         />
         {/* あやすの文字数上限は仕様に無いので、カウンタもバブルのときだけ出す */}
         {isBubble ? <CharCounter text={body} /> : null}
 
-        <div className="eg-compose__tags">
-          {TAG_CATALOG.map((tag) => {
-            const selected = tags.includes(tag);
-            return (
-              <button
-                key={tag}
-                type="button"
-                aria-pressed={selected}
-                className={cx("eg-tag-choice__item", "t-label", selected && "is-selected")}
-                onClick={() =>
-                  setTags((current) =>
-                    current.includes(tag)
-                      ? current.filter((item) => item !== tag)
-                      : [...current, tag],
-                  )
-                }
-              >
-                {tag}
-              </button>
-            );
-          })}
-        </div>
 
         {rejected ? (
           <NoteBox variant="reject" title="匿名性を守るため、投稿できません" role="alert">
@@ -293,15 +291,30 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
         <div className="eg-compose__mock">
           <p className={cx("t-caption")}>モック操作：拒否の見え方を試すサンプル入力</p>
           <div className="eg-compose__mock-buttons">
-            <Button variant="quiet" onClick={() => setBody(BLOCK_DEMO_INPUT)}>
+            <Button variant="quiet" onClick={() => changeBody(BLOCK_DEMO_INPUT)}>
               block になる例
             </Button>
-            <Button variant="quiet" onClick={() => setBody(REWRITE_DEMO_INPUT)}>
+            <Button variant="quiet" onClick={() => changeBody(REWRITE_DEMO_INPUT)}>
               rewrite_required になる例
             </Button>
           </div>
         </div>
       </div>
+
+      {/* 押す前に止めるのは AI が落ちているときだけ（NFR-003） */}
+      {!aiAvailable ? (
+        <p className={cx("eg-compose__gate", "t-caption")} role="status">
+          いま ことばを はかれないので、投稿できません。
+        </p>
+      ) : null}
+      {/* 閾値に届かず弾かれたとき（FR-AI-EVAL-007） */}
+      {evaluation !== null && !evaluation.passed ? (
+        <p className={cx("eg-compose__gate", "t-caption")} role="status">
+          {persona === "baby"
+            ? "もう少し 赤ちゃんっぽく 書けたら 投稿できます。"
+            : "もう少し お母さんっぽく 書けたら 投稿できます。"}
+        </p>
+      ) : null}
 
       {/* 入力欄の下：3つ横並び */}
       <div className="eg-compose__tools">
@@ -359,7 +372,7 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
                     key={stamp.id}
                     type="button"
                     className={cx("eg-stamp-pick", "eg-touch")}
-                    onClick={() => setBody((current) => current + ":" + stamp.id + ":")}
+                    onClick={() => changeBody(body + ":" + stamp.id + ":")}
                   >
                     <StampGlyph id={stamp.id} picker />
                     <span className={cx("t-caption")}>{stamp.name}</span>
@@ -383,7 +396,7 @@ export function ComposePanel({ mode, me, aiAvailable, onClose, onPosted }: Compo
                 state={aiAvailable ? ai : { kind: "unavailable" }}
                 onUseTransformed={(text) => {
                   // 本文欄に入るだけ。保存はしない（FR-AI-TRANS-006/007）
-                  setBody(text);
+                  changeBody(text);
                   setAi({ kind: "idle" });
                 }}
                 onDismiss={() => setAi({ kind: "idle" })}
@@ -468,8 +481,16 @@ function EvaluateView({
           style={{ width: String(Math.round((result.months / MAX_MONTHS) * 100)) + "%" }}
         />
       </div>
+      <p
+        className={cx("eg-evaluate__verdict", "t-label", result.passed ? "is-pass" : "is-fail")}
+        role="status"
+      >
+        {result.passed ? "このまま 投稿できます" : "このままだと 投稿できません"}
+      </p>
       <p className={cx("eg-evaluate__note", "t-caption")}>
-        目安です。この結果で 投稿できなくなることは ありません。
+        {result.passed
+          ? "書きかえたら、もう一度 はかってね。"
+          : "つらさは そのままで だいじょうぶ。言い方だけ やわらかくしてみて。"}
       </p>
     </div>
   );

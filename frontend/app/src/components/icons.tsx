@@ -5,8 +5,8 @@
  * DESIGN.md §11 の通り、アイコンセットは未定。ここにあるのは仮のもので、
  * 差し替え前提。currentColor で描くので、色はトークン側で決まる。
  *
- * 「わかるわぁ」の哺乳瓶は、DESIGN.md §4 が指定している唯一のアイコン。
- * これは「わかるわぁ」というリアクションの絵柄であって、別のリアクションではない（FR-REACT-009）。
+ * 「まんま」の哺乳瓶は、DESIGN.md §4 が指定している唯一のアイコン。
+ * これは「まんま」というリアクション1つの絵柄であって、別のリアクションではない（FR-REACT-009）。
  */
 
 type IconProps = {
@@ -47,8 +47,8 @@ export function IconYoshiyoshi({ className }: IconProps) {
   );
 }
 
-/** わかるわぁ：哺乳瓶（このリアクションのアイコン） */
-export function IconWakaruwa({ className }: IconProps) {
+/** まんま：哺乳瓶（絵柄は仮。DESIGN.md §11 でアイコンセットは未定） */
+export function IconManma({ className }: IconProps) {
   return (
     <svg {...BASE_PROPS} className={className}>
       <path d="M6.6 1.6h2.8c.2.7.3 1.2.3 1.7H6.3c0-.5.1-1 .3-1.7Z" />

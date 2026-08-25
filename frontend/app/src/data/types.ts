@@ -17,10 +17,11 @@ export type PublicPersona = {
 };
 
 /**
- * リアクションの種類。`wakaruwa` の別名が「哺乳瓶」で、2種類ではない（FR-REACT-009）。
+ * リアクションの種類。
+ * `manma`（旧称「わかるわぁ」「哺乳瓶」）は1つのリアクション（FR-REACT-009）。
  * `babu` はお母さんとしてのあやす専用（FR-REACT-005）。
  */
-export type ReactionType = "ogya" | "yoshiyoshi" | "wakaruwa" | "babu";
+export type ReactionType = "ogya" | "yoshiyoshi" | "manma" | "babu";
 
 /** リアクションの対象。何を出せるかはこの種類だけで決まる（FR-REACT-003〜006） */
 export type ReactionTargetKind = "bubble" | "babySoothe" | "motherSoothe";
@@ -46,7 +47,6 @@ export type Bubble = {
   readonly id: string;
   readonly author: PublicPersona;
   readonly body: string;
-  readonly tags: readonly string[];
   /** ISO8601。画面では常に相対表示にする（DESIGN.md §0.1-5） */
   readonly createdAt: string;
   readonly reactions: ReactionState;
@@ -95,7 +95,6 @@ export type Stamp = {
 
 export type CreateBubbleInput = {
   readonly body: string;
-  readonly tags: readonly string[];
 };
 
 export type CreateSootheInput = {

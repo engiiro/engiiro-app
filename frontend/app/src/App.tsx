@@ -7,6 +7,7 @@ import {
   fetchEmptyFeed,
   fetchFeed,
   markRead,
+  setAiAvailability,
 } from "./data/api";
 import type { FeedResult } from "./data/api";
 import { ME } from "./data/personas";
@@ -170,7 +171,11 @@ export function App() {
         theme={theme}
         onThemeChange={setTheme}
         aiAvailable={aiAvailable}
-        onAiAvailableChange={setAiAvailable}
+        onAiAvailableChange={(available) => {
+          setAiAvailable(available);
+          // サーバ側の AI も落ちている扱いにする（投稿の可否が評価に依存するため）
+          setAiAvailability(available);
+        }}
         feedMode={feedMode}
         onFeedModeChange={(mode) => {
           setFeedLoading(true);

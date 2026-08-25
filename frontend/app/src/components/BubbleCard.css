@@ -57,23 +57,9 @@
 .eg-card__meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--space-xs);
   margin-top: var(--space-xs);
-}
-
-.eg-card__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  min-width: 0;
-}
-
-.eg-tag {
-  padding: 0 var(--space-xs);
-  border-radius: var(--rounded-pill);
-  background: var(--card);
-  color: var(--muted);
 }
 
 .eg-card__more {

@@ -17,13 +17,6 @@
   color: var(--body);
 }
 
-.eg-detail__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  margin-top: var(--space-sm);
-}
-
 .eg-detail__reactions {
   margin-top: var(--space-md);
 }

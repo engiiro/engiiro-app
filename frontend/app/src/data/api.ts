@@ -1,3 +1,5 @@
+import { mockAiEvaluate } from "../lib/mockAiEvaluate";
+import { AiUnavailableError } from "../lib/mockAiTransform";
 import { moderate } from "../lib/mockModeration";
 import { BUBBLE_MAX_LENGTH, REACTION_MAX_PER_USER, countChars } from "./constants";
 import { BUBBLE_SEEDS } from "./bubbles";
@@ -44,6 +46,19 @@ import type {
  */
 const MOCK_LATENCY_MS = 520;
 
+/*
+ * サーバ側から見た AI の生死。モック操作帯の「AI: 稼働 / 停止」がここを動かす。
+ *
+ * 投稿の可否が AI 評価に依存するようになったため（FR-AI-EVAL-007 / NFR-003、
+ * 2026-08-25 の PO 改訂）、AI が落ちていれば保存もできない。
+ * 画面側でもボタンを止めるが、止めるのはこちら。
+ */
+let aiAvailable = true;
+
+export function setAiAvailability(available: boolean): void {
+  aiAvailable = available;
+}
+
 /** 画面を開いた時刻を基準に、ダミーの相対時刻を絶対時刻へ直す */
 const BOOT_TIME = Date.now();
 const MINUTE_MS = 60000;
@@ -66,7 +81,6 @@ let bubbles: Bubble[] = BUBBLE_SEEDS.map((seed) => ({
   id: seed.id,
   author: seed.author,
   body: seed.body,
-  tags: seed.tags,
   createdAt: isoMinutesAgo(seed.minutesAgo),
   reactions: seed.reactions,
   isMine: seed.isMine,
@@ -153,7 +167,10 @@ export async function fetchMe(): Promise<Me> {
 
 export type CreateBubbleResult =
   | { readonly ok: true; readonly bubble: Bubble }
-  | { readonly ok: false; readonly reason: "too_long" | "moderation" | "empty" };
+  | {
+      readonly ok: false;
+      readonly reason: "too_long" | "moderation" | "empty" | "evaluation" | "ai_unavailable";
+    };
 
 /**
  * バブルの作成。
@@ -177,12 +194,16 @@ export async function createBubble(input: CreateBubbleInput): Promise<CreateBubb
     // 伏せ字にして保存しない（FR-MOD-031）。検出した原文もここに残さない（FR-PRIV-002）
     return { ok: false, reason: "moderation" };
   }
+  // FR-AI-EVAL-007：閾値を超えなかったものは保存しない。バブルは常に赤ちゃん
+  const gate = await evaluateGate(body, "baby");
+  if (gate !== "ok") {
+    return { ok: false, reason: gate };
+  }
 
   const bubble: Bubble = {
     id: nextId("bubble"),
     author: ME.baby, // バブルは常に赤ちゃんペルソナ（FR-POST-001/003）
     body,
-    tags: input.tags,
     createdAt: new Date().toISOString(),
     reactions: { counts: {}, mine: {} },
     isMine: true,
@@ -196,7 +217,15 @@ export async function createBubble(input: CreateBubbleInput): Promise<CreateBubb
 
 export type CreateSootheResult =
   | { readonly ok: true; readonly soothe: Soothe }
-  | { readonly ok: false; readonly reason: "moderation" | "persona_not_allowed" | "empty" };
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "moderation"
+        | "persona_not_allowed"
+        | "empty"
+        | "evaluation"
+        | "ai_unavailable";
+    };
 
 /**
  * あやすの作成。
@@ -222,6 +251,10 @@ export async function createSoothe(input: CreateSootheInput): Promise<CreateSoot
   if (moderate(body) === "violation") {
     return { ok: false, reason: "moderation" };
   }
+  const gate = await evaluateGate(body, input.personaKind);
+  if (gate !== "ok") {
+    return { ok: false, reason: gate };
+  }
 
   const soothe: Soothe = {
     id: nextId("soothe"),
@@ -238,6 +271,25 @@ export async function createSoothe(input: CreateSootheInput): Promise<CreateSoot
     bubble.id === input.bubbleId ? { ...bubble, sootheCount: bubble.sootheCount + 1 } : bubble,
   );
   return { ok: true, soothe };
+}
+
+/**
+ * 保存してよいかを AI 評価で判定する（FR-AI-EVAL-007 / NFR-003）。
+ * 評価そのものが使えないときは保存しない（NFR-004 と同じ立場）。
+ */
+async function evaluateGate(
+  body: string,
+  personaKind: PersonaKind,
+): Promise<"ok" | "evaluation" | "ai_unavailable"> {
+  try {
+    const result = await mockAiEvaluate(body, personaKind, { available: aiAvailable });
+    return result.passed ? "ok" : "evaluation";
+  } catch (error) {
+    if (error instanceof AiUnavailableError) {
+      return "ai_unavailable";
+    }
+    throw error;
+  }
 }
 
 function personaOf(kind: PersonaKind): PublicPersona {
