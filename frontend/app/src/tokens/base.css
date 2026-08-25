@@ -60,6 +60,8 @@
   --input-padding: 12px;
   --avatar-size: 34px;
   --avatar-size-sm: 26px;
+  /* プロフィールの見出しに置く大きいアバター（S8 / S6） */
+  --avatar-size-lg: 64px;
   --meter-height: 9px;
 }
 

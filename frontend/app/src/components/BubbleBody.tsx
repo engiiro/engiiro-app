@@ -20,12 +20,19 @@ const STAMP_IDS = new Set(STAMP_CATALOG.map((stamp) => stamp.id));
 export function BubbleBody({
   body,
   className,
+  as: Tag = "p",
 }: {
   readonly body: string;
   readonly className?: string;
+  /**
+   * 置き場所に合わせて要素を変える。
+   * button の中に入れるときは "span" にする。button が中に置けるのは
+   * phrasing content だけで、p を入れるとブラウザが要素を組み替えてしまう。
+   */
+  readonly as?: "p" | "span";
 }) {
   return (
-    <p className={cx("t-bubble-body", "eg-prose", className)}>{renderWithStamps(body)}</p>
+    <Tag className={cx("t-bubble-body", "eg-prose", className)}>{renderWithStamps(body)}</Tag>
   );
 }
 

@@ -244,3 +244,31 @@ export function IconSwap({ className }: IconProps) {
     </svg>
   );
 }
+
+/** つぎへ：行の右端に置く矢印 */
+export function IconChevronRight({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M6 3.2 10.8 8 6 12.8" />
+    </svg>
+  );
+}
+
+/** すきな相手：フォロー中の行に置く。フォロワー側には使わない（OUT-004） */
+export function IconHeart({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M8 13.4 2.9 8.5a3 3 0 1 1 5.1-3.2 3 3 0 1 1 5.1 3.2Z" />
+    </svg>
+  );
+}
+
+/** 生年月日：S8 でしか使わない（DESIGN.md §0.1-5・FR-PRIV-004） */
+export function IconCalendar({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <rect x="2.2" y="3.4" width="11.6" height="10.4" rx="1.6" />
+      <path d="M2.2 6.6h11.6M5.4 1.9v2.4M10.6 1.9v2.4" />
+    </svg>
+  );
+}
