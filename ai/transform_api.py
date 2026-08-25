@@ -51,6 +51,7 @@ import sys
 import time
 from typing import Any, Literal
 
+import external_moderation
 from moderation_rules import check_rules, merge_verdicts
 
 
@@ -475,10 +476,15 @@ def moderate(text: str, client=None) -> dict:
 
     rule_verdict = check_rules(text)
 
-    # 規則で block が確定したものは、LLM へ送らずに止める。
+    # 規則で block が確定したものは、外部へ一切送らずに止める。
     # 送っても結論は変わらず、API呼び出しと個人情報の外部送信が増えるだけ。
+    # 個人情報を含む文が外へ出ないのは、この早期打ち切りによる。
     if rule_verdict["action"] == "block":
         return {"action": "block", "reasonCodes": rule_verdict["reasonCodes"]}
+
+    # 外部のモデレーションAPI。設定されていなければ何も起きない。
+    # 落ちていてもここで止めない。あれば効く追加の網という位置づけ。
+    external_verdicts = external_moderation.check(text)
 
     client = client or build_client()
     contents = [{"role": "user", "parts": [{"text": text}]}]
@@ -506,7 +512,7 @@ def moderate(text: str, client=None) -> dict:
         "action": parsed["action"],
         "reasonCodes": list(parsed.get("reasonCodes") or []),
     }
-    verdict = merge_verdicts(rule_verdict, llm_verdict)
+    verdict = merge_verdicts(rule_verdict, llm_verdict, *external_verdicts)
 
     # 人間監督の決定により、自傷・他害は例外なく block。
     # LLM が self_harm を立てながら rewrite_required を返すことがあるため、
