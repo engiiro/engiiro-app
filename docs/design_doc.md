@@ -226,12 +226,89 @@ flowchart TD
 
 ## 6. データ設計（PostgreSQL）
 
-6章時点でDBはPostgreSQL（RDB）を前提とする。エンティティ間の関係をER図で示したうえで、テーブルごとの主要カラムと制約の方針を示す。値の型・インデックスの詳細な確定は実装フェーズ（詳細設計書）で行い、ここでは全体設計として最低限の構造を示す（カラム・キー制約の詳細な記法は`docs/design_doc.md`の後続の更新で拡充する）。
+6章時点でDBはPostgreSQL（RDB）を前提とする。エンティティ間の関係と、各テーブルのカラム・主キー（PK）・外部キー（FK）・一意制約（UK）・NOT NULL制約をER図で示す。値の詳細な型・インデックス設計は実装フェーズ（詳細設計書）で確定し、ここでは全体設計として必要な制約を示す。
 
 ### 6.1 ER図
 
+`PK`＝主キー、`FK`＝外部キー、`UK`＝一意制約（UNIQUE）。属性のコメント欄にNOT NULLや排他制約などの補足を記す（コメントがないカラムはNULL許容）。CHECK制約や「参照先の値に依存する制約」（例：あやすの`persona_type`とリアクションの対象種別の対応）はER図の記法だけでは表現しきれないため、6.2節の文章で補足する。
+
 ```mermaid
 erDiagram
+    ACCOUNTS {
+        uuid id PK
+        string login_id UK "NOT NULL. ログイン用ID（内部idとは別物）"
+        string password_hash "NOT NULL"
+        date birth_date "NOT NULL. 非公開（本人専用プロフィールにのみ表示）"
+        timestamptz created_at "NOT NULL"
+    }
+    BABY_PERSONAS {
+        uuid id PK
+        uuid account_id FK "NOT NULL, UNIQUE（1アカウントにつき1行）"
+        string nickname "NOT NULL"
+        string bio
+        timestamptz created_at "NOT NULL"
+    }
+    MOTHER_PERSONAS {
+        uuid id PK
+        uuid account_id FK "NOT NULL, UNIQUE（1アカウントにつき1行）"
+        string nickname "NOT NULL"
+        string bio
+        timestamptz created_at "NOT NULL"
+    }
+    STAMPS {
+        uuid id PK
+        string name "NOT NULL"
+        string image_url "NOT NULL"
+        timestamptz created_at "NOT NULL"
+    }
+    POSTS {
+        uuid id PK
+        uuid baby_persona_id FK "NOT NULL"
+        string body "NOT NULL. 150文字以内（FR-POST-002）"
+        timestamptz deleted_at "論理削除用。未削除ならNULL"
+        timestamptz created_at "NOT NULL"
+    }
+    POST_STAMPS {
+        uuid id PK
+        uuid post_id FK "NOT NULL"
+        uuid stamp_id FK "NOT NULL"
+        int position "本文中の挿入位置。省略時はNULL"
+    }
+    COMMENTS {
+        uuid id PK
+        uuid post_id FK "NOT NULL"
+        string persona_type "NOT NULL. 'baby' or 'mother'"
+        uuid baby_persona_id FK "persona_type='baby'のときのみNOT NULL"
+        uuid mother_persona_id FK "persona_type='mother'のときのみNOT NULL"
+        uuid reply_to_comment_id FK "お母さんへの返信時のみ設定。それ以外はNULL"
+        string body "NOT NULL"
+        timestamptz deleted_at "論理削除用。未削除ならNULL"
+        timestamptz created_at "NOT NULL"
+    }
+    REACTIONS {
+        uuid id PK
+        string target_type "NOT NULL. 'post' or 'comment'"
+        uuid target_post_id FK "target_type='post'のときのみNOT NULL"
+        uuid target_comment_id FK "target_type='comment'のときのみNOT NULL"
+        uuid reactor_account_id FK "NOT NULL"
+        string type "NOT NULL. 'ogya'|'yoshiyoshi'|'manma'|'babu'"
+        timestamptz created_at "NOT NULL"
+    }
+    FOLLOWS {
+        uuid id PK
+        uuid follower_account_id FK "NOT NULL"
+        string target_persona_type "NOT NULL. 'baby' or 'mother'"
+        uuid target_persona_id "NOT NULL. UNIQUE(follower_account_id, target_persona_type, target_persona_id)"
+        timestamptz created_at "NOT NULL"
+    }
+    PERSONA_AGE_ESTIMATES {
+        string persona_type PK "'baby' or 'mother'"
+        uuid persona_id PK
+        numeric estimated_age "未評価時はNULL"
+        int sample_count "NOT NULL, デフォルト0"
+        timestamptz updated_at "NOT NULL"
+    }
+
     ACCOUNTS ||--|| BABY_PERSONAS : "1対1で内部所有（非公開）"
     ACCOUNTS ||--|| MOTHER_PERSONAS : "1対1で内部所有（非公開）"
     BABY_PERSONAS ||--o{ POSTS : "投稿する"
@@ -250,8 +327,6 @@ erDiagram
     BABY_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "推定年齢を持つ"
     MOTHER_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "推定対象年齢を持つ"
 ```
-
-> ER図にPK・FK・UNIQUE・NOT NULL等の制約を明記した詳細版は6.3節で扱う（別ブランチでの更新予定）。
 
 ### 6.2 テーブル定義
 
