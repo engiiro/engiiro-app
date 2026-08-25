@@ -1,0 +1,14 @@
+# どう言い換えても前向きな文章にならない語。
+# 書き方は README.md を読んでください。
+
+
+死ね	substring
+殺す	substring
+消えろ	substring
+キチガイ	substring
+ガイジ	substring
+きえろ	substring
+きちがい	substring
+しね	token
+ころす	token
+がいじ	token

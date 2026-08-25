@@ -31,6 +31,57 @@ import unicodedata
 
 ANY_POS = "*"
 
+# 辞書ファイルに書く照合方法の名前と、内部表現の対応。
+_RULE_NAMES = {"substring": None, "token": ANY_POS}
+
+# Colab など、ファイルを読めない場所で使うときの埋め込み先。
+# 生成スクリプトがここへ辞書を流し込む。空なら dictionaries/ から読む。
+INLINE_DICTIONARIES: dict[str, dict] = {}
+
+
+def load_dictionary(name: str) -> dict:
+    """dictionaries/<name>.txt を読み込む。
+
+    1行1語。空行と # で始まる行は無視。
+    「語<TAB>照合方法」の形式で、照合方法を省くと substring になる。
+    書き方の詳細は dictionaries/README.md を参照。
+    """
+    if name in INLINE_DICTIONARIES:
+        return dict(INLINE_DICTIONARIES[name])
+
+    from pathlib import Path
+
+    # Colab のセルなど、ファイルとして実行されていない場所では __file__ が無い。
+    # その場合は埋め込みしか使えないので、ここで諦める。
+    module_file = globals().get("__file__")
+    if not module_file:
+        print(
+            f"[警告] 辞書 {name} を読み込めません。"
+            "埋め込みもファイルもありません。",
+            file=sys.stderr,
+        )
+        return {}
+
+    path = Path(module_file).resolve().parent / "dictionaries" / f"{name}.txt"
+    if not path.exists():
+        print(f"[警告] 辞書が見つかりません: {path}", file=sys.stderr)
+        return {}
+
+    table = {}
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        word, _, rule_name = line.partition("\t")
+        word = word.strip()
+        rule_name = rule_name.strip() or "substring"
+        if not word:
+            continue
+        # substring / token は決まった値へ、それ以外は品詞名としてそのまま使う
+        table[word] = _RULE_NAMES.get(rule_name, rule_name)
+    return table
+
+
 # どちらの辞書に入れるかは、人間監督の決めた基準に従う。
 #
 #   言い換えて愚痴や励ましになるなら  → NG_WORDS_REWRITE
@@ -40,32 +91,10 @@ ANY_POS = "*"
 # 「死ね」はやわらげようとすると中身が何も残らない。
 
 # どう言い換えても前向きな文章にならないもの
-NG_WORDS_BLOCK = {
-    "死ね": None,
-    "殺す": None,
-    "消えろ": None,
-    "キチガイ": None,
-    "ガイジ": None,
-    # ひらがな・カタカナ表記は、他の語の一部になりやすいので1語として照合する
-    "きえろ": None,
-    "きちがい": None,
-    # 他の語の一部になりやすいものだけ1語として照合する
-    "しね": ANY_POS,     # 「推しねこ」と衝突する
-    "ころす": ANY_POS,   # 「石ころすら」と衝突する
-    "がいじ": ANY_POS,   # 「これが以上」と衝突する
-}
+NG_WORDS_BLOCK = load_dictionary("block")
 
 # 言い換えれば愚痴や励ましになるもの（マサカリ寄りの語）
-NG_WORDS_REWRITE = {
-    "無能": None,
-    "役立たず": None,
-    "バカ": "名詞",
-    "馬鹿": "名詞",
-    "カス": "名詞",
-    "クズ": "名詞",
-    "ボケ": "名詞",
-    "マヌケ": "名詞",
-}
+NG_WORDS_REWRITE = load_dictionary("rewrite")
 
 # 「ゴミ」と「アホ」はここに入れない。
 #   ゴミ … 罵倒も「ごみを捨てる」も名詞。直後の語でも分けられない
@@ -88,26 +117,7 @@ NG_WORDS_REWRITE = {
 # えんじいろが書くための場所として用意しているものなので、ここには入れない。
 # 「死ぬ」は入れない。「サーバーが死んだ」「プロセスが死んでる」という
 # 言い方をエンジニアは日常的に使う。原形で照合すると全部巻き込む。
-SELF_HARM_WORDS = {
-    "死にたい": ANY_POS,
-    "しにたい": ANY_POS,
-    "死のう": ANY_POS,
-    "しのう": ANY_POS,
-    "消えたい": ANY_POS,
-    "きえたい": ANY_POS,
-    "生きていたくない": ANY_POS,
-    "生きるのをやめる": ANY_POS,
-    "自殺": ANY_POS,
-    "自傷": ANY_POS,
-    "自害": ANY_POS,
-    "リストカット": ANY_POS,
-    "リスカ": ANY_POS,
-    "首を吊る": ANY_POS,
-    "首吊り": ANY_POS,
-    "飛び降りる": ANY_POS,
-    "練炭": ANY_POS,
-    "オーバードーズ": ANY_POS,
-}
+SELF_HARM_WORDS = load_dictionary("self_harm")
 
 # 他人を傷つけること、犯罪をほのめかす表現。
 # 「殺す」「ころす」は NG_WORDS_BLOCK にも入っているが、
@@ -115,17 +125,7 @@ SELF_HARM_WORDS = {
 #
 # 「刺す」「殴る」は入れない。「釘を刺す」「壁を殴る」と区別できないため。
 # この種のものは LLM 側の判定に任せる。
-HARM_OTHERS_WORDS = {
-    "殺してやる": ANY_POS,
-    "殺害": ANY_POS,
-    "殺人": ANY_POS,
-    "放火": ANY_POS,
-    "爆破": ANY_POS,
-    "通り魔": ANY_POS,
-    "刺してやる": ANY_POS,
-    "殴ってやる": ANY_POS,
-    "ぶっ殺": ANY_POS,
-}
+HARM_OTHERS_WORDS = load_dictionary("harm_others")
 
 # 自傷・他害を検出したときの扱い。人間監督の決定により block で固定。
 # 設定値として残してあるが、AIの判断で変更しないこと。

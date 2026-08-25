@@ -1,0 +1,13 @@
+# 他人を傷つける・犯罪をほのめかす語。例外なく block します。
+# 「刺す」「殴る」は日常語と分けられないので入れないこと。
+
+
+殺してやる	token
+殺害	token
+殺人	token
+放火	token
+爆破	token
+通り魔	token
+刺してやる	token
+殴ってやる	token
+ぶっ殺	token
