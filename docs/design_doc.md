@@ -230,7 +230,7 @@ flowchart TD
 
 ### 6.1 ER図
 
-`PK`＝主キー、`FK`＝外部キー、`UK`＝一意制約（UNIQUE）。属性のコメント欄にNOT NULLや排他制約などの補足を記す（コメントがないカラムはNULL許容）。CHECK制約や「参照先の値に依存する制約」（例：あやすの`persona_type`とリアクションの対象種別の対応）はER図の記法だけでは表現しきれないため、6.2節の文章で補足する。
+`PK`＝主キー、`FK`＝外部キー、`UK`＝一意制約（UNIQUE）。属性のコメント欄にNOT NULLや排他制約などの補足を記す（コメントがないカラムはNULL許容）。テーブル間の関係線は「行を持つかどうか」というデータベース上の参照関係（`has`）のみを示し、業務上の意味（誰が投稿する・誰が返信するといった振る舞い）はここには書かない。CHECK制約や「参照先の値に依存する制約」（例：あやすの`persona_type`とリアクションの対象種別の対応）はER図の記法だけでは表現しきれないため、6.2節のDDLと6.3節の文章で補足する。
 
 ```mermaid
 erDiagram
@@ -309,28 +309,161 @@ erDiagram
         timestamptz updated_at "NOT NULL"
     }
 
-    ACCOUNTS ||--|| BABY_PERSONAS : "1対1で内部所有（非公開）"
-    ACCOUNTS ||--|| MOTHER_PERSONAS : "1対1で内部所有（非公開）"
-    BABY_PERSONAS ||--o{ POSTS : "投稿する"
-    POSTS ||--o{ POST_STAMPS : "スタンプを挿入"
-    STAMPS ||--o{ POST_STAMPS : "カタログ参照"
-    POSTS ||--o{ COMMENTS : "あやすを受ける"
-    BABY_PERSONAS ||--o{ COMMENTS : "赤ちゃんとしてあやす"
-    MOTHER_PERSONAS ||--o{ COMMENTS : "お母さんとしてあやす"
-    COMMENTS ||--o{ COMMENTS : "お母さんへの返信は赤ちゃんのみ"
-    ACCOUNTS ||--o{ REACTIONS : "リアクションする"
-    POSTS ||--o{ REACTIONS : "対象になる"
-    COMMENTS ||--o{ REACTIONS : "対象になる"
-    ACCOUNTS ||--o{ FOLLOWS : "フォローする"
-    BABY_PERSONAS ||--o{ FOLLOWS : "フォローされる（対象）"
-    MOTHER_PERSONAS ||--o{ FOLLOWS : "フォローされる（対象）"
-    BABY_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "推定年齢を持つ"
-    MOTHER_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "推定対象年齢を持つ"
+    ACCOUNTS ||--|| BABY_PERSONAS : "has"
+    ACCOUNTS ||--|| MOTHER_PERSONAS : "has"
+    BABY_PERSONAS ||--o{ POSTS : "has"
+    POSTS ||--o{ POST_STAMPS : "has"
+    STAMPS ||--o{ POST_STAMPS : "has"
+    POSTS ||--o{ COMMENTS : "has"
+    BABY_PERSONAS ||--o{ COMMENTS : "has"
+    MOTHER_PERSONAS ||--o{ COMMENTS : "has"
+    COMMENTS ||--o{ COMMENTS : "replies to"
+    ACCOUNTS ||--o{ REACTIONS : "has"
+    POSTS ||--o{ REACTIONS : "has"
+    COMMENTS ||--o{ REACTIONS : "has"
+    ACCOUNTS ||--o{ FOLLOWS : "has"
+    BABY_PERSONAS ||--o{ FOLLOWS : "has"
+    MOTHER_PERSONAS ||--o{ FOLLOWS : "has"
+    BABY_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "has"
+    MOTHER_PERSONAS ||--o| PERSONA_AGE_ESTIMATES : "has"
 ```
 
-### 6.2 テーブル定義
+### 6.2 DDL（PostgreSQL CREATE TABLE文）
 
-3.2節の通り、1アカウントは赤ちゃんペルソナ／お母さんペルソナという2つの公開アイデンティティを持つ。`accounts.id`は内部でこの2つを紐づけるためだけに使い、外部レスポンスには含めない（FR-COMMON-005、FR-PRIV-004）。
+6.1節のER図をそのままPostgreSQLのDDLに落としたもの。主キー・外部キー・一意制約・NOT NULL制約・CHECK制約をSQLとして確定させ、このDDLをそのまま実行すればスキーマを再現できる状態にする。列の型・桁数（`varchar`の長さ等）は実装フェーズで調整可能な仮の値とする。
+
+```sql
+create extension if not exists pgcrypto; -- gen_random_uuid() を使うため
+
+create table accounts (
+    id            uuid primary key default gen_random_uuid(),
+    login_id      varchar(50)  not null unique,
+    password_hash varchar(255) not null,
+    birth_date    date         not null,
+    created_at    timestamptz  not null default now()
+);
+
+create table baby_personas (
+    id         uuid primary key default gen_random_uuid(),
+    account_id uuid         not null unique references accounts (id),
+    nickname   varchar(50)  not null,
+    bio        text,
+    created_at timestamptz  not null default now()
+);
+
+create table mother_personas (
+    id         uuid primary key default gen_random_uuid(),
+    account_id uuid         not null unique references accounts (id),
+    nickname   varchar(50)  not null,
+    bio        text,
+    created_at timestamptz  not null default now()
+);
+
+create table stamps (
+    id         uuid primary key default gen_random_uuid(),
+    name       varchar(50) not null,
+    image_url  text        not null,
+    created_at timestamptz not null default now()
+);
+
+create table posts (
+    id              uuid primary key default gen_random_uuid(),
+    baby_persona_id uuid        not null references baby_personas (id),
+    body            varchar(150) not null,
+    deleted_at      timestamptz,
+    created_at      timestamptz not null default now()
+);
+
+create table post_stamps (
+    id       uuid primary key default gen_random_uuid(),
+    post_id  uuid    not null references posts (id),
+    stamp_id uuid    not null references stamps (id),
+    position integer
+);
+
+create table comments (
+    id                  uuid primary key default gen_random_uuid(),
+    post_id             uuid        not null references posts (id),
+    persona_type        varchar(6)  not null check (persona_type in ('baby', 'mother')),
+    baby_persona_id     uuid references baby_personas (id),
+    mother_persona_id   uuid references mother_personas (id),
+    reply_to_comment_id uuid references comments (id),
+    body                text        not null,
+    deleted_at          timestamptz,
+    created_at          timestamptz not null default now(),
+    -- persona_type='baby' なら baby_persona_id のみ、'mother' なら mother_persona_id のみが埋まる
+    constraint comments_persona_exclusive check (
+        (persona_type = 'baby'   and baby_persona_id   is not null and mother_persona_id is null) or
+        (persona_type = 'mother' and mother_persona_id is not null and baby_persona_id   is null)
+    )
+);
+
+create table reactions (
+    id                 uuid primary key default gen_random_uuid(),
+    target_type        varchar(7)  not null check (target_type in ('post', 'comment')),
+    target_post_id     uuid references posts (id),
+    target_comment_id  uuid references comments (id),
+    reactor_account_id uuid        not null references accounts (id),
+    type               varchar(10) not null check (type in ('ogya', 'yoshiyoshi', 'manma', 'babu')),
+    created_at         timestamptz not null default now(),
+    -- target_type='post' なら target_post_id のみ、'comment' なら target_comment_id のみが埋まる
+    constraint reactions_target_exclusive check (
+        (target_type = 'post'    and target_post_id    is not null and target_comment_id is null) or
+        (target_type = 'comment' and target_comment_id is not null and target_post_id    is null)
+    )
+);
+
+-- 同一利用者・同一対象・同一種類のリアクションは5件まで（FR-REACT-010〜011）。
+-- 集計を伴う制約はCHECK制約単体では書けないため、INSERT前トリガーで検査する。
+create or replace function reactions_enforce_limit() returns trigger as $$
+declare
+    current_count integer;
+begin
+    select count(*) into current_count
+    from reactions
+    where reactor_account_id = new.reactor_account_id
+      and target_type = new.target_type
+      and target_post_id is not distinct from new.target_post_id
+      and target_comment_id is not distinct from new.target_comment_id
+      and type = new.type;
+
+    if current_count >= 5 then
+        raise exception 'reaction limit exceeded: max 5 per reactor/target/type (FR-REACT-011)';
+    end if;
+
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger reactions_limit_check
+    before insert on reactions
+    for each row
+    execute function reactions_enforce_limit();
+
+create table follows (
+    id                   uuid primary key default gen_random_uuid(),
+    follower_account_id  uuid        not null references accounts (id),
+    target_persona_type  varchar(6)  not null check (target_persona_type in ('baby', 'mother')),
+    target_persona_id    uuid        not null,
+    created_at           timestamptz not null default now(),
+    unique (follower_account_id, target_persona_type, target_persona_id)
+);
+
+create table persona_age_estimates (
+    persona_type  varchar(6)   not null check (persona_type in ('baby', 'mother')),
+    persona_id    uuid         not null,
+    estimated_age numeric(4,1),
+    sample_count  integer      not null default 0,
+    updated_at    timestamptz  not null default now(),
+    primary key (persona_type, persona_id)
+);
+```
+
+> `comments_persona_exclusive`・`reactions_target_exclusive`は「入力された値の組み合わせ」を検査するCHECK制約であり、6.1節で触れた「参照先テーブルの行の値に依存する制約」（例：`reply_to_comment_id`が指す行の`persona_type`が`'mother'`なら自分は`'baby'`でなければならない、リアクション対象のあやすが`mother`なら`type`は`babu`のみ、というFR-COMMENT-005〜007・FR-REACT-005〜007の制約）はCHECK制約だけでは書けない。これらはPostgreSQLのトリガー（`CREATE TRIGGER` + `CREATE FUNCTION`）またはアプリケーション層でのバリデーションで担保する（6.5節参照）。`reactions_enforce_limit`トリガーは、この種の「集計を伴う制約」（同一利用者・同一対象・同一種類は5件まで、FR-REACT-010〜011）をトリガーで実装する例である。
+
+### 6.3 テーブル定義
+
+3.2節の通り、1アカウントは赤ちゃんペルソナ／お母さんペルソナという2つの公開アイデンティティを持つ。`accounts.id`は内部でこの2つを紐づけるためだけに使い、外部レスポンスには含めない（FR-COMMON-005、FR-PRIV-004）。6.2節のDDLと対応させながら、各テーブルの意図と仕様IDとの対応を示す。
 
 | テーブル                 | 主なカラム                                                                                                    | 制約・備考                                                                                                                                                 |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -345,7 +478,7 @@ erDiagram
 | `follows`                | `id (PK)`, `follower_account_id (FK -> accounts.id)`, `target_persona_type ('baby'|'mother')`, `target_persona_id`, `created_at` | `UNIQUE (follower_account_id, target_persona_type, target_persona_id)`。**被フォロー側からフォロワーを逆引きするAPI・クエリは提供しない**という設計上の割り切り（FR-FOLLOW-004、FR-FOLLOW-005）。DB上は技術的に可能でも、アプリケーション層で意図的に提供しない。 |
 | `persona_age_estimates`  | `persona_type ('baby'|'mother')`, `persona_id`, `estimated_age`, `sample_count`, `updated_at`                   | プロフィール画面表示用の集計値。複合主キー`(persona_type, persona_id)`。赤ちゃん度・お母さん度はそれぞれ対応するペルソナの発言のみから算出する（FR-PROFILE-003〜004）。 |
 
-### 6.3 認証・セッションの持ち方
+### 6.4 認証・セッションの持ち方
 
 認証には**JWT（署名付きトークン）**を採用する。
 
@@ -354,11 +487,11 @@ erDiagram
 - **JWTはステートレスであるため、DBにセッション行を持たない。** ログアウト（`DELETE /api/sessions`）はサーバ側でのトークン失効を伴わず、クライアント側がトークンを破棄するだけの操作になる。トークンは有効期限が切れるまで技術的には有効なままである点を踏まえ、有効期限は短めに設定する方針とする（具体的な期間は10章のオープンイシュー）。
 - JWTのペイロードに含まれる`accountId`はランダムなUUIDであり、それ単体を読んでも赤ちゃん／お母さんペルソナの紐づけ（3.2節の非連結の原則）は分からない。ただし署名は改ざん防止のためのものであり、ペイロードの内容そのものは暗号化されず誰でも読めることを踏まえ、`accountId`以外の情報をペイロードに載せない。
 
-### 6.4 設計方針
+### 6.5 設計方針
 
 - KVのキー構造による非正規化ではなく、外部キー制約と正規化されたテーブルでエンティティ間の整合性をDB側でも保証する。ただし「対象によってリアクション種別が異なる」「お母さんへの返信は赤ちゃんのみ」といった**参照先の値に依存する制約**は、PostgreSQLのCHECK制約単体では完結しないため、トリガーまたはアプリケーション層のバリデーションを併用する方針とする（実装方式の詳細は各担当の裁量）。
 - 一覧取得（あるペルソナのバブル一覧、自分がフォローしているペルソナ一覧など）は、外部キーにインデックスを張った通常のSQLクエリ（`WHERE` + `ORDER BY` + ページング）で実現する。
-- `follows`テーブルは技術的には対象側からフォロワーを引けるが、「誰が自分をフォローしているか」を可視化しないための内部設計上の割り切りとして、そのためのAPI・クエリを一切提供しない（6.2参照）。
+- `follows`テーブルは技術的には対象側からフォロワーを引けるが、「誰が自分をフォローしているか」を可視化しないための内部設計上の割り切りとして、そのためのAPI・クエリを一切提供しない（6.3参照）。
 - 赤ちゃんペルソナ・お母さんペルソナが同一`account_id`に紐づくという情報は、本人が自分のプロフィールを見るとき（`GET /api/profile/me`、7章参照）以外では組み合わせて返さないことを設計上の原則とする。
 - 禁止内容を検出した本文（モデレーション違反として拒否された原文）は、恒久的なレコードとして`posts`・`comments`テーブルに保存しない（FR-PRIV-002）。一時的な検査処理の入力としてのみ扱い、永続化しない。
 - 値のスキーマは実装フェーズで柔軟に調整可能とし、ここでは最低限のカラムのみ定義する（アジャイルのため厳密な型定義・インデックス設計は各スプリントで確定）。
@@ -369,7 +502,7 @@ erDiagram
 
 エンドポイントごとに**引数（リクエスト）と戻り値（レスポンス）のJSON形式のみ**を定義する。内部の処理ロジック（レコメンドアルゴリズムやAI連携の詳細）はあえて抽象的なままにし、実装フェーズで詰める。
 
-認証が必要なエンドポイントは、リクエストボディに`accountId`・`babyPersonaId`・`reactorAccountId`等の身元情報を含めない。代わりに`Authorization: Bearer <JWT>`ヘッダーで送られたトークンから、サーバー側で操作主体（アカウント・該当ペルソナ）を解決する（6.3参照）。未認証で認証必須のエンドポイントを呼んだ場合は拒否する（FR-COMMON-001）。
+認証が必要なエンドポイントは、リクエストボディに`accountId`・`babyPersonaId`・`reactorAccountId`等の身元情報を含めない。代わりに`Authorization: Bearer <JWT>`ヘッダーで送られたトークンから、サーバー側で操作主体（アカウント・該当ペルソナ）を解決する（6.4参照）。未認証で認証必須のエンドポイントを呼んだ場合は拒否する（FR-COMMON-001）。
 
 | エンドポイント                                                | 概要                                                                                                             | 認証 |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --- |
@@ -416,7 +549,7 @@ erDiagram
 }
 ```
 
-> `loginId`はユーザーが指定するログイン用のID、サーバ内部の管理用ID（`accountId`）とは別物であり、レスポンスにも`accountId`は含めない（6.3参照）。以降の認証必須のAPI呼び出しは、リクエストボディにIDを含めず`Authorization: Bearer <token>`ヘッダーで行う。
+> `loginId`はユーザーが指定するログイン用のID、サーバ内部の管理用ID（`accountId`）とは別物であり、レスポンスにも`accountId`は含めない（6.4参照）。以降の認証必須のAPI呼び出しは、リクエストボディにIDを含めず`Authorization: Bearer <token>`ヘッダーで行う。
 >
 > **未確定**：`loginId`・`password`のバリデーション規則（文字種・長さ）、パスワードのハッシュ化方式、生年月日のバリデーション（未来日付や極端な高齢の扱い）、トークンの具体的な有効期限は未確定（10章）。
 
