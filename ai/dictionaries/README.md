@@ -65,6 +65,23 @@ python -m pytest ai/tests/test_patterns.py -q
 えんじいろの利用者はエンジニアなので、技術用語や日常語が弾かれると
 サービスとして使えなくなります。
 
+## 他のAIへ依頼するとき
+
+相手が読める形式のものを渡してください。中身は3つとも同じです。
+
+| ファイル | 渡す相手 |
+|---|---|
+| `AI_TASK.md` | Markdown を読めるもの（ChatGPT、Gemini、Claude など） |
+| `AI_TASK.txt` | Markdown を扱えないもの |
+| `ai_task.py` | GitHub Copilot など、コードを文脈にするもの。書き込み欄つき |
+
+`.txt` と `.py` は `AI_TASK.md` から生成しています。
+**直すときは `AI_TASK.md` だけを直して、生成し直してください。**
+
+```bash
+python ai/dictionaries/build_formats.py
+```
+
 ## ファイル
 
 | ファイル | 判定 |
