@@ -562,6 +562,10 @@ def find_organizations(text: str) -> list[str]:
         if pos.startswith("名詞") and "接尾" not in pos.split(",")[1]:
             run.append((surface, pos))
             continue
+        # 「福井の高専」の「の」で切らない。連体化の「の」は名詞をつなぐ。
+        # 切ると固有名詞と学校名が別々の並びになり、拾えなくなる（実測で確認）。
+        if run and "連体化" in pos:
+            continue
         if run:
             joined = "".join(s for s, _ in run)
             has_proper = any("固有名詞" in p for _, p in run)

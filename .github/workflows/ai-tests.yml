@@ -1,0 +1,54 @@
+# ai/ のテストを自動で回す。
+#
+# 人間監督の指示により追加した。それまではテスト結果がPR本文の記載でしか
+# 確認できず、独立レビューでも「CIが無い」ことが繰り返し指摘されていた。
+#
+# **ai/ 配下が変わったときだけ動く。** 他担当のPRには影響しない。
+# backend/ と frontend/ にテストが用意されたら、別のワークフローとして
+# 足すか、ここへジョブを増やすかを、その担当と相談して決めること。
+
+name: ai tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ai/**'
+      - '.github/workflows/ai-tests.yml'
+  pull_request:
+    paths:
+      - 'ai/**'
+      - '.github/workflows/ai-tests.yml'
+
+# 同じブランチへ続けて push したとき、古い実行を止める。
+concurrency:
+  group: ai-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ai/Dockerfile と同じ 3.11 に合わせる
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: ai/requirements.txt
+
+      - name: 依存を入れる
+        run: |
+          python -m pip install --upgrade pip
+          # torch は CPU 版だけでよい。既定だと GPU 版を取りに行って重くなる
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+            -r ai/requirements.txt
+          python -m pip install pytest
+
+      # APIキーは渡さない。**判定APIは通信しないので、キー無しで全件通る。**
+      # ここが落ちたら「キーが無いと動かない経路」が混ざったということ。
+      - name: テストを回す
+        run: python -m pytest ai/tests/ -q
