@@ -1,4 +1,9 @@
-import { Pool, type QueryResult, type QueryResultRow } from "pg";
+import {
+  Pool,
+  type PoolClient,
+  type QueryResult,
+  type QueryResultRow,
+} from "pg";
 
 /**
  * 接続プールはモジュールのトップレベルで1回だけ作る。
@@ -101,6 +106,31 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
       console.warn(`[db] retrying after ${code} (attempt ${attempt + 1})`);
       await new Promise((resolve) => setTimeout(resolve, backoff[attempt]));
     }
+  }
+}
+
+/**
+ * 複数のINSERT/UPDATEを1つのトランザクションにまとめて実行する。
+ *
+ * アカウント登録（accounts・baby_personas・mother_personasの3行）のように、
+ * 途中で失敗したら全体をやり直したい処理で使う。`fn`の中で投げた例外は
+ * ROLLBACKしてから外へ再送出する。切断エラーの再試行は行わない
+ * （トランザクション途中の再試行は二重実行の危険があるため、呼び出し側に委ねる）。
+ */
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const result = await fn(client);
+    await client.query("commit");
+    return result;
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
