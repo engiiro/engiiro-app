@@ -87,9 +87,23 @@ Deploy上ではconsole.deno.comのPre-Deploy Commandに`deno task migrate`を
 cd backend
 docker compose up -d
 export PGHOST=localhost PGPORT=5432 PGUSER=engiiro PGPASSWORD=engiiro PGDATABASE=engiiro
+export JWT_SECRET=local-dev-secret-do-not-use-in-production
 deno task migrate
 deno task dev
 ```
+
+## 認証
+
+`src/lib/auth.ts`がパスワードのハッシュ化（`node:crypto`のscrypt）とJWTの発行・検証
+（`@zaubrik/djwt`）を担う。ここ以外でパスワードやトークンの検証ロジックを書かない。
+
+`JWT_SECRET`環境変数が無いと起動時に例外を投げて落ちる（意図的な挙動。鍵が無いまま
+起動して「誰の署名も検証できないトークン」を発行し続ける事故を防ぐ）。Deploy上での
+本番の鍵の管理方法（Secretsへの登録等）は別Issueで扱う。
+
+ログインの成功・失敗で応答時間に差が出ないよう、アカウントが存在しない場合も
+ダミーハッシュに対してscryptを1回計算してから401を返す（`sessions.ts`の
+`DUMMY_HASH`）。ここを早期returnに書き換えない。
 
 ## 変更したら
 

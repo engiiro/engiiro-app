@@ -13,8 +13,9 @@ cd backend
 # 1. Postgresを起動する
 docker compose up -d
 
-# 2. 接続情報を環境変数に入れる（ターミナルを開き直すたびに必要）
+# 2. 接続情報とJWTの署名鍵を環境変数に入れる（ターミナルを開き直すたびに必要）
 export PGHOST=localhost PGPORT=5432 PGUSER=engiiro PGPASSWORD=engiiro PGDATABASE=engiiro
+export JWT_SECRET=local-dev-secret-do-not-use-in-production
 
 # 3. テーブルを作る
 deno task migrate
@@ -22,6 +23,8 @@ deno task migrate
 # 4. サーバを起動する
 deno task dev
 ```
+
+`JWT_SECRET`はログイン・アカウント登録が発行するトークンの署名に使う秘密鍵。未設定だとサーバが起動時に落ちる。ローカルでは適当な文字列でよいが、本番相当の値をコミットしたり共有チャットに貼ったりしない。
 
 `http://localhost:8000/health` を開いて `{"status":"ok","db":"up"}` が返れば、
 アプリもDBも正常に起動している。

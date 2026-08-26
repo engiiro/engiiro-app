@@ -9,6 +9,7 @@
   },
   "imports": {
     "@std/http": "jsr:@std/http@^1.0.20",
+    "@zaubrik/djwt": "jsr:@zaubrik/djwt@^3.0.2",
     "pg": "npm:pg@^8.23.0"
   },
   "fmt": {
