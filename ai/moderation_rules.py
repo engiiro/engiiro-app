@@ -139,6 +139,15 @@ HARM_OTHERS_ACTION = "block"
 # 状況で変えない方針へ変わった。文脈を見て軽くすることはしない。
 HARSH_CRITICISM_ACTION = "block"
 
+# 「姓＋敬称」（田中さん）も実名として弾くかどうか。
+#
+# 仕様書 FR-MOD-012 は実名情報を禁止しているが、
+# FR-MOD-022 は「個人を識別・連絡・接触できない抽象的な表現」を
+# 禁止対象から外している。姓だけの言及がどちらにあたるかは解釈が要る。
+# 人間監督の判断が出るまで、拾わないほうにしてある。
+# フルネーム（山田太郎）は解釈の余地がないので、この設定に関わらず拾う。
+FULL_NAME_WITH_HONORIFIC = False
+
 
 # ============================================================
 # 2. 伏字回避の正規化
@@ -452,8 +461,55 @@ def find_personal_data(text: str) -> list[str]:
         found.append("postal_code")
     if _ACCOUNT_ID.search(text):
         found.append("account_id")
+    if find_full_names(text):
+        found.append("real_name")
 
     return sorted(set(found))
+
+
+# 敬称。姓のうしろに付く。
+HONORIFICS = ("さん", "くん", "ちゃん", "君", "氏", "様", "さま")
+
+
+def find_full_names(text: str, with_honorific: bool = FULL_NAME_WITH_HONORIFIC) -> list[str]:
+    """本名らしき並びを探す。仕様書 FR-MOD-012（実名情報）に対応する。
+
+    **姓だけでは拾わない。** 日本語の姓は普通名詞と重なるものが多く、
+    「森の中を歩いた」「林の写真を撮った」「岡から見える」「大西日が眩しい」が
+    すべて人名として当たってしまう（実測で確認）。
+
+    姓のうしろに名が続く並びだけを本名とみなす。
+        山田太郎 → 拾う
+        森の中   → 拾わない
+
+    with_honorific を立てると「姓＋敬称」も拾う。
+    「田中さんに聞いてみるね」まで弾くかどうかは仕様の解釈が要る。
+    FR-MOD-012（実名情報は禁止）と FR-MOD-022（個人を識別・連絡・接触
+    できない抽象的な表現は禁止しない）のどちらを重く見るかによる。
+    人間監督の判断が出るまでは既定で拾わない。
+    """
+    tokens = iter_tokens(text)
+    if not tokens:
+        return []
+
+    # iter_tokens は品詞の大分類しか返さないので、ここだけ細分類を見る
+    detailed = [
+        (token.surface, token.part_of_speech)
+        for token in _tokenizer.tokenize(normalize_for_tokenize(text))
+    ]
+
+    hits = []
+    for index, (surface, pos) in enumerate(detailed):
+        if "固有名詞,人名,姓" not in pos:
+            continue
+        if index + 1 >= len(detailed):
+            continue
+        next_surface, next_pos = detailed[index + 1]
+        if "固有名詞,人名,名" in next_pos:
+            hits.append(surface + next_surface)
+        elif with_honorific and next_surface in HONORIFICS:
+            hits.append(surface + next_surface)
+    return hits
 
 
 # ============================================================

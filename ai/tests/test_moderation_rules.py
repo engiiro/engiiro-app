@@ -7,9 +7,16 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from moderation_rules import check_rules, find_personal_data, normalize_for_check
+from moderation_rules import (
+    check_rules,
+    find_full_names,
+    find_personal_data,
+    normalize_for_check,
+)
 
 
 # ============================================================
@@ -136,3 +143,43 @@ def test_個人情報はblockする():
 def test_技術用語は個人情報にしない():
     for sample in TECH_SAMPLES:
         assert find_personal_data(sample) == [], sample
+
+
+# ============================================================
+# 実名（仕様書 FR-MOD-012）
+# ============================================================
+# ChatGPT-Web::akatonboboonboon の指摘（#21::…::03）で、
+# 実名が未検出だと分かった箇所。
+
+def test_フルネームを実名として拾う():
+    assert find_full_names("山田太郎です。") == ["山田太郎"]
+    assert "real_name" in check_rules("山田太郎です。")["details"]["personal_data"]
+
+
+@pytest.mark.parametrize("text", [
+    "森の中を歩いた。",
+    "林の写真を撮った。",
+    "岡から見える景色がきれいだった。",
+    "大西日が眩しい。",
+])
+def test_姓と重なる普通名詞を実名と取り違えない(text):
+    """日本語の姓は普通名詞と重なるものが多い。
+
+    姓だけで拾うと、この4件がすべて人名として当たる（実測で確認）。
+    姓のうしろに名が続く並びだけを本名とみなしている。
+    """
+    assert find_full_names(text) == []
+    assert check_rules(text)["action"] == "allow"
+
+
+def test_姓と敬称は既定では拾わない():
+    """FR-MOD-012 と FR-MOD-022 のどちらを重く見るかの解釈が要る。
+
+    人間監督の判断が出るまで、拾わないほうにしてある。
+    """
+    assert find_full_names("田中さんに聞いてみる。") == []
+    assert check_rules("田中さんに聞いてみる。")["action"] == "allow"
+
+
+def test_設定を立てれば姓と敬称も拾える():
+    assert find_full_names("田中さんに聞いてみる。", with_honorific=True) == ["田中さん"]
