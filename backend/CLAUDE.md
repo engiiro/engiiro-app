@@ -105,7 +105,27 @@ deno task dev
 ダミーハッシュに対してscryptを1回計算してから401を返す（`sessions.ts`の
 `DUMMY_HASH`）。ここを早期returnに書き換えない。
 
+## AI評価・モデレーション（暫定実装）
+
+`src/lib/aiEvaluate.ts`（AI文章評価）と`src/lib/moderation.ts`（規則ベースの
+モデレーション）は、どちらも本物のAIモデル抜きの暫定実装。design_doc.md 8章
+「AI評価・AI文章変換は最初は簡易ロジックで良い」という方針に基づく。
+
+- `aiEvaluate.ts`：ひらがな比率や固定パターンの一致から月齢の目安を出す。
+  `ai/`配下の本物のAI評価に差し替える際は`evaluateText()`の中身だけを
+  差し替えれば良く、呼び出し側（`routes/ai.ts`、`routes/posts.ts`）は変更不要
+- `moderation.ts`：`ai/moderation_rules.py`（Python側の同種の実装）を
+  TypeScriptへ移植したもの。**移植元とロジックがずれたら、design_doc.md
+  9.2章の確定仕様（FR-MOD-023はblock）を優先し、Python側の実装を疑う**
+
+正規表現を文字クラス`[...]`で組み立てる際、`-`（ハイフン）は他の記号と同様に
+エスケープが必要（`moderation.ts`のMASK_PATTERNで一度踏んだ不具合）。
+`deno check`は正規表現の構文エラーを検出しないため、`RegExp`を動的に組み立てる
+コードを変更したら、実際にサーバを起動して確認する。
+
 ## 変更したら
 
 `deno task check`を通す。`deno check`と`deno lint`と`deno fmt --check`を
-まとめて実行する。
+まとめて実行する。ただし`deno check`は型チェックのみで、正規表現の構文エラー
+（上記）のような実行時エラーは検出しない。ローカルのPostgresでサーバを起動し、
+`curl`で実際に叩いて確認する（`README.md`のローカル起動手順を参照）。
