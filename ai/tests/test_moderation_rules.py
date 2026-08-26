@@ -172,14 +172,58 @@ def test_姓と重なる普通名詞を実名と取り違えない(text):
     assert check_rules(text)["action"] == "allow"
 
 
-def test_姓と敬称は既定では拾わない():
-    """FR-MOD-012 と FR-MOD-022 のどちらを重く見るかの解釈が要る。
+def test_姓と敬称も実名として拾う():
+    """人間監督の決定：「弾きます。個人情報は完全に弾きます」
 
-    人間監督の判断が出るまで、拾わないほうにしてある。
+    FR-MOD-012（実名は禁止）を FR-MOD-022（抽象的な表現は禁止しない）より
+    重く見る、という判断である。
     """
-    assert find_full_names("田中さんに聞いてみる。") == []
-    assert check_rules("田中さんに聞いてみる。")["action"] == "allow"
+    assert find_full_names("田中さんに聞いてみる。") == ["田中さん"]
+    assert check_rules("田中さんに聞いてみる。")["action"] == "block"
 
 
-def test_設定を立てれば姓と敬称も拾える():
-    assert find_full_names("田中さんに聞いてみる。", with_honorific=True) == ["田中さん"]
+def test_設定を落とせば姓と敬称は拾わない():
+    assert find_full_names("田中さんに聞いてみる。", with_honorific=False) == []
+
+
+# ============================================================
+# 学校・勤務先・住所・待ち合わせ・外部連絡（FR-MOD-013〜020）
+# ============================================================
+
+@pytest.mark.parametrize("text,code", [
+    ("東京都立産業技術高専に通ってるの。", "organization"),
+    ("早稲田大学の学園祭に行くの。", "organization"),
+    ("株式会社えんじいろで働いてるの。", "organization"),
+    ("渋谷区神南1丁目に住んでるの。", "address"),
+    ("204号室にいるよ。", "address"),
+    ("渋谷駅で待ち合わせしよう。", "meetup"),
+    ("渋谷で会おう。", "meetup"),
+    ("今度オフ会しよう。", "meetup"),
+    ("直接会いましょう。", "meetup"),
+    ("LINEで連絡してね。", "external_contact"),
+    ("Twitterのアカウント教えて。", "external_contact"),
+])
+def test_文脈型の個人情報を拾う(text, code):
+    assert code in find_personal_data(text), text
+    assert check_rules(text)["action"] == "block"
+
+
+@pytest.mark.parametrize("text", [
+    # FR-MOD-022：個人を識別・連絡・接触できない抽象的な表現は禁止しない
+    "会社で疲れた。",
+    "学校が大変。",
+    "大学の課題がつらい。",
+    # 「会いたい」だけで待ち合わせ誘導にしない。えんじいろの弱音そのもの
+    "おばあちゃんに会いたい。",
+    "家族に会いたい。",
+    "ねこに会いたいのー。",
+    "また明日会おうね。",
+    "会議で会おうという話になった。",
+    # サービス名だけでは連絡誘導にしない
+    "Slack のアプリを作った。",
+    "Discord の bot を直した。",
+    "LINE Bot の API を叩いた。",
+])
+def test_文脈型の個人情報で日常語を弾かない(text):
+    assert find_personal_data(text) == [], text
+    assert check_rules(text)["action"] == "allow"

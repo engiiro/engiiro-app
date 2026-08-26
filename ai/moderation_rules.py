@@ -139,14 +139,11 @@ HARM_OTHERS_ACTION = "block"
 # 状況で変えない方針へ変わった。文脈を見て軽くすることはしない。
 HARSH_CRITICISM_ACTION = "block"
 
-# 「姓＋敬称」（田中さん）も実名として弾くかどうか。
-#
-# 仕様書 FR-MOD-012 は実名情報を禁止しているが、
-# FR-MOD-022 は「個人を識別・連絡・接触できない抽象的な表現」を
-# 禁止対象から外している。姓だけの言及がどちらにあたるかは解釈が要る。
-# 人間監督の判断が出るまで、拾わないほうにしてある。
-# フルネーム（山田太郎）は解釈の余地がないので、この設定に関わらず拾う。
-FULL_NAME_WITH_HONORIFIC = False
+# 「姓＋敬称」（田中さん）も実名として弾く。人間監督の決定：
+#   「弾きます。個人情報は完全に弾きます」
+# FR-MOD-012（実名情報は禁止）を、FR-MOD-022（抽象的な表現は禁止しない）より
+# 重く見る、という判断である。AIの判断で緩めないこと。
+FULL_NAME_WITH_HONORIFIC = True
 
 
 # ============================================================
@@ -408,6 +405,64 @@ _PHONE = re.compile(r"0\d{1,4}[-\s]?\d{1,4}[-\s]?\d{3,4}")
 _POSTAL = re.compile(r"\d{3}-\d{4}")
 _ACCOUNT_ID = re.compile(r"(?<![0-9a-z])@[0-9a-z_]{3,}", re.IGNORECASE)
 
+# 住所（仕様書 FR-MOD-013）。
+# 「〜丁目」「〜番地」「〜号室」と、都道府県＋市区町村の並び。
+_ADDRESS = re.compile(
+    r"[0-9０-９一二三四五六七八九十]+\s*(丁目|番地|号室|番館)"
+    r"|[都道府県][^\s、。]{1,12}?[市区町村](?![長民])"
+    r"|(東京都|北海道|大阪府|京都府)[^\s、。]{0,12}?[市区町村](?![長民])"
+)
+
+# 学校・勤務先の具体名（仕様書 FR-MOD-013 / FR-MOD-020）。
+#
+# **これ単体では拾わない。** 固有名詞と一緒に並んでいるときだけ拾う。
+# FR-MOD-022 が「会社で疲れた」「学校が大変」を通すよう求めているためである。
+#   大学の課題がつらい      → 通す（固有名詞がない）
+#   早稲田大学の学園祭      → 拾う
+#   東京都立産業技術高専    → 拾う
+_ORGANIZATION_WORDS = (
+    "大学", "大学院", "高専", "高等専門学校", "高校", "高等学校",
+    "中学校", "小学校", "学園", "学院", "専門学校",
+)
+
+# 会社を示す語。**これは単体で拾う。**
+# 「株式会社」を固有名詞なしで書くことは実際にはなく、
+# 「会社で疲れた」のような抽象的な言い方とも重ならない。
+# 社名の側が固有名詞として解析されないことがあるため
+# （「株式会社えんじいろ」の「えんじいろ」は動詞に割れる。実測で確認）、
+# 固有名詞との共起を条件にすると取りこぼす。
+_COMPANY_MARKS = re.compile(r"株式会社|有限会社|合同会社|㈱|\(株\)")
+
+# 現実世界での接触・待ち合わせの誘導（仕様書 FR-MOD-018）。
+#
+# **「会いたい」「会おう」だけでは拾わない。**
+# 拾うと、えんじいろが書くために用意している弱音まで弾いてしまう。
+#   おばあちゃんに会いたい ／ 家族に会いたいのー ／ ねこに会いたいのー
+# 実測で確認した。段取りを示す語があるときだけ拾う。
+_MEETUP = re.compile(
+    r"待ち合わせ|オフ会|直接会|集まろう|集まりましょう|集合しよう|集合しましょう"
+)
+
+# 場所を指定して会おうとしている並び。上の語が無くてもこれは拾う。
+#   渋谷で会おう ／ 東京駅で会いませんか
+# 「また明日会おうね」は場所が無いので拾わない。
+_MEET_VERB = re.compile(r"会(お|い(ま|た)|える)")
+_PLACE_SUFFIX = ("駅", "空港", "会場")
+
+# 外部サービスでの連絡誘導（仕様書 FR-MOD-016 / FR-MOD-017）。
+#
+# **サービス名だけでは拾わない。** 連絡を促す言い方と並んだときだけ拾う。
+# 「Slack のアプリを作った」「Discord の bot を直した」は技術の話なので通す。
+_EXTERNAL_SERVICES = (
+    "line", "ライン", "twitter", "ツイッター", "discord", "ディスコード",
+    "instagram", "インスタ", "slack", "telegram", "skype", "スカイプ",
+    "カカオ", "messenger", "メッセンジャー", "dm", "ディーエム",
+)
+_CONTACT_INVITE = re.compile(
+    r"で連絡|に連絡|連絡して|連絡ちょうだい|連絡ください|送って|教えて"
+    r"|交換し|やり取りし|話そ|フォローして|つながろ|登録して"
+)
+
 # よく使われるトップレベルドメイン。
 # ドットを含む語をURLとみなすのは、ここで終わるときだけにする。
 # 「1.5rem」「3.11」のようなバージョンや単位を弾かないため、
@@ -463,8 +518,82 @@ def find_personal_data(text: str) -> list[str]:
         found.append("account_id")
     if find_full_names(text):
         found.append("real_name")
+    if _ADDRESS.search(text):
+        found.append("address")
+    if _COMPANY_MARKS.search(text) or find_organizations(text):
+        found.append("organization")
+    if _MEETUP.search(text) or _meets_at_place(text):
+        found.append("meetup")
+    if _invites_external_contact(text):
+        found.append("external_contact")
 
     return sorted(set(found))
+
+
+def find_organizations(text: str) -> list[str]:
+    """学校名・勤務先名らしき並びを探す。FR-MOD-013 / FR-MOD-020 に対応する。
+
+    **「大学」「会社」だけでは拾わない。**
+    FR-MOD-022 が「会社で疲れた」「学校が大変」を通すよう求めているためである。
+    固有名詞と同じ名詞の並びに入っているときだけ、具体名とみなす。
+
+        大学の課題がつらい        → 拾わない
+        早稲田大学の学園祭        → 拾う（固有名詞1語に含まれる）
+        東京都立産業技術高専      → 拾う（東京[固有名詞]と同じ並びにある）
+    """
+    if not tokenizer_available():
+        return []
+
+    tokens = [
+        (token.surface, token.part_of_speech)
+        for token in _tokenizer.tokenize(normalize_for_tokenize(text))
+    ]
+
+    hits = []
+    run: list[tuple[str, str]] = []
+    for surface, pos in tokens + [("", "")]:
+        if pos.startswith("名詞") and "接尾" not in pos.split(",")[1]:
+            run.append((surface, pos))
+            continue
+        if run:
+            joined = "".join(s for s, _ in run)
+            has_proper = any("固有名詞" in p for _, p in run)
+            if has_proper and any(word in joined for word in _ORGANIZATION_WORDS):
+                hits.append(joined)
+        run = []
+    return hits
+
+
+def _meets_at_place(text: str) -> bool:
+    """場所を指定して会おうとしているか。FR-MOD-018。
+
+    「渋谷で会おう」は拾い、「おばあちゃんに会いたい」は拾わない。
+    地名か駅名が同じ文にあることを条件にしている。
+    """
+    if not _MEET_VERB.search(text):
+        return False
+    if not tokenizer_available():
+        return False
+
+    for token in _tokenizer.tokenize(normalize_for_tokenize(text)):
+        pos = token.part_of_speech
+        if "固有名詞,地域" in pos:
+            return True
+        if token.surface in _PLACE_SUFFIX and "接尾" in pos:
+            return True
+    return False
+
+
+def _invites_external_contact(text: str) -> bool:
+    """外部サービスでの連絡を促しているか。FR-MOD-016 / FR-MOD-017。
+
+    **サービス名だけでは拾わない。** 連絡を促す言い方と並んだときだけ。
+    「Slack のアプリを作った」「Discord の bot を直した」は技術の話である。
+    """
+    lowered = normalize_for_check(text)
+    if not any(service in lowered for service in _EXTERNAL_SERVICES):
+        return False
+    return bool(_CONTACT_INVITE.search(text))
 
 
 # 敬称。姓のうしろに付く。
@@ -482,11 +611,8 @@ def find_full_names(text: str, with_honorific: bool = FULL_NAME_WITH_HONORIFIC) 
         山田太郎 → 拾う
         森の中   → 拾わない
 
-    with_honorific を立てると「姓＋敬称」も拾う。
-    「田中さんに聞いてみるね」まで弾くかどうかは仕様の解釈が要る。
-    FR-MOD-012（実名情報は禁止）と FR-MOD-022（個人を識別・連絡・接触
-    できない抽象的な表現は禁止しない）のどちらを重く見るかによる。
-    人間監督の判断が出るまでは既定で拾わない。
+    人間監督の決定により、「姓＋敬称」（田中さん）も拾う。
+        「弾きます。個人情報は完全に弾きます」
     """
     tokens = iter_tokens(text)
     if not tokens:
