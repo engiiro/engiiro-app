@@ -267,6 +267,77 @@ def test_理由コードが複数なら保留にする(fake_llm):
     assert "self_harm.txt" not in harvest.format_lines(found)
 
 
+@pytest.mark.parametrize("later_codes", [
+    ["harsh_criticism", "personal_data"],   # 理由コードが複数
+    ["personal_data"],                      # 対応する辞書が無い
+    [],                                     # 理由コードが無い
+])
+def test_同じ語の分類が食い違えば保留へ上げる(fake_llm, later_codes):
+    """先に決めた分類を、後の文で分かった「決められない」で上書きすること。
+
+    語ごとに1回しか見ないと、**最初の文の分類が残り続ける。**
+    保留は安全側なので、後から分かったほうへ倒す。
+    """
+    first, later = "このポンコツが。", "ポンコツと言われたの。"
+    assert rules.check_rules(later)["action"] != "block", "前提が崩れている"
+
+    fake_llm[first] = {
+        "action": "block", "reasonCodes": ["harsh_criticism"], "words": ["ポンコツ"],
+    }
+    fake_llm[later] = {
+        "action": "block", "reasonCodes": later_codes, "words": ["ポンコツ"],
+    }
+
+    found = harvest.harvest([first, later])
+    assert len(found) == 1
+    assert found[0]["dictionary"] is None, "最初の分類が残っている"
+    assert found[0]["hold_reason"]
+    assert "rewrite.txt" not in harvest.format_lines(found)
+
+
+def test_保留が先でも後の単一理由で戻さない(fake_llm):
+    """検出の順序で結果が変わらないこと。"""
+    first, later = "ポンコツと言われたの。", "このポンコツが。"
+    fake_llm[first] = {
+        "action": "block", "reasonCodes": [], "words": ["ポンコツ"],
+    }
+    fake_llm[later] = {
+        "action": "block", "reasonCodes": ["harsh_criticism"], "words": ["ポンコツ"],
+    }
+
+    found = harvest.harvest([first, later])
+    assert found[0]["dictionary"] is None, "保留が解除されている"
+
+
+def test_文によって追記先が違えば保留にする(fake_llm):
+    """rewrite と self_harm のどちらへ入れるかは、語だけでは決まらない。"""
+    first, later = "このポンコツが。", "ポンコツと言われたの。"
+    fake_llm[first] = {
+        "action": "block", "reasonCodes": ["harsh_criticism"], "words": ["ポンコツ"],
+    }
+    fake_llm[later] = {
+        "action": "block", "reasonCodes": ["self_harm"], "words": ["ポンコツ"],
+    }
+
+    found = harvest.harvest([first, later])
+    assert found[0]["dictionary"] is None
+    assert "self_harm.txt" not in harvest.format_lines(found)
+
+
+def test_同じ理由が続いても保留にはしない(fake_llm):
+    """食い違っていないものまで保留にすると、候補が出なくなる。"""
+    first, later = "このポンコツが。", "ポンコツと言われたの。"
+    for sentence in (first, later):
+        fake_llm[sentence] = {
+            "action": "block", "reasonCodes": ["harsh_criticism"],
+            "words": ["ポンコツ"],
+        }
+
+    found = harvest.harvest([first, later])
+    assert found[0]["dictionary"] == "rewrite"
+    assert not found[0]["hold_reason"]
+
+
 # ============================================================
 # 本文の送り先
 # ============================================================

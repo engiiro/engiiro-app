@@ -37,6 +37,9 @@
 `personal_data` と `sexual_explicit` には対応する辞書が無く、
 `judge()` は理由コードが空でも語を挙げてくることがあるためである。
 
+同じ語が別の文でも挙がり、そこで分類が食い違った場合も保留へ上げる。
+**先に見つけたほうで決め打たない。** そうしないと、結果が文の並び順で変わる。
+
 決められないものを `rewrite.txt`（マサカリ）へ流すと、
 その語は本番で `harsh_criticism` として弾かれる。**理由コードが変わると、
 弾いたあと利用者へ見せる文言まで変わる。** 個人情報の語で
@@ -215,7 +218,13 @@ def harvest(sentences: list[str], limit: int | None = None) -> list[dict]:
 
         dictionary, hold_reason = _pick_dictionary(verdict["reasonCodes"])
         for word in verdict["words"]:
-            if word in already or word in found:
+            if word in already:
+                continue
+            if word in found:
+                # 同じ語が別の文でも挙がった。分類が食い違えば保留へ上げる。
+                # 最初の1回で決め打つと、後から分かった「決められない」を
+                # 取りこぼす（実測ではなく、独立レビューの指摘で気づいた）。
+                _merge_into(found[word], dictionary, hold_reason, sentence)
                 continue
             suggestion = suggest_rule(word, must_pass, found_in=sentence)
             if suggestion is None:
@@ -278,6 +287,34 @@ def _pick_dictionary(codes: list[str]) -> tuple[str | None, str]:
     if not known:
         return None, "対応する辞書が無い: " + "/".join(unknown)
     return None, "理由コードが複数ある: " + "/".join(known + unknown)
+
+
+def _merge_into(item: dict, dictionary: str | None, hold_reason: str,
+                sentence: str) -> None:
+    """すでに見つけている語に、別の文での判定を突き合わせる。
+
+    **食い違ったら保留へ上げる。** 先に見つけたほうを採用して後を捨てると、
+    後の文で分かった「決められない」が消えてしまう。
+    保留が安全側なので、いったん上げたら下げない。
+    こうすることで、結果が文の並び順に左右されなくなる。
+    """
+    if item.get("hold_reason"):
+        return                                   # すでに保留。変わらない
+    if not hold_reason and dictionary == item["dictionary"]:
+        return                                   # 同じ結論
+
+    if hold_reason:
+        item["hold_reason"] = (
+            f"別の文では決められなかった（{hold_reason}）: {sentence[:20]}"
+        )
+    else:
+        item["hold_reason"] = (
+            f"文によって追記先が違う（{item['dictionary']} と {dictionary}）: "
+            f"{sentence[:20]}"
+        )
+    item["dictionary"] = None
+    print(f"      保留へ変更: {item['word']}（{item['hold_reason']}）",
+          file=sys.stderr)
 
 
 def format_lines(candidates: list[dict]) -> str:
