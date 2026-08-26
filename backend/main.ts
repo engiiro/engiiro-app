@@ -24,6 +24,7 @@ import {
 } from "./src/routes/reactions.ts";
 import { handleLogin, handleLogout } from "./src/routes/sessions.ts";
 import { handleCreateSoothe, handleListSoothes } from "./src/routes/soothes.ts";
+import { handleListStamps } from "./src/routes/stamps.ts";
 
 // エンドポイント一覧・リクエスト/レスポンス形式は docs/design_doc.md 7章を参照。
 // 増えてきたらフレームワーク（Hono等）の導入も検討する。
@@ -135,7 +136,12 @@ const routes: Route[] = [
     pattern: new URLPattern({ pathname: "/api/personas/mother/:id" }),
     handler: (req, params) => handleGetPublicPersona(req, "mother", params.id!),
   },
-  // TODO: /api/ai/transform, /api/stamps を追加していく
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/stamps" }),
+    handler: handleListStamps,
+  },
+  // TODO: /api/ai/transform を追加していく
 ];
 
 async function router(request: Request): Promise<Response> {
