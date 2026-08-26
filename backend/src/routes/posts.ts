@@ -24,7 +24,9 @@ export async function handleCreatePost(req: Request): Promise<Response> {
   await kv.set(["posts", post.id], post);
   await kv.set(["posts_by_persona", post.babyPersonaId, post.id], post.id);
 
-  return Response.json({ id: post.id, createdAt: post.createdAt }, { status: 201 });
+  return Response.json({ id: post.id, createdAt: post.createdAt }, {
+    status: 201,
+  });
 }
 
 export async function handleFeed(_req: Request): Promise<Response> {
