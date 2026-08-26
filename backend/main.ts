@@ -9,6 +9,12 @@ import {
   handleFeed,
   handleGetPost,
 } from "./src/routes/posts.ts";
+import {
+  handleCreateCommentReaction,
+  handleCreatePostReaction,
+  handleDeleteCommentReaction,
+  handleDeletePostReaction,
+} from "./src/routes/reactions.ts";
 import { handleLogin, handleLogout } from "./src/routes/sessions.ts";
 import { handleCreateSoothe, handleListSoothes } from "./src/routes/soothes.ts";
 
@@ -67,11 +73,32 @@ const routes: Route[] = [
   },
   {
     method: "POST",
+    pattern: new URLPattern({ pathname: "/api/posts/:id/reactions" }),
+    handler: (req, params) => handleCreatePostReaction(req, params.id!),
+  },
+  {
+    method: "DELETE",
+    pattern: new URLPattern({ pathname: "/api/posts/:id/reactions/:type" }),
+    handler: (req, params) =>
+      handleDeletePostReaction(req, params.id!, params.type!),
+  },
+  {
+    method: "POST",
+    pattern: new URLPattern({ pathname: "/api/comments/:id/reactions" }),
+    handler: (req, params) => handleCreateCommentReaction(req, params.id!),
+  },
+  {
+    method: "DELETE",
+    pattern: new URLPattern({ pathname: "/api/comments/:id/reactions/:type" }),
+    handler: (req, params) =>
+      handleDeleteCommentReaction(req, params.id!, params.type!),
+  },
+  {
+    method: "POST",
     pattern: new URLPattern({ pathname: "/api/ai/evaluate" }),
     handler: handleEvaluate,
   },
-  // TODO: /api/personas/*, /api/profile/me,
-  //       /api/posts/:id/reactions, /api/comments/:id/reactions, /api/follows,
+  // TODO: /api/personas/*, /api/profile/me, /api/follows,
   //       /api/follows/me, /api/ai/transform, /api/stamps を追加していく
 ];
 
