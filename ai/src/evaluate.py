@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Iterable
 
 
@@ -36,19 +37,6 @@ _BABY_YOUNG_CUES = (
     ("わんわん", -0.4),
     ("にゃんにゃん", -0.4),
     ("だっこ", -0.3),
-)
-
-_BABY_ADULT_CUES = (
-    ("仕様書", 0.4),
-    ("レビュー", 0.3),
-    ("実装", 0.4),
-    ("設計", 0.4),
-    ("検証", 0.4),
-    ("要件", 0.4),
-    ("業務", 0.4),
-    ("原因", 0.3),
-    ("対応", 0.3),
-    ("報告", 0.3),
 )
 
 _MOTHER_YOUNG_TARGET_CUES = (
@@ -73,8 +61,6 @@ _MOTHER_OLDER_TARGET_CUES = (
     ("ありがとうございます", 0.8),
     ("無理なさら", 0.7),
     ("ご自愛", 0.8),
-    ("業務", 0.4),
-    ("資料", 0.3),
 )
 
 _BABY_ENDING_PATTERNS = (
@@ -98,6 +84,20 @@ _TECHNICAL_FRAGMENT_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_])[A-Za-z0-9_]+(?:[./:+-][A-Za-z0-9_]+)*"
 )
 
+# 話題を変えても、同じ日本語の文体なら評価値を変えない。
+_TECHNICAL_JAPANESE_TERMS = (
+    "仕様書", "レビュー", "実装", "設計", "検証", "要件", "業務",
+    "原因", "対応", "報告", "資料",
+)
+
+# 判定用コピーから不可視の format 文字を除く。原文を変更する用途には使わない。
+def _normalize_for_evaluation(text: str) -> str:
+    """NFKC と不可視文字除去を適用した判定用コピーを返す。"""
+    normalized = unicodedata.normalize("NFKC", text)
+    return "".join(
+        character for character in normalized if unicodedata.category(character) != "Cf"
+    )
+
 
 def evaluate(body: str, persona_type: str) -> float:
     """本文を評価し、0.0〜6.0歳の範囲で小数1桁の目安を返す。
@@ -113,7 +113,7 @@ def evaluate(body: str, persona_type: str) -> float:
     if not isinstance(body, str):
         raise TypeError("body must be a string")
 
-    text = body.strip()
+    text = _normalize_for_evaluation(body).strip()
     if not text:
         raise ValueError("body must not be blank")
     if persona_type not in {"baby", "mother"}:
@@ -129,7 +129,6 @@ def _evaluate_baby_text(text: str) -> float:
 
     age = 4.1
     age += _bounded_cue_adjustment(text, _BABY_YOUNG_CUES, -2.8, 0.0)
-    age += _bounded_cue_adjustment(text, _BABY_ADULT_CUES, 0.0, 1.4)
 
     for pattern, adjustment in _BABY_ENDING_PATTERNS:
         if pattern.search(text):
@@ -192,6 +191,8 @@ def _japanese_script_counts(text: str) -> tuple[int, int, int]:
     """技術断片を除いた本文の、ひらがな・カタカナ・漢字数を返す。"""
 
     linguistic_text = _TECHNICAL_FRAGMENT_PATTERN.sub("", text)
+    for term in _TECHNICAL_JAPANESE_TERMS:
+        linguistic_text = linguistic_text.replace(term, "")
     hiragana = sum("ぁ" <= character <= "ゖ" for character in linguistic_text)
     katakana = sum("ァ" <= character <= "ヺ" for character in linguistic_text)
     kanji = sum(
