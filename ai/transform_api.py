@@ -5,8 +5,11 @@ AI文章変換（FR-AI-TRANS-*）に対応する。
 
 **AI文章評価（FR-AI-EVAL-*）はここには無い。**
 あちらは文章から年齢の目安を返すもので、`ai/src/evaluate.py` が担当している。
-判定APIが返す点数は、赤ちゃん語・ママ語の書き方になっているかという
-文体の適合度であって、年齢の目安ではない。
+
+**赤ちゃん語・ママ語になっているかは、ここでは判定しない。**
+人間監督の決定により、採点基準を先に決めない。ラベル付きの学習データから
+得られる判断と食い違うためである（例：お母さんに絵文字を必須にしてしまう）。
+文体の判定は、学習データに基づく方式で後から入れる。
 
 HTTP からは `ai/src/transform.py` を経由して `ai/app.py` が呼ぶ。
 
@@ -14,11 +17,9 @@ HTTP からは `ai/src/transform.py` を経由して `ai/app.py` が呼ぶ。
     POST /moderate   → moderate()    通信しない
     POST /evaluate   → ai/src/evaluate.py（このモジュールとは無関係）
 
-    判定API  moderate(text, mode=None)
+    判定API  moderate(text)
         形態素解析と辞書だけで判定する。**通信しない。**
-        mode を渡すと赤ちゃん語・ママ語らしさを0〜100で採点する。
-        100点なら allow、100点未満は rewrite_required、
-        問題のある語があれば点数に関わらず block。
+        問題のある語があれば block、無ければ allow。
         人間監督の決定により、判定はAPI制限を消費しない。
         投稿ごとに何度呼んでも枠を使わず、Gemini が落ちていても動く。
 
@@ -82,7 +83,6 @@ import time
 from typing import Any, Literal
 
 import external_moderation
-import style_score
 from moderation_rules import SEVERITY, check_rules, merge_verdicts, severer
 
 
@@ -107,10 +107,6 @@ USE_FEWSHOT = True
 #     ここは犯罪者・自殺者応援サイトではないのです」
 #   「マサカリは完全にブロックにしましょう。状況によって変えません」
 ALWAYS_BLOCK_CODES = {"self_harm", "harm_others", "harsh_criticism"}
-
-# 赤ちゃん語・ママ語として足りないときの理由コード。
-# 問題のある語があるわけではないので、他の理由コードとは性質が違う。
-STYLE_REASON_CODE = "style_mismatch"
 
 # ===== レート制限への対応 =====
 # 無料枠は1分あたりの回数が少なく、まとめて処理するとすぐ 429 になる。
@@ -609,54 +605,44 @@ def transform_text(mode: Mode, text: str, client=None) -> str:
 # モデレーション
 # ============================================================
 
-def moderate(text: str, mode: Mode | None = None) -> dict:
+def moderate(text: str) -> dict:
     """文章を判定する。判定APIの本体。
 
     **形態素解析と辞書だけで動く。通信しない。**
     人間監督の決定により、判定APIはAPI制限を消費しない。
     そのため投稿ごとに何度呼んでも枠を使わず、Gemini が落ちていても動く。
 
-    mode を渡すと、赤ちゃん語・ママ語にどれだけ近いかを採点する。
-    人間監督の決定による扱いは次のとおり。
+    見るのは「問題のある語があるか」だけである。
 
-        問題のある語がある → 度合いに関わらず block
-        100点              → allow
-        100点未満          → rewrite_required
+        問題のある語がある → block
+        無ければ           → allow
 
-    mode を渡さなければ採点せず、問題のある語だけを見る。
-    変換APIが変換前の原文を判定するときは、こちらを使う。
-    原文は赤ちゃん語で書かれていないのが当たり前だからである。
+    **赤ちゃん語・ママ語になっているかは見ない。**
+    人間監督の決定により、採点基準を先に決めない。ラベル付きの学習データから
+    得られる判断と食い違うためである。文体の判定は後から別の方式で入れる。
 
     LLMや外部モデレーションサービスは、ここでは使わない。
     辞書を育てるための道具として別に置いてある（moderate_by_llm）。
 
     Args:
         text: 判定したい文章
-        mode: "baby" / "mother" / None（採点しない）
 
     Returns:
-        {
-          "action": "allow"|"rewrite_required"|"block",
-          "reasonCodes": [...],
-          "score": 0〜100 または None,      # mode を渡したときだけ数値
-          "styleChecks": {項目名: 満たしたか} または None,
-        }
+        {"action": "allow"|"block", "reasonCodes": [...]}
 
     Raises:
-        ValueError: text が空、または mode が "baby"/"mother"/None のどれでもない
+        ValueError: text が空、または150文字を超える
     """
     if not text or not text.strip():
         raise ValueError("空文字列は判定できません。")
-    if mode is not None and mode not in style_score.CHECKS:
-        raise ValueError(f"mode は 'baby' または 'mother' です。指定: {mode}")
     if len(text) > MAX_INPUT_CHARS:
         raise ValueError(
             f"入力は{MAX_INPUT_CHARS}文字以内です。現在: {len(text)}文字"
         )
-    return _judge(text, mode)
+    return _judge(text)
 
 
-def _judge(text: str, mode: Mode | None) -> dict:
+def _judge(text: str) -> dict:
     """判定の中身。文字数の上限は見ない。
 
     上限は判定APIの入口（moderate）が見る。ここを分けてあるのは、
@@ -671,28 +657,10 @@ def _judge(text: str, mode: Mode | None) -> dict:
     if ALWAYS_BLOCK_CODES & set(verdict["reasonCodes"]):
         verdict["action"] = "block"
 
-    result = {
+    return {
         "action": verdict["action"],
         "reasonCodes": verdict["reasonCodes"],
-        "score": None,
-        "styleChecks": None,
     }
-    if mode is None:
-        return result
-
-    scored = style_score.score(mode, text)
-    result["score"] = scored["score"]
-    result["styleChecks"] = scored["checks"]
-
-    # 問題のある語があれば、点数に関わらず block のまま。
-    # 人間監督の決定：「問題のある言葉を使っていたら度合いに関わらずBlock」
-    if result["action"] == "block":
-        return result
-
-    if scored["score"] < 100:
-        result["action"] = "rewrite_required"
-        result["reasonCodes"] = sorted(set(result["reasonCodes"] + [STYLE_REASON_CODE]))
-    return result
 
 
 # ============================================================
@@ -776,17 +744,12 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     rewrite_required として返すだけで、変換のやり直しはしない。
     やり直すかどうかは仕様の決めごとなので、このモジュールでは決めない。
 
-    **変換前も採点する。** 原文が赤ちゃん語・ママ語として100点でなければ
-    rewrite_required になる。これは仕様書 FR-AI-TRANS-004 の
-    「原文のままでは利用できないことを利用者に伝える」にあたる。
-    利用者は返ってきた transformedText を使えばよい。
-
     Gemini を呼ぶのは変換の1回だけである。判定はローカルなので枠を使わない。
     規則で block が確定した場合は1回も呼ばない。
 
-    判定の内訳（styleChecks）は返さない。
-    仕様書 FR-AI-TRANS-009 が、変換の応答に判定の内部情報を
-    含めないよう求めているためである。
+    **原文が赤ちゃん語・ママ語になっているかは判定しない。**
+    人間監督の決定により採点基準を置かないため、仕様書 FR-AI-TRANS-004 の
+    「原文のままでは利用できないことを利用者に伝える」は現時点で未実装である。
 
     変換結果が150文字を超えたときは、作り直さずに rewrite_required を返す。
     人間監督の決定：「変換後150文字超えたら弾いて書き直させましょう」
@@ -799,13 +762,7 @@ def transform(mode: Mode, text: str, client=None) -> dict:
         判定API  150文字（自分で書くときはこちら）
 
     Returns:
-        {
-          "action": ...,
-          "transformedText": str | None,
-          "reasonCodes": [...],
-          "score": 原文の点数,
-          "transformedScore": 変換結果の点数（返さないときは None）,
-        }
+        {"action": ..., "transformedText": str | None, "reasonCodes": [...]}
     """
     _validate_input(mode, text)
 
@@ -814,14 +771,12 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     # ローカルだけで弾ける入力までキーのエラーで落ちる。
     # 生成APIが止まっている間も判定だけで動かせるようにするため、
     # 通信の準備は本当に必要になるまでしない。
-    before = _judge(text, mode)
+    before = _judge(text)
     if before["action"] == "block":
         return {
             "action": "block",
             "transformedText": None,
             "reasonCodes": before["reasonCodes"],
-            "score": before["score"],
-            "transformedScore": None,
         }
 
     client = client or build_client()
@@ -832,15 +787,13 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     # 仕様書 FR-MOD-002 は変換後の出力もモデレーションの対象としている。
     # 長さで先に打ち切ると、この経路だけ判定を飛ばすことになる。
     # 文字数の上限は見ない。変換結果は150文字を超えうるが、判定は必ず通す。
-    after = _judge(converted, mode)
+    after = _judge(converted)
     reason_codes = sorted(set(before["reasonCodes"] + after["reasonCodes"]))
     if after["action"] == "block":
         return {
             "action": "block",
             "transformedText": None,
             "reasonCodes": reason_codes,
-            "score": before["score"],
-            "transformedScore": after["score"],
         }
 
     # 変換結果が長すぎたら、作り直さずに書き直してもらう。
@@ -852,8 +805,6 @@ def transform(mode: Mode, text: str, client=None) -> dict:
             "action": "rewrite_required",
             "transformedText": None,
             "reasonCodes": sorted(set(reason_codes + ["too_long"])),
-            "score": before["score"],
-            "transformedScore": after["score"],
         }
 
     # 変換前と変換後で重いほうを採り、理由コードは両方を合わせる。
@@ -863,8 +814,6 @@ def transform(mode: Mode, text: str, client=None) -> dict:
         "action": severer(before["action"], after["action"]),
         "transformedText": converted,
         "reasonCodes": reason_codes,
-        "score": before["score"],
-        "transformedScore": after["score"],
     }
 
 
@@ -889,8 +838,8 @@ def parse_args() -> argparse.Namespace:
                         help="判定を行わず、変換だけを試します。")
     parser.add_argument("--judge-only", action="store_true",
                         help=(
-                            "変換せず、判定APIだけを試します。"
-                            "赤ちゃん語・ママ語らしさの点数も出ます。通信しません。"
+                            "変換せず、判定APIだけを試します。通信しません。"
+                            "--mode は判定では使いません。"
                         ))
     parser.add_argument("--min-interval", type=float, default=MIN_INTERVAL_SECONDS,
                         help=(
@@ -927,7 +876,7 @@ def main() -> int:
 
     # 判定APIは通信しないので、APIキーが無くても動く
     if args.judge_only:
-        verdicts = [dict(moderate(text, args.mode), input=text) for text in texts]
+        verdicts = [dict(moderate(text), input=text) for text in texts]
         print(json.dumps(verdicts if len(texts) > 1 else verdicts[0],
                          ensure_ascii=False, indent=2))
         return 0

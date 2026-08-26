@@ -84,7 +84,7 @@ def test_判定APIは通信せずに判定する(no_network, text, action, codes
     verdict = T.moderate(text)
     assert verdict["action"] == action
     assert verdict["reasonCodes"] == codes
-    assert verdict["score"] is None, "mode を渡していないので採点しない"
+    assert set(verdict) == {"action", "reasonCodes"}, "書き方は判定しない"
 
 
 def test_判定APIはclientを受け取らない():
@@ -307,9 +307,9 @@ def test_入力の上限は判定150文字_変換100文字(calls):
 
 
 def test_判定APIは150文字まで受ける(no_network):
-    T.moderate("あ" * 150, "baby")
+    T.moderate("あ" * 150)
     with pytest.raises(ValueError) as err:
-        T.moderate("あ" * 151, "baby")
+        T.moderate("あ" * 151)
     assert "150" in str(err.value)
 
 
@@ -322,7 +322,6 @@ def test_変換後blockなら変換結果を返さない(calls):
     """変換によって新しくNG語が生じた場合。
 
     変換前は問題なしなので、後段の判定が効いていないと素通りする。
-    原文を満点の赤ちゃん語にして、点数由来の指摘が混ざらないようにしてある。
     """
     calls["script"].append("おまえなんてきえろなのー")
     result = T.transform("baby", "ねむいのー", client=object())
@@ -330,7 +329,6 @@ def test_変換後blockなら変換結果を返さない(calls):
     assert result["action"] == "block"
     assert result["transformedText"] is None
     assert result["reasonCodes"] == ["ng_word"]
-    assert result["score"] == 100, "原文は赤ちゃん語として満点"
 
 
 def test_変換後のマサカリも弾く(calls):
@@ -353,7 +351,6 @@ def test_変換後のrewrite_requiredを捨てない(calls, monkeypatch):
     捨てると、変換後に判定する意味がなくなる。
 
     いまの辞書は rewrite_required を返さないので、判定を差し替えて確かめる。
-    どちらの文も満点の赤ちゃん語にして、点数由来の指摘が混ざらないようにしてある。
     """
     verdicts = iter([
         {"action": "allow", "reasonCodes": []},

@@ -42,13 +42,10 @@ class TransformResponse(BaseModel):
     action: str                      # "allow" | "rewrite_required" | "block"
     transformedText: str | None
     reasonCodes: list[str]
-    score: int | None                # 原文が赤ちゃん語・ママ語になっている度合い
-    transformedScore: int | None     # 変換結果の同じ度合い
 
 
 class ModerateRequest(BaseModel):
     body: str
-    personaType: str | None = None   # "baby" | "mother" | 未指定なら採点しない
 
 
 class ModerateResponse(BaseModel):
@@ -56,7 +53,6 @@ class ModerateResponse(BaseModel):
 
     action: str
     reasonCodes: list[str]
-    score: int | None
 
 
 @app.get("/health")
@@ -93,11 +89,10 @@ def post_transform(req: TransformRequest):
 def post_moderate(req: ModerateRequest):
     """判定だけを行う。通信しないので、推論APIが止まっていても動く。"""
     try:
-        result = moderate(req.body, req.personaType)
+        result = moderate(req.body)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return ModerateResponse(
         action=result["action"],
         reasonCodes=result["reasonCodes"],
-        score=result["score"],
     )

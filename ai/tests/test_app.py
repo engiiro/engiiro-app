@@ -51,45 +51,39 @@ def test_health():
 # /moderate。通信しないことが最も大事
 # ============================================================
 
-def test_moderate_満点ならallow(no_network):
-    res = client.post("/moderate", json={"body": "ねむいのー。", "personaType": "baby"})
+def test_moderate_問題が無ければallow(no_network):
+    res = client.post("/moderate", json={"body": "ねむいのー。"})
     assert res.status_code == 200
-    assert res.json() == {"action": "allow", "reasonCodes": [], "score": 100}
+    assert res.json() == {"action": "allow", "reasonCodes": []}
 
 
-def test_moderate_満点未満はrewrite_required(no_network):
-    res = client.post("/moderate", json={"body": "眠い。", "personaType": "baby"})
-    body = res.json()
-    assert body["action"] == "rewrite_required"
-    assert body["score"] < 100
-    assert body["reasonCodes"] == ["style_mismatch"]
+def test_moderate_書き方は判定しない(no_network):
+    """人間監督の決定により採点基準を置かない。
+
+    赤ちゃん語になっていない文も、問題のある語が無ければ通す。
+    文体の判定は、ラベル付きの学習データに基づく方式で後から入れる。
+    """
+    res = client.post("/moderate", json={"body": "眠い。"})
+    assert res.json() == {"action": "allow", "reasonCodes": []}
 
 
 def test_moderate_個人情報はblock(no_network):
-    res = client.post("/moderate", json={"body": "山田太郎です。", "personaType": "baby"})
+    res = client.post("/moderate", json={"body": "山田太郎です。"})
     body = res.json()
     assert body["action"] == "block"
     assert body["reasonCodes"] == ["personal_data"]
 
 
-def test_moderate_personaTypeなしなら採点しない(no_network):
-    res = client.post("/moderate", json={"body": "眠い。"})
-    body = res.json()
-    assert body["score"] is None
-    assert body["action"] == "allow"
-
-
 def test_moderate_判定の内訳は返さない(no_network):
     """FR-MOD-034：拒否時の表示に判定の内部情報を含めない。"""
-    body = client.post("/moderate",
-                       json={"body": "眠い。", "personaType": "baby"}).json()
-    assert set(body) == {"action", "reasonCodes", "score"}
+    body = client.post("/moderate", json={"body": "眠い。"}).json()
+    assert set(body) == {"action", "reasonCodes"}
 
 
 def test_moderate_150文字まで受ける(no_network):
-    assert client.post("/moderate", json={"body": "あ" * 150,
-                                          "personaType": "baby"}).status_code == 200
-    res = client.post("/moderate", json={"body": "あ" * 151, "personaType": "baby"})
+    assert client.post("/moderate",
+                       json={"body": "あ" * 150}).status_code == 200
+    res = client.post("/moderate", json={"body": "あ" * 151})
     assert res.status_code == 400
     assert "150" in res.json()["detail"]
 
@@ -102,21 +96,18 @@ def test_moderate_空文字列は400(no_network):
 # /transform
 # ============================================================
 
-def test_transform_変換結果と点数を返す(fake_transform):
+def test_transform_変換結果を返す(fake_transform):
     res = client.post("/transform", json={"body": "眠い。", "style": "baby"})
     assert res.status_code == 200
     body = res.json()
     assert body["transformedText"] == "へんかんしたのー"
-    assert body["action"] == "rewrite_required", "原文が赤ちゃん語ではない"
-    assert body["score"] < 100
-    assert body["transformedScore"] == 100
+    assert body["action"] == "allow"
 
 
 def test_transform_判定の内訳は返さない(fake_transform):
     """FR-AI-TRANS-009：変換の応答に判定の内部情報を含めない。"""
     body = client.post("/transform", json={"body": "眠い。", "style": "baby"}).json()
-    assert set(body) == {"action", "transformedText", "reasonCodes",
-                         "score", "transformedScore"}
+    assert set(body) == {"action", "transformedText", "reasonCodes"}
 
 
 def test_transform_入力上限は100文字(fake_transform):

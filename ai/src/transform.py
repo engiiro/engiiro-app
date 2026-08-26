@@ -29,7 +29,7 @@ def transform(body: str, style: str) -> dict:
         style: "baby" または "mother"
 
     Returns:
-        {"action", "transformedText", "reasonCodes", "score", "transformedScore"}
+        {"action", "transformedText", "reasonCodes"}
 
     Raises:
         ValueError: 入力が不正（空文字列、style 違い、100文字超）
@@ -38,23 +38,22 @@ def transform(body: str, style: str) -> dict:
     return transform_api.transform(style, body)
 
 
-def moderate(body: str, persona_type: str | None = None) -> dict:
+def moderate(body: str) -> dict:
     """文章を判定する。**通信しない。**
 
-    persona_type を渡すと、赤ちゃん語・ママ語の書き方になっている度合いを
-    0〜100で採点する。100点なら allow、100点未満は rewrite_required、
-    問題のある語があれば点数に関わらず block。
+    問題のある語があれば block、無ければ allow。
+    **赤ちゃん語・ママ語になっているかは判定しない。** 人間監督の決定により
+    採点基準を置かないため（学習データから得られる判断と食い違う）。
 
     変換APIが止まっていても動く。利用回数の制限も受けない。
 
     Args:
         body: 判定したい文章。150文字以内
-        persona_type: "baby" / "mother" / None（採点しない）
 
     Returns:
-        {"action", "reasonCodes", "score", "styleChecks"}
+        {"action", "reasonCodes"}
 
     Raises:
-        ValueError: 入力が不正（空文字列、persona_type 違い、150文字超）
+        ValueError: 入力が不正（空文字列、150文字超）
     """
-    return transform_api.moderate(body, persona_type)
+    return transform_api.moderate(body)
