@@ -82,7 +82,9 @@ def no_network(monkeypatch):
 ])
 def test_判定APIは通信せずに判定する(no_network, text, action, codes):
     verdict = T.moderate(text)
-    assert verdict == {"action": action, "reasonCodes": codes}
+    assert verdict["action"] == action
+    assert verdict["reasonCodes"] == codes
+    assert verdict["score"] is None, "mode を渡していないので採点しない"
 
 
 def test_判定APIはclientを受け取らない():
@@ -208,33 +210,32 @@ def test_規則でblockなら1回も呼ばない(calls):
 
 
 # ============================================================
-# 150文字超過。最大1回だけ作り直す
+# 文字数の制限は入力側だけ
 # ============================================================
+# 人間監督の決定：
+#   「生成時は150文字を超過していいです。入力のみ150文字制限を設けます」
+# 出力に上限を置くと、超えたときに作り直してAPIを2回呼ぶことになっていた。
 
-def test_長すぎたら1回だけ作り直す(calls):
-    long = "あ" * (T.MAX_OUTPUT_CHARS + 1)
-    calls["script"].extend([long, "みじかいよ"])
+def test_出力が長くても作り直さない(calls):
+    long = "あ" * (T.MAX_INPUT_CHARS * 3)
+    calls["script"].append(long)
     result = T.transform("baby", "テストです", client=object())
 
-    assert result["transformedText"] == "みじかいよ"
-    assert len(calls["log"]) == 2, "変換→再変換の2回"
-    # 2回目は、作り直しの指示が入った内容で呼ばれる
-    assert calls["log"][0]["text"] != calls["log"][1]["text"]
+    assert result["transformedText"] == long, "切り詰めも作り直しもしない"
+    assert len(calls["log"]) == 1, "変換の1回だけ"
 
 
-def test_作り直しても長ければ切り捨てずに諦める(calls):
-    calls["script"].append("あ" * (T.MAX_OUTPUT_CHARS + 1))
-    with pytest.raises(RuntimeError) as err:
-        T.transform("baby", "テストです", client=object())
-    assert "切り捨てはしません" in str(err.value)
+def test_入力の上限は150文字(calls):
+    assert T.MAX_INPUT_CHARS == 150
+    with pytest.raises(ValueError) as err:
+        T.transform("baby", "あ" * 151, client=object())
+    assert "150" in str(err.value)
+    assert calls["log"] == []
 
 
-def test_150文字ちょうどは作り直さない(calls):
-    exact = "あ" * T.MAX_OUTPUT_CHARS
-    calls["script"].append(exact)
-    result = T.transform("baby", "テストです", client=object())
-    assert result["transformedText"] == exact
-    assert len(calls["log"]) == 1
+def test_出力の上限は持たない():
+    assert not hasattr(T, "MAX_OUTPUT_CHARS"), \
+        "出力に上限を戻すと、作り直しでAPIを2回呼ぶことになる"
 
 
 # ============================================================

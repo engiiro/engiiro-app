@@ -2,8 +2,11 @@
 
 Issue #15 の実装。仕様書の FR-AI-001「文章評価と文章変換は別の機能」に対応する。
 
-    判定API  moderate(text)
+    判定API  moderate(text, mode=None)
         形態素解析と辞書だけで判定する。**通信しない。**
+        mode を渡すと赤ちゃん語・ママ語らしさを0〜100で採点する。
+        100点なら allow、100点未満は rewrite_required、
+        問題のある語があれば点数に関わらず block。
         人間監督の決定により、判定はAPI制限を消費しない。
         投稿ごとに何度呼んでも枠を使わず、Gemini が落ちていても動く。
 
@@ -37,7 +40,7 @@ APIキー:
     このモジュールは、失敗したときに代わりの結果を作らない。
     例外を投げて呼び出し側へ返す。何を表示するかは呼び出し側が決める。
 
-    ValueError   … 入力が不正（空文字列、mode 違い、500文字超）
+    ValueError   … 入力が不正（空文字列、mode 違い、150文字超）
     RuntimeError … APIが使えない。文面で理由が分かるようにしてある
                      ・レート制限（待っても解除されなかった場合）
                      ・1日あたりの上限（待っても回復しない）
@@ -66,12 +69,16 @@ import time
 from typing import Any, Literal
 
 import external_moderation
+import style_score
 from moderation_rules import SEVERITY, check_rules, merge_verdicts, severer
 
 
 MODEL_NAME = "gemini-3.5-flash-lite"
-MAX_INPUT_CHARS = 500
-MAX_OUTPUT_CHARS = 150
+# 文字数の制限は入力側だけに置く。人間監督の決定：
+#   「生成時は150文字を超過していいです。入力のみ150文字制限を設けます」
+# 出力に上限を置くと、超えたときに作り直してAPIを2回呼ぶことになる。
+# 上限を外したことで、変換1回あたりの呼び出しがちょうど1回になった。
+MAX_INPUT_CHARS = 150
 TEMPERATURE = 0.6
 USE_FEWSHOT = True
 
@@ -81,6 +88,10 @@ USE_FEWSHOT = True
 #     ここは犯罪者・自殺者応援サイトではないのです」
 #   「マサカリは完全にブロックにしましょう。状況によって変えません」
 ALWAYS_BLOCK_CODES = {"self_harm", "harm_others", "harsh_criticism"}
+
+# 赤ちゃん語・ママ語として足りないときの理由コード。
+# 問題のある語があるわけではないので、他の理由コードとは性質が違う。
+STYLE_REASON_CODE = "style_mismatch"
 
 # ===== レート制限への対応 =====
 # 無料枠は1分あたりの回数が少なく、まとめて処理するとすぐ 429 になる。
@@ -110,7 +121,6 @@ INSTRUCTIONS = {
 ルール:
 - 入力への返答や助言はしない。入力文そのものを言い換える
 - 原文に無い出来事・事実・解決策は足さない
-- 150文字以内
 - 絵文字、Markdown、説明、注釈は出力しない
 - 変換後の文章だけを出力する
 
@@ -160,7 +170,6 @@ INSTRUCTIONS = {
 - 相手の能力や人格を否定する表現は、責めない表現へ変える
 - 技術用語、製品名、数値、英数字はそのまま残す
   （赤ちゃん側と違い、お母さんは大人の言葉で話すため）
-- 150文字以内
 - Markdown、説明、注釈は出力しない
 - 変換後の文章だけを出力する
 
@@ -523,7 +532,7 @@ def call_with_retry(client, system_instruction, contents, *, json_mode=False, on
 # 変換
 # ============================================================
 
-def build_contents(mode: Mode, text: str, retry: bool = False) -> list[dict]:
+def build_contents(mode: Mode, text: str) -> list[dict]:
     """会話のターンとして組み立てる。
 
     ルール本文は system_instruction 側に置くので、ここには含めない。
@@ -535,10 +544,7 @@ def build_contents(mode: Mode, text: str, retry: bool = False) -> list[dict]:
             turns.append({"role": "user", "parts": [{"text": f"{ASK[mode]}\n\n{source_text}"}]})
             turns.append({"role": "model", "parts": [{"text": target_text}]})
 
-    ask = f"{ASK[mode]}\n\n{text}"
-    if retry:
-        ask += "\n\n（前回は150文字を超えました。意味を保って、必ず150文字以内へ短くしてください。）"
-    turns.append({"role": "user", "parts": [{"text": ask}]})
+    turns.append({"role": "user", "parts": [{"text": f"{ASK[mode]}\n\n{text}"}]})
     return turns
 
 
@@ -561,7 +567,7 @@ def _validate_input(mode: str, text: str):
         raise ValueError(f"入力は{MAX_INPUT_CHARS}文字以内です。現在: {len(text)}文字")
 
 
-def transform_text(mode: Mode, text: str, retry: bool = False, client=None) -> str:
+def transform_text(mode: Mode, text: str, client=None) -> str:
     """文章を指定のスタイルへ言い換える。判定はしない。
 
     Issue #15 が指定した関数。戻り値は str のまま変えていない。
@@ -570,7 +576,7 @@ def transform_text(mode: Mode, text: str, retry: bool = False, client=None) -> s
     client = client or build_client()
 
     try:
-        response = call_with_retry(client, INSTRUCTIONS[mode], build_contents(mode, text, retry))
+        response = call_with_retry(client, INSTRUCTIONS[mode], build_contents(mode, text))
     except Exception as exc:
         _raise_readable(exc)
 
@@ -584,29 +590,76 @@ def transform_text(mode: Mode, text: str, retry: bool = False, client=None) -> s
 # モデレーション
 # ============================================================
 
-def moderate(text: str) -> dict:
+def moderate(text: str, mode: Mode | None = None) -> dict:
     """文章を判定する。判定APIの本体。
 
     **形態素解析と辞書だけで動く。通信しない。**
     人間監督の決定により、判定APIはAPI制限を消費しない。
     そのため投稿ごとに何度呼んでも枠を使わず、Gemini が落ちていても動く。
 
+    mode を渡すと、赤ちゃん語・ママ語にどれだけ近いかを採点する。
+    人間監督の決定による扱いは次のとおり。
+
+        問題のある語がある → 度合いに関わらず block
+        100点              → allow
+        100点未満          → rewrite_required
+
+    mode を渡さなければ採点せず、問題のある語だけを見る。
+    変換APIが変換前の原文を判定するときは、こちらを使う。
+    原文は赤ちゃん語で書かれていないのが当たり前だからである。
+
     LLMや外部モデレーションサービスは、ここでは使わない。
     辞書を育てるための道具として別に置いてある（moderate_by_llm）。
 
+    Args:
+        text: 判定したい文章
+        mode: "baby" / "mother" / None（採点しない）
+
     Returns:
-        {"action": "allow"|"rewrite_required"|"block", "reasonCodes": [...]}
+        {
+          "action": "allow"|"rewrite_required"|"block",
+          "reasonCodes": [...],
+          "score": 0〜100 または None,      # mode を渡したときだけ数値
+          "styleChecks": {項目名: 満たしたか} または None,
+        }
+
+    Raises:
+        ValueError: text が空、または mode が "baby"/"mother"/None のどれでもない
     """
     if not text or not text.strip():
         raise ValueError("空文字列は判定できません。")
+    if mode is not None and mode not in style_score.CHECKS:
+        raise ValueError(f"mode は 'baby' または 'mother' です。指定: {mode}")
 
     verdict = check_rules(text)
 
-    # 人間監督の決定により、自傷・他害は例外なく block。
+    # 人間監督の決定により、自傷・他害・マサカリは例外なく block。
     # 辞書側の設定を書き換えられても倒れるように、ここで二重に見る。
     if ALWAYS_BLOCK_CODES & set(verdict["reasonCodes"]):
         verdict["action"] = "block"
-    return {"action": verdict["action"], "reasonCodes": verdict["reasonCodes"]}
+
+    result = {
+        "action": verdict["action"],
+        "reasonCodes": verdict["reasonCodes"],
+        "score": None,
+        "styleChecks": None,
+    }
+    if mode is None:
+        return result
+
+    scored = style_score.score(mode, text)
+    result["score"] = scored["score"]
+    result["styleChecks"] = scored["checks"]
+
+    # 問題のある語があれば、点数に関わらず block のまま。
+    # 人間監督の決定：「問題のある言葉を使っていたら度合いに関わらずBlock」
+    if result["action"] == "block":
+        return result
+
+    if scored["score"] < 100:
+        result["action"] = "rewrite_required"
+        result["reasonCodes"] = sorted(set(result["reasonCodes"] + [STYLE_REASON_CODE]))
+    return result
 
 
 # ============================================================
@@ -690,9 +743,8 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     rewrite_required として返すだけで、変換のやり直しはしない。
     やり直すかどうかは仕様の決めごとなので、このモジュールでは決めない。
 
-    Gemini を呼ぶ回数は、規則で block が確定した場合を除き
-    最低3回（変換前判定・変換・変換後判定）である。
-    150文字を超えて作り直した場合は4回になる。
+    Gemini を呼ぶのは変換の1回だけである。判定はローカルなので枠を使わない。
+    規則で block が確定した場合は1回も呼ばない。
 
     Returns:
         {"action": ..., "transformedText": str | None, "reasonCodes": [...]}
@@ -704,11 +756,8 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     if before["action"] == "block":
         return {"action": "block", "transformedText": None, "reasonCodes": before["reasonCodes"]}
 
+    # 出力の文字数は見ない。人間監督の決定により上限は入力側だけに置く。
     converted = transform_text(mode, text, client=client)
-    if len(converted) > MAX_OUTPUT_CHARS:
-        converted = transform_text(mode, text, retry=True, client=client)
-    if len(converted) > MAX_OUTPUT_CHARS:
-        raise RuntimeError(f"再生成後も{len(converted)}文字です。切り捨てはしません。")
 
     after = moderate(converted)
     if after["action"] == "block":
@@ -747,6 +796,11 @@ def parse_args() -> argparse.Namespace:
                         help="1行1件のテキストファイル。空行と # で始まる行は飛ばします。")
     parser.add_argument("--no-moderation", action="store_true",
                         help="判定を行わず、変換だけを試します。")
+    parser.add_argument("--judge-only", action="store_true",
+                        help=(
+                            "変換せず、判定APIだけを試します。"
+                            "赤ちゃん語・ママ語らしさの点数も出ます。通信しません。"
+                        ))
     parser.add_argument("--min-interval", type=float, default=MIN_INTERVAL_SECONDS,
                         help=(
                             "API呼び出しの最短間隔（秒）。"
@@ -779,6 +833,13 @@ def main() -> int:
             ]
     else:
         texts = [args.text]
+
+    # 判定APIは通信しないので、APIキーが無くても動く
+    if args.judge_only:
+        verdicts = [dict(moderate(text, args.mode), input=text) for text in texts]
+        print(json.dumps(verdicts if len(texts) > 1 else verdicts[0],
+                         ensure_ascii=False, indent=2))
+        return 0
 
     try:
         client = build_client()
