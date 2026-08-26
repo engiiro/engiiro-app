@@ -30,6 +30,13 @@ def test_baby_kana_and_childish_ending_are_younger_than_adult_text() -> None:
     assert childish_text < adult_text
 
 
+def test_sentence_ending_score_does_not_depend_on_sentence_order() -> None:
+    ending_first = evaluate("ねむいのー。おなかすいた。", "baby")
+    ending_last = evaluate("おなかすいた。ねむいのー。", "baby")
+
+    assert ending_first == ending_last
+
+
 def test_mother_language_for_small_child_is_younger_than_polite_encouragement() -> None:
     young_target = evaluate("よしよし、できたね", "mother")
     older_target = evaluate(
