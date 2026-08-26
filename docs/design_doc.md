@@ -69,7 +69,7 @@
 
 ### 3.3 アカウント登録時に登録する情報
 
-アカウント登録時、利用者は次を入力する（4.1 S1、7.1参照）。
+アカウント登録時、利用者は次を入力する（4.1 S1、7.2参照）。
 
 | 項目 | 公開・非公開 | 用途 |
 | --- | --- | --- |
@@ -467,7 +467,7 @@ create table persona_age_estimates (
 
 | テーブル                 | 主なカラム                                                                                                    | 制約・備考                                                                                                                                                 |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accounts`               | `id (PK)`, `login_id (UNIQUE)`, `password_hash`, `birth_date`, `created_at`                                     | 認証情報・生年月日など内部専用の最小限の情報のみ。`login_id`はログイン用の入力ID、`id`はサーバ内部管理用のUUID（3.3、7.1参照）。いずれも外部レスポンスには一切含めない。`birth_date`は本人専用プロフィール（`GET /api/profile/me`）以外では返さない。 |
+| `accounts`               | `id (PK)`, `login_id (UNIQUE)`, `password_hash`, `birth_date`, `created_at`                                     | 認証情報・生年月日など内部専用の最小限の情報のみ。`login_id`はログイン用の入力ID、`id`はサーバ内部管理用のUUID（3.3、7.2参照）。いずれも外部レスポンスには一切含めない。`birth_date`は本人専用プロフィール（`GET /api/profile/me`）以外では返さない。 |
 | `baby_personas`          | `id (PK)`, `account_id (FK -> accounts.id)`, `nickname`, `bio`, `created_at`                                    | `account_id`は内部専用。他ユーザーには非公開（FR-PERSONA-003）。1アカウントにつき1行のみ。                                                                  |
 | `mother_personas`        | `id (PK)`, `account_id (FK -> accounts.id)`, `nickname`, `bio`, `created_at`                                    | 同上。`baby_personas`とは別テーブルとして独立させ、ニックネーム等の見た目が互いに影響しないようにする（FR-PERSONA-002）。                                    |
 | `stamps`                 | `id (PK)`, `name`, `image_url`, `created_at`                                                                    | 投稿に挿入できるスタンプのカタログ（マスタ）。おぎゃー／よしよし／まんば等のリアクションとは別物。                                                          |
@@ -523,11 +523,67 @@ create table persona_age_estimates (
 | `POST /api/comments/:id/reactions`                             | あやすへのリアクション（対象が赤ちゃんとしてのあやすなら3種、お母さんとしてのあやすなら`ばぶー`のみ）。同一種類は1人5回まで | 必要 |
 | `DELETE /api/comments/:id/reactions/:type`                     | あやすへのリアクションを1回分取り消す                                                                             | 必要 |
 | `POST /api/follows`                                            | ペルソナ（赤ちゃん or お母さん）をフォロー                                                                        | 必要 |
+| `DELETE /api/follows`                                          | ペルソナのフォローを解除                                                                                          | 必要 |
 | `GET /api/follows/me`                                          | 自分がフォローしているペルソナ一覧の取得（本人のみ参照可。フォロワー一覧・人数を返すAPIは提供しない）             | 必要 |
 | `POST /api/ai/evaluate`                                        | 文章の「赤ちゃん度／お母さん度」を年齢の目安としてAIが評価                                                        | 必要 |
 | `POST /api/ai/transform`                                       | 文章を赤ちゃん言葉・お母さん言葉に変換                                                                            | 必要 |
 
-### 7.1 リクエスト/レスポンス例
+### 7.1 共通のオブジェクト形式
+
+複数のエンドポイントで繰り返し登場する形は、ここで定義してから参照する。7.2節のJSON例で`"Bubble"`のように型名だけを文字列で書いている箇所は、この節で定義した形のオブジェクト（または配列）がそのまま入ることを示す略記であり、実際の値が文字列になるわけではない。
+
+**`PublicPersona`（公開ペルソナ）**
+
+```json
+{ "id": "string", "kind": "baby | mother", "nickname": "string" }
+```
+
+> `accountId`は含めない（FR-COMMON-005）。
+
+**`ReactionState`（リアクションの状態）**
+
+```json
+{
+  "counts": { "ogya": "number", "yoshiyoshi": "number", "manma": "number", "babu": "number" },
+  "mine": { "ogya": "number", "yoshiyoshi": "number", "manma": "number", "babu": "number" }
+}
+```
+
+> `counts`は種類ごとの全利用者の合計送信回数、`mine`は閲覧者自身の送信回数（0〜5、FR-REACT-010〜012）。値が0の種類はキーごと省略してよい。誰が押したかは持たない（FR-PERSONA-003と同じ非連結の考え方）。未ログイン時は`mine`が全て0になる。
+
+**`Bubble`（バブル）**
+
+```json
+{
+  "id": "string",
+  "author": "PublicPersona（常にkind: baby, FR-POST-003）",
+  "body": "string",
+  "stamps": [{ "stampId": "string", "position": "number (optional)" }],
+  "createdAt": "string (ISO8601)",
+  "reactions": "ReactionState",
+  "isMine": "boolean（閲覧者自身の投稿か。未ログイン時は常にfalse）",
+  "affinity": "number（タイムラインの優先表示の材料。FR-FEED-003）",
+  "sootheCount": "number（直接ついたあやすの件数。あやすへの返信は含まない）"
+}
+```
+
+**`Soothe`（あやす）**
+
+```json
+{
+  "id": "string",
+  "bubbleId": "string",
+  "author": "PublicPersona",
+  "body": "string",
+  "createdAt": "string (ISO8601)",
+  "reactions": "ReactionState",
+  "isMine": "boolean",
+  "replyToSootheId": "string (optional, お母さんとしてのあやすへの返信のとき)",
+  "replyCount": "number（このあやすに直接ついたあやすの件数）"
+}
+```
+
+### 7.2 リクエスト/レスポンス例
 
 **`POST /api/accounts`（アカウント登録、両ペルソナを同時作成）**
 
@@ -542,8 +598,8 @@ create table persona_age_estimates (
 }
 // Response
 {
-  "babyPersona": { "id": "string", "nickname": "string" },
-  "motherPersona": { "id": "string", "nickname": "string" },
+  "baby": { "id": "string", "kind": "baby", "nickname": "string" },
+  "mother": { "id": "string", "kind": "mother", "nickname": "string" },
   "token": "string（JWT。以降のAuthorizationヘッダーで使う）",
   "createdAt": "string (ISO8601)"
 }
@@ -563,8 +619,8 @@ create table persona_age_estimates (
 }
 // Response（成功時、200）
 {
-  "babyPersona": { "id": "string", "nickname": "string" },
-  "motherPersona": { "id": "string", "nickname": "string" },
+  "baby": { "id": "string", "kind": "baby", "nickname": "string" },
+  "mother": { "id": "string", "kind": "mother", "nickname": "string" },
   "token": "string（JWT）"
 }
 // Response（失敗時、401）
@@ -588,21 +644,26 @@ create table persona_age_estimates (
 ```json
 // Response
 {
-  "birthDate": "string (YYYY-MM-DD)",
-  "babyPersona": {
-    "id": "string",
-    "nickname": "string",
-    "estimatedAge": "number"
+  "baby": {
+    "persona": { "id": "string", "kind": "baby", "nickname": "string" },
+    "status": {
+      "months": "number（何か月相当かの目安）",
+      "label": "string（画面表示用の文言）",
+      "axis": "string（例：赤ちゃん度（文章の幼さ））",
+      "sampleCount": "number（算出のもとにした本文の件数。0なら未算出）"
+    }
   },
-  "motherPersona": {
-    "id": "string",
-    "nickname": "string",
-    "estimatedAge": "number"
-  }
+  "mother": {
+    "persona": { "id": "string", "kind": "mother", "nickname": "string" },
+    "status": { "...": "babyと同形。axisはお母さん向けの文言になる" }
+  },
+  "birthDate": "string (YYYY-MM-DD)",
+  "followingBabyCount": "number（フォロー中の赤ちゃんペルソナ数）",
+  "followingMotherCount": "number（フォロー中のお母さんペルソナ数）"
 }
 ```
 
-> 本人しか呼べないエンドポイント。赤ちゃんペルソナとお母さんペルソナが同一アカウントに紐づくという情報や生年月日を返すのは、この本人専用エンドポイントだけという原則（FR-PERSONA-005、FR-PRIV-007）。
+> 本人しか呼べないエンドポイント。赤ちゃんペルソナとお母さんペルソナが同一アカウントに紐づくという情報や生年月日を返すのは、この本人専用エンドポイントだけという原則（FR-PERSONA-005、FR-PRIV-007）。`status`はAI文章評価が使えない場合`null`を返し、その場合もプロフィール自体は表示できる（NFR-002）。赤ちゃん度はそのペルソナのバブルと赤ちゃんとしてのあやすから、お母さん度はそのペルソナのお母さんとしてのあやすのみから算出する（FR-PROFILE-003〜004）。`followingBabyCount`・`followingMotherCount`は本人がフォロー**している**数であり、フォローされている数（フォロワー数）ではない（FR-FOLLOW-004〜005）。
 
 **`GET /api/stamps`（スタンプカタログ取得）**
 
@@ -615,6 +676,21 @@ create table persona_age_estimates (
 }
 ```
 
+**`GET /api/personas/baby/:id` / `GET /api/personas/mother/:id`（他人の公開プロフィール取得）**
+
+```json
+// Response
+{
+  "persona": { "id": "string", "kind": "baby | mother", "nickname": "string" },
+  "liked": "boolean（閲覧者がこのペルソナをフォローしているか。未ログインなら常にfalse）",
+  "isMe": "boolean（閲覧者自身のペルソナか）"
+}
+```
+
+> `accountId`・生年月日・もう一方のペルソナへの導線は一切含めない（FR-PERSONA-003〜004、FR-PRIV-007）。未ログインでも取得できる（FR-GUEST-003）。
+>
+> **未確定**：推定年齢（`status`相当）をこのレスポンスに含めるかはPO判断待ち（Issue #30 A-3）。含める場合は`GET /api/profile/me`と同じ`status`の形を追加する想定。
+
 **`POST /api/posts`（バブル作成、常に赤ちゃんペルソナとして投稿。テキスト＋スタンプ）**
 
 ```json
@@ -626,10 +702,7 @@ create table persona_age_estimates (
   ]
 }
 // Response（保存できた場合）
-{
-  "id": "string",
-  "createdAt": "string (ISO8601)"
-}
+"Bubble"
 // Response（AI評価の閾値未達、またはモデレーション違反で拒否された場合）
 {
   "error": "string（匿名性保護等の趣旨が伝わる理由。内部の判定コードや辞書内容は含めない, FR-MOD-033〜034）"
@@ -648,30 +721,22 @@ create table persona_age_estimates (
 }
 // Response
 {
-  "posts": [
-    { "postId": "string", "similarityScore": "number (optional)" }
-  ],
+  "recommended": ["Bubble", "..."],
+  "rest": ["Bubble", "..."],
   "nextCursor": "string (optional)"
 }
 ```
 
-> `Authorization`ヘッダーがある場合はそのトークンから閲覧者の赤ちゃんペルソナを解決し、推定年齢・投稿傾向に近い、他の赤ちゃんペルソナのバブルを優先的に含めて並べる（FR-FEED-002〜003）。**ヘッダーがない場合（未ログイン）は、似た境遇レコメンドを行わず新着順で返す**（FR-GUEST-004、4.4参照）。削除済みのバブルは含めない（FR-FEED-004）。新着順との混ぜ方や具体的なランキングロジックは実装フェーズで検討。
+> `Authorization`ヘッダーがある場合はそのトークンから閲覧者の赤ちゃんペルソナを解決し、推定年齢・投稿傾向に近い、他の赤ちゃんペルソナのバブルを`recommended`として優先的に切り出し、残りを`rest`に含めて並べる（FR-FEED-002〜003）。自分のバブルは`recommended`には含めない。**ヘッダーがない場合（未ログイン）は、似た境遇レコメンドを行わず`recommended`を空にして新着順で`rest`のみ返す**（FR-GUEST-004、4.4参照）。削除済みのバブルは含めない（FR-FEED-004）。具体的なランキングロジック・`recommended`の件数は実装フェーズで検討。
 
 **`GET /api/posts/:id`（バブル詳細取得）**
 
 ```json
 // Response
-{
-  "id": "string",
-  "babyPersonaId": "string",
-  "body": "string",
-  "stamps": [{ "stampId": "string", "position": "number" }],
-  "reactionCounts": { "ogya": "number", "yoshiyoshi": "number", "manma": "number" },
-  "createdAt": "string (ISO8601)"
-}
+"Bubble"
 ```
 
-> 削除済みのバブルを要求した場合は取得できない（FR-POST-006）。未ログインでも取得できる（FR-GUEST-002、4.4参照）。
+> 削除済みのバブルを要求した場合は取得できない（FR-POST-006）。未ログインでも取得できる（FR-GUEST-002、4.4参照）。`isMine`・`reactions.mine`は閲覧者ごとに変わる値で、未ログイン時は`isMine: false`・`reactions.mine`は全て0になる（FR-GUEST-005）。
 
 **`DELETE /api/posts/:id`（自分のバブルの削除）**
 
@@ -689,38 +754,26 @@ create table persona_age_estimates (
 ```json
 // Request
 {
-  "personaType": "baby | mother",
+  "personaKind": "baby | mother",
   "body": "string",
-  "replyToCommentId": "string (optional, お母さんとしてのあやすに返信する場合に指定)"
+  "replyToSootheId": "string (optional, お母さんとしてのあやすに返信する場合に指定)"
 }
 // Response（保存できた場合）
-{
-  "id": "string",
-  "createdAt": "string (ISO8601)"
-}
+"Soothe"
 ```
 
-> あやすの発信ペルソナはトークンの`accountId`と`personaType`から解決するため、`personaId`はリクエストに含めない。`replyToCommentId`が指すあやすが`personaType: "mother"`の場合、このリクエストの`personaType`は`"baby"`以外を受け付けない。`"mother"`を指定した場合はサーバ側で拒否する（クライアント側の非表示だけに頼らない、FR-COMMENT-005〜007）。
+> あやすの発信ペルソナはトークンの`accountId`と`personaKind`から解決するため、`personaId`はリクエストに含めない。`replyToSootheId`が指すあやすが`personaKind: "mother"`の場合、このリクエストの`personaKind`は`"baby"`以外を受け付けない。`"mother"`を指定した場合はサーバ側で拒否する（クライアント側の非表示だけに頼らない、FR-COMMENT-005〜007）。
 
 **`GET /api/posts/:id/comments`（あやす一覧取得）**
 
 ```json
 // Response
 {
-  "comments": [
-    {
-      "id": "string",
-      "personaType": "baby | mother",
-      "personaId": "string",
-      "body": "string",
-      "replyToCommentId": "string (optional)",
-      "createdAt": "string (ISO8601)"
-    }
-  ]
+  "soothes": ["Soothe", "..."]
 }
 ```
 
-> 発信者情報から、同一アカウントのもう一方のペルソナを特定できる情報は含まない（FR-COMMENT-004）。未ログインでも取得できる（FR-GUEST-002、4.4参照）。
+> 返すのはバブルに**直接**ついたあやすだけで、あやすへの返信は含まない（あやすへの返信は`GET /api/comments/:id/comments`相当の口で扱う。10章のオープンイシュー参照）。発信者情報から、同一アカウントのもう一方のペルソナを特定できる情報は含まない（FR-COMMENT-004）。未ログインでも取得できる（FR-GUEST-002、4.4参照）。
 
 **`POST /api/posts/:id/reactions`（バブルへのやさしいリアクション）**
 
@@ -731,32 +784,22 @@ create table persona_age_estimates (
 }
 // Response（保存できた場合）
 {
-  "id": "string",
-  "createdAt": "string (ISO8601)",
-  "counts": {
-    "ogya": { "total": "number", "mine": "number" },
-    "yoshiyoshi": { "total": "number", "mine": "number" },
-    "manma": { "total": "number", "mine": "number" }
-  }
+  "reactions": "ReactionState"
 }
-// Response（同一種類で自分の送信回数が5回に達している場合）
+// Response（対象外の組み合わせ、自分の投稿への自演、5回上限などで拒否された場合）
 {
-  "error": "string（上限に達している旨のメッセージ）"
+  "error": "string"
 }
 ```
 
-> リアクションを送った利用者はトークンから解決するため、リクエストボディに`reactorAccountId`は含めない。バブルに対しては通常リアクション3種（おぎゃー／よしよし／まんま）のみを受け付ける。`babu`を指定した場合は保存しない（FR-REACT-003〜004、FR-REACT-007）。同一利用者・同一種類のリアクションは5回まで送信でき、6回目は保存しない（FR-REACT-010〜011）。応答の`counts`は、種類ごとの全利用者の合計送信回数（`total`）と自分の送信回数（`mine`）を含む（FR-REACT-012）。
+> リアクションを送った利用者はトークンから解決するため、リクエストボディに`reactorAccountId`は含めない。バブルに対しては通常リアクション3種（おぎゃー／よしよし／まんま）のみを受け付ける。`babu`を指定した場合は保存しない（FR-REACT-003〜004、FR-REACT-007）。同一利用者・同一種類のリアクションは5回まで送信でき、6回目は保存しない（FR-REACT-010〜011）。応答の`reactions`は、保存後の対象の`ReactionState`全体（全利用者の合計と自分の送信回数）を返す（FR-REACT-012）。
 
 **`DELETE /api/posts/:id/reactions/:type`（バブルへのリアクションを1回分取り消す）**
 
 ```json
 // Response
 {
-  "counts": {
-    "ogya": { "total": "number", "mine": "number" },
-    "yoshiyoshi": { "total": "number", "mine": "number" },
-    "manma": { "total": "number", "mine": "number" }
-  }
+  "reactions": "ReactionState"
 }
 ```
 
@@ -771,12 +814,7 @@ create table persona_age_estimates (
 }
 // Response（保存できた場合）
 {
-  "id": "string",
-  "createdAt": "string (ISO8601)",
-  "counts": {
-    "type": "number (total)",
-    "mine": "number"
-  }
+  "reactions": "ReactionState"
 }
 ```
 
@@ -787,10 +825,7 @@ create table persona_age_estimates (
 ```json
 // Response
 {
-  "counts": {
-    "type": "number (total)",
-    "mine": "number"
-  }
+  "reactions": "ReactionState"
 }
 ```
 
@@ -801,7 +836,7 @@ create table persona_age_estimates (
 ```json
 // Request
 {
-  "targetPersonaType": "baby | mother",
+  "targetPersonaKind": "baby | mother",
   "targetPersonaId": "string"
 }
 // Response
@@ -812,13 +847,26 @@ create table persona_age_estimates (
 
 > フォローする利用者はトークンから解決するため、`followerAccountId`はリクエストに含めない。補足：フォロワー（自分を誰がフォローしているか、その人数も含む）を返すエンドポイントは意図的に用意しない。
 
+**`DELETE /api/follows`（ペルソナのフォローを解除）**
+
+```json
+// Request
+{
+  "targetPersonaKind": "baby | mother",
+  "targetPersonaId": "string"
+}
+// Response（204 No Content）
+```
+
+> フォローしていない相手に対して要求しても、その場合は何も起きない（べき等）。
+
 **`GET /api/follows/me`（自分がフォローしているペルソナ一覧）**
 
 ```json
 // Response
 {
-  "followingBabies": [{ "babyPersonaId": "string" }],
-  "followingMothers": [{ "motherPersonaId": "string" }]
+  "baby": ["PublicPersona", "..."],
+  "mother": ["PublicPersona", "..."]
 }
 ```
 
@@ -828,7 +876,7 @@ create table persona_age_estimates (
 // Request
 {
   "body": "string",
-  "personaType": "baby | mother"
+  "personaKind": "baby | mother"
 }
 // Response
 {
@@ -936,6 +984,9 @@ create table persona_age_estimates (
   か）は担当エンジニアが決定。
 - 未ログインユーザーに興味関心・技術領域を入力させてタイムラインをレコメンドする拡張機能（3.6参照）の詳細。
 - 本格運用を見据えた場合のスケーラビリティ・モデレーション体制の検討。
+- あやすへの返信一覧を取得する口（`GET /api/comments/:id` ＋ `GET /api/comments/:id/comments`相当）、および本人・他人のプロフィールの投稿／あやす一覧を取得する口（`GET /api/profile/me/activity`・`GET /api/personas/{kind}/:id/activity`相当）。フロントエンド側でモック実装が先行しており、要否・詳細仕様はPO判断待ち（Issue #30）。
+- 自分のバブル・あやすに自分自身でリアクションできないという制約（フロントエンド側で先行実装）。仕様書のFR-REACT系に未反映のため、要否をPOに確認する必要がある。
+- バブルの既読管理（閲覧者がそのバブルを開いたかどうか）。フロントエンドの`Bubble.read`に対応するDB設計・APIが未検討。
 
 ---
 
