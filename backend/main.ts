@@ -1,48 +1,91 @@
-import { closePool } from "./src/lib/db.ts";
 import { handleCreateAccount } from "./src/routes/accounts.ts";
 import { handleEvaluate } from "./src/routes/ai.ts";
+import { closePool } from "./src/lib/db.ts";
+import { error, type Route } from "./src/lib/http.ts";
 import { handleHealth } from "./src/routes/health.ts";
-import { handleCreatePost, handleFeed } from "./src/routes/posts.ts";
+import {
+  handleCreatePost,
+  handleDeletePost,
+  handleFeed,
+  handleGetPost,
+} from "./src/routes/posts.ts";
 import { handleLogin, handleLogout } from "./src/routes/sessions.ts";
 
-// 最低限のルーティング。エンドポイントが増えてきたら、フレームワーク（Hono等）の導入も検討。
-// エンドポイント一覧は docs/design_doc.md 7章を参照。
-async function router(req: Request): Promise<Response> {
-  const { pathname } = new URL(req.url);
-
-  if (pathname === "/health" && req.method === "GET") {
-    return await handleHealth();
-  }
-
-  if (pathname === "/api/accounts" && req.method === "POST") {
-    return await handleCreateAccount(req);
-  }
-
-  if (pathname === "/api/sessions" && req.method === "POST") {
-    return await handleLogin(req);
-  }
-
-  if (pathname === "/api/sessions" && req.method === "DELETE") {
-    return await handleLogout(req);
-  }
-
-  if (pathname === "/api/posts" && req.method === "POST") {
-    return await handleCreatePost(req);
-  }
-
-  if (pathname === "/api/posts/feed" && req.method === "GET") {
-    return await handleFeed(req);
-  }
-
-  if (pathname === "/api/ai/evaluate" && req.method === "POST") {
-    return await handleEvaluate(req);
-  }
-
-  // TODO: /api/personas/*, /api/profile/me, /api/posts/:id, /api/posts/:id/comments,
+// エンドポイント一覧・リクエスト/レスポンス形式は docs/design_doc.md 7章を参照。
+// 増えてきたらフレームワーク（Hono等）の導入も検討する。
+const routes: Route[] = [
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/health" }),
+    handler: handleHealth,
+  },
+  {
+    method: "POST",
+    pattern: new URLPattern({ pathname: "/api/accounts" }),
+    handler: handleCreateAccount,
+  },
+  {
+    method: "POST",
+    pattern: new URLPattern({ pathname: "/api/sessions" }),
+    handler: handleLogin,
+  },
+  {
+    method: "DELETE",
+    pattern: new URLPattern({ pathname: "/api/sessions" }),
+    handler: handleLogout,
+  },
+  {
+    method: "POST",
+    pattern: new URLPattern({ pathname: "/api/posts" }),
+    handler: handleCreatePost,
+  },
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/posts/feed" }),
+    handler: handleFeed,
+  },
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/posts/:id" }),
+    handler: (req, params) => handleGetPost(req, params.id!),
+  },
+  {
+    method: "DELETE",
+    pattern: new URLPattern({ pathname: "/api/posts/:id" }),
+    handler: (req, params) => handleDeletePost(req, params.id!),
+  },
+  {
+    method: "POST",
+    pattern: new URLPattern({ pathname: "/api/ai/evaluate" }),
+    handler: handleEvaluate,
+  },
+  // TODO: /api/personas/*, /api/profile/me, /api/posts/:id/comments,
   //       /api/posts/:id/reactions, /api/comments/:id/reactions, /api/follows,
   //       /api/follows/me, /api/ai/transform, /api/stamps を追加していく
+];
 
-  return Response.json({ error: "Not Found" }, { status: 404 });
+async function router(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+
+  let pathMatched = false;
+  for (const route of routes) {
+    const match = route.pattern.exec(url);
+    if (!match) continue;
+    pathMatched = true;
+    if (route.method !== request.method) continue;
+
+    try {
+      return await route.handler(request, match.pathname.groups);
+    } catch (err) {
+      // ハンドラが投げた例外をここで受ける。受けないと接続が切られ、
+      // クライアント側には原因の分からないエラーだけが残る。
+      console.error(`[${request.method} ${url.pathname}]`, err);
+      return error("internal server error", 500);
+    }
+  }
+
+  if (pathMatched) return error("method not allowed", 405);
+  return error("not found", 404);
 }
 
 const port = Number(Deno.env.get("PORT") ?? 8000);
