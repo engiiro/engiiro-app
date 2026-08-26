@@ -8,9 +8,11 @@ AI文章変換（FR-AI-TRANS-*）に対応する。
 判定APIが返す点数は、赤ちゃん語・ママ語の書き方になっているかという
 文体の適合度であって、年齢の目安ではない。
 
-**このモジュールはまだ HTTP へ繋がっていない。**
-`ai/app.py` の `/transform` は `ai/src/transform.py` の置き換え実装を呼ぶ。
-繋ぎ込みは別の作業として残っている。
+HTTP からは `ai/src/transform.py` を経由して `ai/app.py` が呼ぶ。
+
+    POST /transform  → transform()   Gemini を使う
+    POST /moderate   → moderate()    通信しない
+    POST /evaluate   → ai/src/evaluate.py（このモジュールとは無関係）
 
     判定API  moderate(text, mode=None)
         形態素解析と辞書だけで判定する。**通信しない。**
@@ -651,7 +653,17 @@ def moderate(text: str, mode: Mode | None = None) -> dict:
         raise ValueError(
             f"入力は{MAX_INPUT_CHARS}文字以内です。現在: {len(text)}文字"
         )
+    return _judge(text, mode)
 
+
+def _judge(text: str, mode: Mode | None) -> dict:
+    """判定の中身。文字数の上限は見ない。
+
+    上限は判定APIの入口（moderate）が見る。ここを分けてあるのは、
+    変換結果を判定するときに上限へ引っかかると、
+    **変換後モデレーションが飛んでしまう**ためである。
+    変換結果は150文字を超えうるが、判定は必ず通す。
+    """
     verdict = check_rules(text)
 
     # 人間監督の決定により、自傷・他害・マサカリは例外なく block。
@@ -779,6 +791,8 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     変換結果が150文字を超えたときは、作り直さずに rewrite_required を返す。
     人間監督の決定：「変換後150文字超えたら弾いて書き直させましょう」
     理由コードは too_long。変換結果は返さない。
+    **長さを見る前に変換後の判定を行う。** 長さで先に打ち切ると、
+    仕様書 FR-MOD-002 の変換後モデレーションをこの経路だけ飛ばすことになる。
 
     入力の上限は変換と判定で違う。
         変換API  100文字（赤ちゃん語へ開くと1.4〜1.7倍に伸びるため）
@@ -800,7 +814,7 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     # ローカルだけで弾ける入力までキーのエラーで落ちる。
     # 生成APIが止まっている間も判定だけで動かせるようにするため、
     # 通信の準備は本当に必要になるまでしない。
-    before = moderate(text, mode)
+    before = _judge(text, mode)
     if before["action"] == "block":
         return {
             "action": "block",
@@ -814,6 +828,21 @@ def transform(mode: Mode, text: str, client=None) -> dict:
 
     converted = transform_text(mode, text, client=client)
 
+    # **長さを見る前に、必ず変換後の判定を行う。**
+    # 仕様書 FR-MOD-002 は変換後の出力もモデレーションの対象としている。
+    # 長さで先に打ち切ると、この経路だけ判定を飛ばすことになる。
+    # 文字数の上限は見ない。変換結果は150文字を超えうるが、判定は必ず通す。
+    after = _judge(converted, mode)
+    reason_codes = sorted(set(before["reasonCodes"] + after["reasonCodes"]))
+    if after["action"] == "block":
+        return {
+            "action": "block",
+            "transformedText": None,
+            "reasonCodes": reason_codes,
+            "score": before["score"],
+            "transformedScore": after["score"],
+        }
+
     # 変換結果が長すぎたら、作り直さずに書き直してもらう。
     # 人間監督の決定：「変換後150文字超えたら弾いて書き直させましょう」
     # 作り直すとAPIを2回呼ぶことになる。入力を100文字までにしてあるので、
@@ -822,18 +851,7 @@ def transform(mode: Mode, text: str, client=None) -> dict:
         return {
             "action": "rewrite_required",
             "transformedText": None,
-            "reasonCodes": sorted(set(before["reasonCodes"] + ["too_long"])),
-            "score": before["score"],
-            "transformedScore": None,
-        }
-
-    after = moderate(converted, mode)
-    reason_codes = sorted(set(before["reasonCodes"] + after["reasonCodes"]))
-    if after["action"] == "block":
-        return {
-            "action": "block",
-            "transformedText": None,
-            "reasonCodes": reason_codes,
+            "reasonCodes": sorted(set(reason_codes + ["too_long"])),
             "score": before["score"],
             "transformedScore": after["score"],
         }

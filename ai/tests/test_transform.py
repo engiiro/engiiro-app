@@ -263,6 +263,21 @@ def test_出力が長すぎたら作り直さず書き直してもらう(calls):
     assert len(calls["log"]) == 1, "作り直さないので変換の1回だけ"
 
 
+def test_出力が長すぎても変換後の判定は飛ばさない(calls):
+    """長さで先に打ち切ると、変換後モデレーションを飛ばすことになる。
+
+    Codex-Local::akatonboboonboon の指摘（#21::…::05 の1番）。
+    仕様書 FR-MOD-002 は変換後の出力もモデレーションの対象としている。
+    NG語を含んだうえで長い変換結果は、too_long ではなく block である。
+    """
+    calls["script"].append("おまえなんてきえろ" + "のー" * 80)
+    result = T.transform("baby", "ねむいのー", client=object())
+
+    assert result["action"] == "block", "長さより先にNG語を見ること"
+    assert result["reasonCodes"] == ["ng_word"]
+    assert result["transformedText"] is None
+
+
 def test_出力の上限ちょうどは通る(calls):
     exact = "あ" * T.MAX_OUTPUT_CHARS
     calls["script"].append(exact)
