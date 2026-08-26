@@ -159,6 +159,34 @@ def test_おれを含む語を一人称と取り違えない():
     assert S.score("baby", "たおれそうなのー。")["score"] == 100
 
 
+@pytest.mark.parametrize("text", [
+    "つらかったね 😊", "がんばったね 🍀", "そうなのね ☺️", "よかったね ❤",
+    "よしよし 🌸", "えらいね 💛",
+    "つらかったね (˘ω˘)", "そうね (^^)", "なるほどね (´ω｀)",
+], ids=lambda t: t[-4:])
+def test_絵文字と顔文字を拾う(text):
+    assert S._has_emoji(text)
+
+
+@pytest.mark.parametrize("text", [
+    # 矢印。エンジニアは日常的に使う
+    "A → B の順で直したね", "矢印は→こう書くね", "a ⇒ b だね",
+    # 括弧書き。顔文字ではない
+    "そうだったのね (150文字)", "(FR-MOD-001) を直したね", "なおしたのね (テスト)",
+    # その他の記号
+    "①をやったね", "5℃だったね", "✓ を付けたね",
+    "つらかったね",
+], ids=lambda t: t[:12])
+def test_絵文字でないものを絵文字と数えない(text):
+    """Codex-Local::akatonboboonboon の指摘（#21::…::03 の3番）。
+
+    範囲を広く取ると「A → B の順で直したね」だけで
+    お母さん語の絵文字の条件を満たしてしまう。
+    """
+    assert not S._has_emoji(text)
+    assert "emoji" in S.score("mother", text)["failed"]
+
+
 def test_文末の絵文字で語尾の判定が外れない():
     """「つらかったね (˘ω˘)」の語尾は「ね」であって「)」ではない。"""
     assert "ending" not in S.score("mother", "つらかったね (˘ω˘)")["failed"]
