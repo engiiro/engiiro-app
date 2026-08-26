@@ -462,11 +462,18 @@ def find_personal_data(text: str) -> list[str]:
 # ============================================================
 
 def check_rules(text: str) -> dict:
-    """規則ベースの判定をまとめて行う。
+    """辞書に載っている語が使われていないかを調べる。
+
+    **返すのは "allow" か "block" だけである。**
+    人間監督の決定により、自傷・他害・NG語・個人情報・マサカリは
+    すべて block になったため、ここから rewrite_required は出ない。
+
+    rewrite_required は、赤ちゃん語・ママ語としての点数が足りないときに
+    transform_api.moderate が付ける。語の判定とは別の話である。
 
     Returns:
         {
-          "action": "allow" | "rewrite_required" | "block",
+          "action": "allow" | "block",
           "reasonCodes": [...],
           "details": {...},   # どの語・種類で引っかかったか。ログには残さないこと
         }

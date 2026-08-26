@@ -743,28 +743,58 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     rewrite_required として返すだけで、変換のやり直しはしない。
     やり直すかどうかは仕様の決めごとなので、このモジュールでは決めない。
 
+    **変換前も採点する。** 原文が赤ちゃん語・ママ語として100点でなければ
+    rewrite_required になる。これは仕様書 FR-AI-TRANS-004 の
+    「原文のままでは利用できないことを利用者に伝える」にあたる。
+    利用者は返ってきた transformedText を使えばよい。
+
     Gemini を呼ぶのは変換の1回だけである。判定はローカルなので枠を使わない。
     規則で block が確定した場合は1回も呼ばない。
 
+    判定の内訳（styleChecks）は返さない。
+    仕様書 FR-AI-TRANS-009 が、変換の応答に判定の内部情報を
+    含めないよう求めているためである。
+
     Returns:
-        {"action": ..., "transformedText": str | None, "reasonCodes": [...]}
+        {
+          "action": ...,
+          "transformedText": str | None,
+          "reasonCodes": [...],
+          "score": 原文の点数,
+          "transformedScore": 変換結果の点数（block のときは None）,
+        }
     """
     _validate_input(mode, text)
-    client = client or build_client()
 
-    before = moderate(text)
+    # **判定を先に行う。クライアントを作るのはその後。**
+    # 先にクライアントを作ると、APIキーが無いときに
+    # ローカルだけで弾ける入力までキーのエラーで落ちる。
+    # 生成APIが止まっている間も判定だけで動かせるようにするため、
+    # 通信の準備は本当に必要になるまでしない。
+    before = moderate(text, mode)
     if before["action"] == "block":
-        return {"action": "block", "transformedText": None, "reasonCodes": before["reasonCodes"]}
+        return {
+            "action": "block",
+            "transformedText": None,
+            "reasonCodes": before["reasonCodes"],
+            "score": before["score"],
+            "transformedScore": None,
+        }
+
+    client = client or build_client()
 
     # 出力の文字数は見ない。人間監督の決定により上限は入力側だけに置く。
     converted = transform_text(mode, text, client=client)
 
-    after = moderate(converted)
+    after = moderate(converted, mode)
+    reason_codes = sorted(set(before["reasonCodes"] + after["reasonCodes"]))
     if after["action"] == "block":
         return {
             "action": "block",
             "transformedText": None,
-            "reasonCodes": sorted(set(before["reasonCodes"] + after["reasonCodes"])),
+            "reasonCodes": reason_codes,
+            "score": before["score"],
+            "transformedScore": after["score"],
         }
 
     # 変換前と変換後で重いほうを採り、理由コードは両方を合わせる。
@@ -773,7 +803,9 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     return {
         "action": severer(before["action"], after["action"]),
         "transformedText": converted,
-        "reasonCodes": sorted(set(before["reasonCodes"] + after["reasonCodes"])),
+        "reasonCodes": reason_codes,
+        "score": before["score"],
+        "transformedScore": after["score"],
     }
 
 

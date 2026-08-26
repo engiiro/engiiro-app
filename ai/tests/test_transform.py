@@ -155,8 +155,9 @@ def test_おかしな入力はAPIを呼ぶ前にValueError(calls, mode, text):
 
 def test_入力の上限ちょうどは通る(calls):
     calls["script"].append("へんかんしたよ")
-    assert T.transform("baby", "あ" * T.MAX_INPUT_CHARS,
-                       client=object())["action"] == "allow"
+    result = T.transform("baby", "あ" * T.MAX_INPUT_CHARS, client=object())
+    assert result["action"] != "block", "上限ちょうどは弾かれない"
+    assert result["transformedText"] == "へんかんしたよ"
 
 
 # ============================================================
@@ -177,6 +178,36 @@ def test_APIキーが無くても判定APIは動く(no_network, monkeypatch):
     """
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     assert T.moderate("消えたい。")["action"] == "block"
+
+
+def test_APIキーが無くても規則でblockできる入力は弾ける(monkeypatch):
+    """判定はクライアントを作る前に行うこと。
+
+    Codex-Local::akatonboboonboon の指摘（#21::…::02 の2番）。
+    先にクライアントを作ると、ローカルだけで弾ける入力まで
+    キーのエラーで落ちる。生成APIが止まっている間も
+    判定だけで動かせる必要があるため、通信の準備は後回しにする。
+    """
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+
+    def boom(*args, **kwargs):
+        raise AssertionError("判定より先にクライアントを作っています")
+
+    monkeypatch.setattr(T, "build_client", boom)
+    monkeypatch.setattr(T, "_call_api", boom)
+
+    result = T.transform("baby", "消えたい。")
+    assert result["action"] == "block"
+    assert result["reasonCodes"] == ["self_harm"]
+    assert result["transformedText"] is None
+
+
+def test_APIキーが無いと変換の必要な入力ではRuntimeError(monkeypatch):
+    """弾けない入力は、結局クライアントが要る。"""
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    with pytest.raises(RuntimeError) as err:
+        T.transform("baby", "テストが全部落ちた。")
+    assert "GOOGLE_API_KEY" in str(err.value)
 
 
 def test_APIキーが無くてもclientを渡せば変換できる(calls, monkeypatch):
@@ -204,8 +235,9 @@ def test_通常の変換はGeminiを1回だけ呼ぶ(calls):
 
 def test_規則でblockなら1回も呼ばない(calls):
     result = T.transform("baby", "消えたい。", client=object())
-    assert result == {"action": "block", "transformedText": None,
-                      "reasonCodes": ["self_harm"]}
+    assert result["action"] == "block"
+    assert result["transformedText"] is None
+    assert result["reasonCodes"] == ["self_harm"]
     assert calls["log"] == [], "規則で決まったのにAPIを呼んでいる"
 
 
@@ -245,23 +277,25 @@ def test_出力の上限は持たない():
 def test_変換後blockなら変換結果を返さない(calls):
     """変換によって新しくNG語が生じた場合。
 
-    変換前は allow なので、後段の判定が効いていないと素通りする。
+    変換前は問題なしなので、後段の判定が効いていないと素通りする。
+    原文を満点の赤ちゃん語にして、点数由来の指摘が混ざらないようにしてある。
     """
-    calls["script"].append("おまえなんてきえろ")
-    result = T.transform("baby", "テストです", client=object())
+    calls["script"].append("おまえなんてきえろなのー")
+    result = T.transform("baby", "ねむいのー", client=object())
 
     assert result["action"] == "block"
     assert result["transformedText"] is None
     assert result["reasonCodes"] == ["ng_word"]
+    assert result["score"] == 100, "原文は赤ちゃん語として満点"
 
 
 def test_変換後のマサカリも弾く(calls):
-    """変換前は allow、変換によってマサカリ語が生じた場合。
+    """変換前は問題なし、変換によってマサカリ語が生じた場合。
 
     後段の判定が効いていないと素通りする。
     """
-    calls["script"].append("まったく無能なのー")
-    result = T.transform("baby", "テストです", client=object())
+    calls["script"].append("まったく カスなのー")
+    result = T.transform("baby", "ねむいのー", client=object())
 
     assert result["action"] == "block"
     assert result["reasonCodes"] == ["harsh_criticism"]
@@ -275,8 +309,7 @@ def test_変換後のrewrite_requiredを捨てない(calls, monkeypatch):
     捨てると、変換後に判定する意味がなくなる。
 
     いまの辞書は rewrite_required を返さないので、判定を差し替えて確かめる。
-    仕様書 FR-AI-TRANS-002 が3状態を要求しているため、
-    状態が復活したときに壊れていないようにしておく。
+    どちらの文も満点の赤ちゃん語にして、点数由来の指摘が混ざらないようにしてある。
     """
     verdicts = iter([
         {"action": "allow", "reasonCodes": []},
@@ -284,12 +317,12 @@ def test_変換後のrewrite_requiredを捨てない(calls, monkeypatch):
     ])
     monkeypatch.setattr(T, "check_rules", lambda text: next(verdicts))
 
-    calls["script"].append("へんかんしたよ")
-    result = T.transform("baby", "テストです", client=object())
+    calls["script"].append("へんかんしたのー")
+    result = T.transform("baby", "ねむいのー", client=object())
 
     assert result["action"] == "rewrite_required"
     assert result["reasonCodes"] == ["sexual_explicit"]
-    assert result["transformedText"] == "へんかんしたよ", \
+    assert result["transformedText"] == "へんかんしたのー", \
         "block ではないので、変換結果は返す"
 
 
@@ -300,8 +333,8 @@ def test_変換前と変換後の理由コードを合わせる(calls, monkeypat
     ])
     monkeypatch.setattr(T, "check_rules", lambda text: next(verdicts))
 
-    calls["script"].append("へんかんしたよ")
-    result = T.transform("baby", "テストです", client=object())
+    calls["script"].append("へんかんしたのー")
+    result = T.transform("baby", "ねむいのー", client=object())
     assert result["action"] == "block"
     assert result["reasonCodes"] == ["ng_word", "sexual_explicit"]
 
@@ -313,8 +346,8 @@ def test_変換前rewrite_requiredは変換後allowでも残る(calls, monkeypat
     ])
     monkeypatch.setattr(T, "check_rules", lambda text: next(verdicts))
 
-    calls["script"].append("やさしいことばになったよ")
-    result = T.transform("baby", "テストです", client=object())
+    calls["script"].append("やさしくなったのー")
+    result = T.transform("baby", "ねむいのー", client=object())
     assert result["action"] == "rewrite_required", \
         "変換で表面が和らいでも、元の投稿への指摘は消えない"
     assert result["reasonCodes"] == ["sexual_explicit"]
@@ -328,8 +361,8 @@ def test_変換後の判定も通信しない(calls, monkeypatch):
     monkeypatch.setattr(T.external_moderation, "check",
                         lambda text: (_ for _ in ()).throw(
                             AssertionError("変換後の判定で外部へ送っています")))
-    calls["script"].append("へんかんしたよ")
-    assert T.transform("baby", "テストです", client=object())["action"] == "allow"
+    calls["script"].append("へんかんしたのー")
+    assert T.transform("baby", "ねむいのー", client=object())["action"] == "allow"
 
 
 # ============================================================
