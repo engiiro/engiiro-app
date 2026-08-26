@@ -54,19 +54,43 @@ _EMOJI = re.compile(
     "]"
 )
 
-# (^^) (˘ω˘) (´ω｀) のような形。
+# (^^) (˘ω˘) (´ω｀) (T_T) (>_<) のような形。
 #
-# **括弧の中身に英数字・かな・漢字が入っていたら顔文字ではない。**
-# この条件が無いと「そうだったのね (150文字)」「(FR-MOD-001)」まで
+# 括弧の中身で見分ける。**括弧書きを顔文字と誤認しないこと。**
+# 条件が無いと「そうだったのね (150文字)」「(FR-MOD-001)」まで
 # 顔文字と判定される（実測で確認）。
-# 代わりに (T_T) のような英字を使う顔文字は拾えなくなるが、
-# 括弧書きを顔文字と誤認するほうが困るので、拾わないほうを選んだ。
-_KAOMOJI = re.compile(r"[(（][^)）A-Za-z0-9ぁ-んァ-ヶ一-鿿０-９Ａ-Ｚａ-ｚ]{1,12}[)）]")
+#
+# 人間監督の決定により、英字を使う顔文字（T_T）も拾う。
+# 顔の部品になる記号が入っていること、かな・漢字・数字が入っていないこと、
+# 短いことの3つで見分ける。
+_KAOMOJI_INSIDE = re.compile(r"[(（]([^)）]{1,8})[)）]")
+
+# 顔の部品に使う記号。どれか1つは入っている必要がある。
+_FACE_PARTS = set("_^;><=-'`,.~*+ωΔ∀・﹏˘´｀°˙σДΩ△▽∇◕｡ﾟ□◇°〜　 ")
+
+# これが入っていたら顔文字ではない。
+_NOT_FACE = re.compile(r"[0-9０-９ぁ-んァ-ヶ一-鿿]")
+
+
+def _is_kaomoji(inside: str) -> bool:
+    """括弧の中身が顔文字らしいか。
+
+    顔の部品になる記号が入っていれば顔文字とみなす。
+    記号が無くても、左右が同じ文字で短ければ顔文字とみなす。
+    「(ToT)」のように目が英字だけで書かれる形を拾うためである。
+    """
+    if _NOT_FACE.search(inside):
+        return False
+    if any(ch in _FACE_PARTS for ch in inside):
+        return True
+    return 3 <= len(inside) <= 5 and inside[0] == inside[-1]
 
 
 def _has_emoji(text: str) -> bool:
     """絵文字か顔文字が使われているか。"""
-    return bool(_EMOJI.search(text) or _KAOMOJI.search(text))
+    if _EMOJI.search(text):
+        return True
+    return any(_is_kaomoji(m.group(1)) for m in _KAOMOJI_INSIDE.finditer(text))
 
 
 def _strip_decoration(sentence: str) -> str:
@@ -78,7 +102,8 @@ def _strip_decoration(sentence: str) -> str:
     previous = None
     while previous != sentence:
         previous = sentence
-        sentence = _KAOMOJI.sub("", sentence)
+        sentence = _KAOMOJI_INSIDE.sub(
+            lambda m: "" if _is_kaomoji(m.group(1)) else m.group(0), sentence)
         sentence = _EMOJI.sub("", sentence)
         sentence = sentence.strip()
     return sentence

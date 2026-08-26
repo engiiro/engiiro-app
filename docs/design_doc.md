@@ -851,7 +851,9 @@ create table persona_age_estimates (
 {
   "action": "allow | rewrite_required | block",
   "transformedText": "string | null",
-  "reasonCodes": ["string"]
+  "reasonCodes": ["string"],
+  "score": "number（原文が赤ちゃん語・ママ語の書き方になっている度合い。0〜100）",
+  "transformedScore": "number | null（変換結果の同じ度合い。blockのときはnull）"
 }
 ```
 
@@ -860,6 +862,16 @@ create table persona_age_estimates (
 - `block`：安全に提示できる変換候補がない状態。`transformedText`は`null`とする（FR-AI-TRANS-005）。
 - `reasonCodes`：判定理由を表す短い分類コードの配列。内部の判断過程やNG辞書の具体的内容は返さない（FR-AI-TRANS-009）。
 - モデレーションは変換前の入力と変換後の出力の両方に対して行う（FR-MOD-001〜002）。変換結果は自動で投稿・保存せず、利用者がプレビューを確認・編集してから保存操作を行う（FR-AI-TRANS-006〜007）。
+
+`score`と`transformedScore`は、文章が赤ちゃん語・ママ語の**書き方**になっている度合いを0〜100で表す。`/api/ai/evaluate`が返す`estimatedAge`（年齢の目安）とは別物である。判定の内訳（どの項目を満たしたか）は返さない（FR-AI-TRANS-009）。
+
+判定は次の順で決まる。
+
+1. 個人情報・NG語・自傷・他害・マサカリのいずれかを検出した場合は、度合いに関わらず`block`
+2. `score`が100の場合は`allow`
+3. `score`が100未満の場合は`rewrite_required`（`reasonCodes`に`style_mismatch`が入る）
+
+この判定は形態素解析と辞書だけで行い、外部の推論APIを呼ばない。そのため利用回数の制限を受けず、変換用の推論APIが停止していても動作する。利用者が自分で赤ちゃん語を書いた場合は`score`が100になり、変換を経ずに投稿できる。
 
 > 評価（evaluate）とは独立した、生成系の補助機能（FR-AI-001）。ユーザーが普通に書いた文章をバブル・あやす作成前に変換して使うことを想定。理由コードの正式一覧、150文字の数え方、伏字回避の正規化、マサカリ表現の判定、HTTPエラーの詳細は、後続のAPI仕様書・モデレーション仕様・セキュリティ設計で定義する。
 
