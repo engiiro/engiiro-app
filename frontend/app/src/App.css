@@ -47,9 +47,13 @@
   flex-direction: column;
   min-height: 100vh;
   max-height: 100vh;
+  /*
+   * ★ padding-bottom を持たせない（人間の指摘、2026-08-26）。
+   *   下端に貼りつく sticky（バブる／あやす）は親の content box より下へ行けないため、
+   *   ここに padding があると、いちばん下まで送りきった瞬間にそのぶん跳ね上がる。
+   *   下の余白は最後の子（.eg-fab-slot / .eg-bottom-action）の高さで確保する。
+   */
   padding: 0 var(--space-sm);
-  /* 下端のボタンに本文が隠れないぶんだけ空ける */
-  padding-bottom: calc(var(--control-min-height) + var(--space-lg));
   border-inline: var(--border-width) solid var(--hairline);
   /* 左に詰まっても中央はスクロールできる */
   overflow-y: auto;
@@ -72,17 +76,23 @@
 /*
  * 「バブる」の置き場所。
  *
- * 高さ 0 のスロットを中央の列の末尾に置き、margin-top: auto で下端へ送る。
+ * スロットを中央の列の末尾に置き、margin-top: auto で下端へ送る。
  * position: sticky なので、中身が長くてスクロールしても下端に貼りついたまま動かない。
  * ボタン自体を sticky にすると、中身が短いときに本文の直後まで上がってきてしまう。
+ *
+ * ★ 高さは 0 にしない（人間の指摘、2026-08-26）。
+ *   以前は高さ 0 のスロット ＋ 親の padding-bottom で余白を作っていたが、
+ *   その形だと sticky が親の content box に阻まれて、いちばん下まで送った瞬間に
+ *   padding のぶんボタンが跳ねる。ボタンぶんの高さをこの要素自身が持てば、
+ *   スロットの下端 ＝ 列の下端 になり、どこまで送っても位置が変わらない。
  */
 .eg-fab-slot {
   position: sticky;
   bottom: 0;
   z-index: 3;
   margin-top: auto;
-  height: 0;
-  /* 高さ 0 の帯が本文のクリックを奪わないように */
+  height: var(--fab-slot-height);
+  /* 帯そのものが本文のクリックを奪わないように。ボタンだけ拾う */
   pointer-events: none;
 }
 
@@ -162,14 +172,18 @@
 
   .eg-center {
     max-height: none;
-    padding-bottom: calc(var(--touch-target-min) + var(--space-xxl));
     border-inline: none;
+  }
+
+  /* 下端のバーのぶんも、この帯の高さで確保する（親に padding を戻さない） */
+  .eg-fab-slot {
+    height: calc(var(--fab-slot-height) + var(--bottom-nav-height));
   }
 
   /* 中央が画面いっぱいになるので、下端のバーの上に置く */
   .eg-bubble-fab {
     position: fixed;
     right: var(--gutter);
-    bottom: calc(var(--touch-target-min) + var(--space-lg) + env(safe-area-inset-bottom));
+    bottom: calc(var(--bottom-nav-height) + var(--space-lg));
   }
 }

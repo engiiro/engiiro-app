@@ -40,6 +40,23 @@
   --compose-width: 440px;
   --column-gap: 24px;
 
+  /*
+   * 下端に貼りつくものの寸法。
+   *
+   * ★ スクロールする列（.eg-center）に padding-bottom を置かない。
+   *   position: sticky の要素は親の content box より下へは行けないので、
+   *   親に padding-bottom があると、いちばん下まで送りきった瞬間に
+   *   そのぶんだけボタンが跳ね上がる（人間の指摘、2026-08-26）。
+   *   下の余白は「実体のある最後の要素」の高さで確保する。
+   *
+   * --fab-slot-height … 「バブる」を置くスロット。ボタン 48px の上下に 24px ずつ。
+   * --bottom-nav-*    … 767px 未満で下端に出るナビ（LeftRail）。両者が同じ値を見るため
+   *                     ここに置く。片方だけ直すと、ボタンがバーに潜る。
+   */
+  --fab-slot-height: calc(var(--control-min-height) + var(--space-lg) * 2);
+  --bottom-nav-bar-height: calc(var(--touch-target-min) + var(--space-sm));
+  --bottom-nav-height: calc(var(--bottom-nav-bar-height) + env(safe-area-inset-bottom));
+
   /* §4 の各コンポーネント仕様に書かれている寸法 */
   --control-min-height: 48px;
   --control-padding-y: 13px;
