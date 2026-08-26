@@ -163,7 +163,7 @@ def test_transform_変換後が長すぎたら書き直してもらう(monkeypat
 
 
 # ============================================================
-# /evaluate は触っていない
+# /evaluate は中身を触っていない。入口の扱いだけ揃えた
 # ============================================================
 
 def test_evaluate_はそのまま動く():
@@ -171,3 +171,18 @@ def test_evaluate_はそのまま動く():
     res = client.post("/evaluate", json={"body": "まんま", "personaType": "baby"})
     assert res.status_code == 200
     assert isinstance(res.json()["estimatedAge"], float)
+
+
+def test_evaluate_入力が不正なら400(monkeypatch):
+    """PR #40 で evaluate が空文字列と未対応の personaType を拒むようになる。
+
+    入口で写さないと 500 になる（PR #40 の head で実測した）。
+    利用者が直せる誤りなので 400 を返す。
+    """
+    def raising(body, persona_type):
+        raise ValueError("body must not be blank")
+
+    # テストでは app という名前が FastAPI 側なので、文字列で指す
+    monkeypatch.setattr("app.evaluate", raising)
+    res = client.post("/evaluate", json={"body": "  ", "personaType": "baby"})
+    assert res.status_code == 400

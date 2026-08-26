@@ -66,7 +66,13 @@ def health():
 
 @app.post("/evaluate", response_model=EvaluateResponse)
 def post_evaluate(req: EvaluateRequest):
-    estimated_age = evaluate(req.body, req.personaType)
+    try:
+        estimated_age = evaluate(req.body, req.personaType)
+    except ValueError as exc:
+        # 入力が不正。呼び出し側が直せるので 400
+        # 現在の evaluate は投げないが、PR #40 で空文字列と未対応の
+        # personaType を拒むようになる。何もしないと 500 になる。
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return EvaluateResponse(estimatedAge=estimated_age)
 
 
