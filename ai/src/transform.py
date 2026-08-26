@@ -31,11 +31,14 @@ def transform(body: str, style: str) -> dict:
     Returns:
         {"action", "transformedText", "reasonCodes"}
 
+    **待ち方は HTTP 用の上限を渡す。** CLI と同じ上限にすると、
+    1リクエストが最大10分 worker を占有できてしまう（Issue #47 P0-4）。
+
     Raises:
         ValueError: 入力が不正（空文字列、style 違い、100文字超）
-        RuntimeError: 変換APIが使えない（レート制限、認証、空応答など）
+        RuntimeError: 変換APIが使えない（レート制限、認証、空応答、混雑）
     """
-    return transform_api.transform(style, body)
+    return transform_api.transform(style, body, limits=transform_api.HTTP_LIMITS)
 
 
 def moderate(body: str) -> dict:

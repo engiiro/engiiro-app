@@ -152,8 +152,40 @@ FULL_NAME_WITH_HONORIFIC = True
 # 2. 伏字回避の正規化
 # ============================================================
 
-# 幅ゼロ文字・制御文字
-_INVISIBLE = re.compile(r"[​-‏‪-‮⁠-⁤﻿­]")
+# 幅ゼロ文字・書式制御文字・結合文字。
+# **判定用のコピーからだけ落とす。** 利用者へ返す本文は書き換えない。
+#
+# 実測で見つかった回避（Issue #47 P0-3）:
+#   異体字セレクタ、Mongolian vowel separator、tag文字、結合文字の連打
+_INVISIBLE = re.compile(
+    "["
+    "\u200b-\u200f"              # zero width space / joiner / bidi mark
+    "\u202a-\u202e"              # bidi override
+    "\u2060-\u2064"              # word joiner / invisible operator
+    "\ufeff"                     # BOM
+    "\u00ad"                     # soft hyphen
+    "\u180e"                     # Mongolian vowel separator
+    "\ufe00-\ufe0f"              # 異体字セレクタ
+    "\U000e0000-\U000e007f"      # tag文字
+    "\U000e0100-\U000e01ef"      # 異体字セレクタ補助
+    "]"
+)
+
+# 濁点・半濁点。結合文字を落とすときも、これだけは残す。
+_JAPANESE_MARKS = ("\u3099", "\u309a")
+
+
+def _strip_combining(text: str) -> str:
+    """結合文字（Mn）を落とす。**濁点・半濁点は残す。**
+
+    落とすと「ダメ」が「タメ」になり、辞書との一致がずれる。
+    NFKC を先に通すので、普通に書かれた濁点は合成済みで影響を受けない。
+    ここで狙うのは「死」に結合文字を50個挟むような回避である（実測）。
+    """
+    return "".join(
+        ch for ch in text
+        if unicodedata.category(ch) != "Mn" or ch in _JAPANESE_MARKS
+    )
 
 # 伏字に使われやすい記号。文字と文字の間に挟んで検出を逃れる用途を想定する。
 _MASK_CHARS = "○●◯〇◎＊*✳✱×✕╳・･.,、。_＿-－ー‐―~〜^ 　\t"
@@ -184,6 +216,7 @@ def normalize_for_check(text: str) -> str:
 
     normalized = unicodedata.normalize("NFKC", text)
     normalized = _INVISIBLE.sub("", normalized)
+    normalized = _strip_combining(normalized)
     normalized = normalized.lower()
     normalized = _MASK_PATTERN.sub("", normalized)
 
@@ -210,6 +243,7 @@ def normalize_for_tokenize(text: str) -> str:
         return ""
     normalized = unicodedata.normalize("NFKC", text)
     normalized = _INVISIBLE.sub("", normalized)
+    normalized = _strip_combining(normalized)
     normalized = _MASK_PATTERN_LIGHT.sub("", normalized)
     # 「しねええええ」を「しね」に戻す。ここでたたまないと
     # 解析器が し|ねえ|え|ええ に割ってしまい、1語として照合できない。

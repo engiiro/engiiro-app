@@ -85,23 +85,46 @@ def test_1回あたりの待ち時間に上限がある(monkeypatch, no_sleep):
         T, "_call_api",
         _fails_then_succeeds(1, "429 RESOURCE_EXHAUSTED 'retryDelay': '9999s'"))
     T.call_with_retry(None, "s", "c", on_wait=lambda *a: None)
-    assert no_sleep == [T.MAX_WAIT_PER_ATTEMPT]
+    assert no_sleep == [T.CLI_LIMITS.max_wait_per_attempt]
+
+
+def _limits(**changes) -> T.CallLimits:
+    """CLI用の上限を一部だけ変えたものを作る。"""
+    base = dict(max_attempts=T.CLI_LIMITS.max_attempts,
+                total_wait_seconds=T.CLI_LIMITS.total_wait_seconds,
+                max_wait_per_attempt=T.CLI_LIMITS.max_wait_per_attempt,
+                acquire_timeout_seconds=T.CLI_LIMITS.acquire_timeout_seconds)
+    base.update(changes)
+    return T.CallLimits(**base)
 
 
 def test_無限には待たない(monkeypatch, no_sleep):
     monkeypatch.setattr(T, "_call_api", _always_fails(RATE_LIMIT))
-    monkeypatch.setattr(T, "MAX_RETRY_ATTEMPTS", 4)
     with pytest.raises(RuntimeError, match="解除されませんでした"):
-        T.call_with_retry(None, "s", "c", on_wait=lambda *a: None)
+        T.call_with_retry(None, "s", "c", on_wait=lambda *a: None,
+                          limits=_limits(max_attempts=4))
     assert len(no_sleep) == 3  # 最後の試行のあとは待たない
 
 
 def test_合計時間の上限で打ち切る(monkeypatch, no_sleep):
     monkeypatch.setattr(T, "_call_api", _always_fails(RATE_LIMIT))
-    monkeypatch.setattr(T, "MAX_TOTAL_WAIT_SECONDS", 30)
     with pytest.raises(RuntimeError, match="解除されませんでした"):
-        T.call_with_retry(None, "s", "c", on_wait=lambda *a: None)
+        T.call_with_retry(None, "s", "c", on_wait=lambda *a: None,
+                          limits=_limits(total_wait_seconds=30))
     assert sum(no_sleep) <= 30
+
+
+def test_HTTPは長く待たない(monkeypatch, no_sleep):
+    """**HTTPの1リクエストが数分workerを占有してはいけない**（Issue #47 P0-4）。
+
+    CLI用の上限（600秒）をHTTPでも使っていたので分けた。
+    """
+    monkeypatch.setattr(T, "_call_api", _always_fails(RATE_LIMIT))
+    with pytest.raises(RuntimeError, match="解除されませんでした"):
+        T.call_with_retry(None, "s", "c", on_wait=lambda *a: None,
+                          limits=T.HTTP_LIMITS)
+    assert sum(no_sleep) <= T.HTTP_LIMITS.total_wait_seconds
+    assert sum(no_sleep) <= 10, "HTTPで10秒を超えて待っている"
 
 
 def test_1日あたりの上限では待たずに止まる(monkeypatch, no_sleep):
