@@ -72,6 +72,8 @@ type MyProfileScreenProps = {
   readonly tab: ActivityTab;
   readonly onTabChange: (tab: ActivityTab) => void;
   readonly onOpenBubble: (bubbleId: string) => void;
+  /** 一覧のあやすを押したとき。そのあやすの詳細へ（人間の指示、2026-08-26） */
+  readonly onOpenSoothe: (sootheId: string) => void;
   readonly onDeleteBubble: (bubbleId: string) => void;
   readonly onOpenFollowing: (kind: PersonaKind) => void;
   readonly onCompose: () => void;
@@ -85,6 +87,7 @@ export function MyProfileScreen({
   tab,
   onTabChange,
   onOpenBubble,
+  onOpenSoothe,
   onDeleteBubble,
   onOpenFollowing,
   onCompose,
@@ -194,7 +197,8 @@ export function MyProfileScreen({
                   <ActivityItem
                     key={item.kind === "bubble" ? item.bubble.id : item.soothe.id}
                     item={item}
-                    onOpen={onOpenBubble}
+                    onOpenBubble={onOpenBubble}
+                    onOpenSoothe={onOpenSoothe}
                     onDelete={item.kind === "bubble" ? setDeleting : undefined}
                   />
                 ))}

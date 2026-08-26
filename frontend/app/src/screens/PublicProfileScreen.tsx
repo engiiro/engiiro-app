@@ -56,6 +56,8 @@ type PublicProfileScreenProps = {
   readonly onTabChange: (tab: ActivityTab) => void;
   readonly onToggleLike: (next: boolean) => void;
   readonly onOpenBubble: (bubbleId: string) => void;
+  /** 一覧のあやすを押したとき。そのあやすの詳細へ（人間の指示、2026-08-26） */
+  readonly onOpenSoothe: (sootheId: string) => void;
   readonly onBack: () => void;
 };
 
@@ -69,6 +71,7 @@ export function PublicProfileScreen({
   onTabChange,
   onToggleLike,
   onOpenBubble,
+  onOpenSoothe,
   onBack,
 }: PublicProfileScreenProps) {
   const [visible, setVisible] = useState(PAGE_SIZE);
@@ -151,7 +154,8 @@ export function PublicProfileScreen({
                   <ActivityItem
                     key={item.kind === "bubble" ? item.bubble.id : item.soothe.id}
                     item={item}
-                    onOpen={onOpenBubble}
+                    onOpenBubble={onOpenBubble}
+                    onOpenSoothe={onOpenSoothe}
                   />
                 ))}
               </ul>

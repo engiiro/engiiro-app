@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { BubbleDetail, ReactionType, Soothe } from "../data/types";
 import { cx } from "../lib/cx";
 import type { SootheTarget } from "../lib/soothePersonaRule";
+import { BottomAction } from "../components/BottomAction";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
@@ -23,6 +24,11 @@ import "./BubbleDetailScreen.css";
  *   リアクション行の中身がそれぞれ変わる（3種 / ばぶー1種）。
  *   出しわけは SootheItem が発信ペルソナから決める。ここでは選び直さない。
  *
+ * ★ 一覧に並ぶのは「バブルに直接ついたあやす」だけ（人間の指示、2026-08-26）。
+ *   あやすへの返信は、その1件を押して開いた先（S4b あやす詳細）に入る。
+ *   以前は返信も同じ列に平らに混ざっていて、何件ついているのかが読めなかった。
+ *   絞っているのは fetchBubbleDetail の側で、ここは受け取ったものを並べるだけ。
+ *
  * 自分のバブルにだけ削除を出す（FR-POST-006/007）。不可逆なので確認を出す。
  */
 
@@ -37,6 +43,8 @@ type BubbleDetailScreenProps = {
     reaction: ReactionType,
   ) => void;
   readonly onOpenSoothe: (target: SootheTarget) => void;
+  /** あやす1件を押したとき。そのあやすの詳細（誰があやしているか）へ */
+  readonly onOpenSootheDetail: (sootheId: string) => void;
   readonly onDelete: (bubbleId: string) => void;
 };
 
@@ -47,17 +55,11 @@ export function BubbleDetailScreen({
   onReactToBubble,
   onReactToSoothe,
   onOpenSoothe,
+  onOpenSootheDetail,
   onDelete,
 }: BubbleDetailScreenProps) {
   const [confirming, setConfirming] = useState(false);
   const { bubble, soothes } = detail;
-
-  function nicknameOf(sootheId: string | undefined): string | undefined {
-    if (!sootheId) {
-      return undefined;
-    }
-    return soothes.find((item) => item.id === sootheId)?.author.nickname;
-  }
 
   return (
     <>
@@ -113,7 +115,6 @@ export function BubbleDetailScreen({
                 <SootheItem
                   key={soothe.id}
                   soothe={soothe}
-                  replyToNickname={nicknameOf(soothe.replyToSootheId)}
                   onOpenProfile={onOpenProfile}
                   onReact={(sootheId, reaction) =>
                     onReactToSoothe(sootheId, soothe.author.kind, reaction)
@@ -128,6 +129,7 @@ export function BubbleDetailScreen({
                       bubbleIsMine: bubble.isMine,
                     })
                   }
+                  onOpen={(target) => onOpenSootheDetail(target.id)}
                 />
               ))}
             </ul>
@@ -135,7 +137,7 @@ export function BubbleDetailScreen({
         </section>
       </div>
 
-      <div className="eg-detail__action">
+      <BottomAction>
         <Button
           fullWidth
           onClick={() =>
@@ -150,7 +152,7 @@ export function BubbleDetailScreen({
           <IconSoothe />
           あやす
         </Button>
-      </div>
+      </BottomAction>
 
       {confirming ? (
         <ConfirmDialog

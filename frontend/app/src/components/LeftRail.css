@@ -124,8 +124,9 @@
     flex: 1;
   }
 
+  /* 高さは base.css のトークン。中央の列の下余白が同じ値を見ている */
   .eg-rail__item {
-    height: calc(var(--touch-target-min) + var(--space-sm));
+    height: var(--bottom-nav-bar-height);
     border-radius: 0;
   }
 
