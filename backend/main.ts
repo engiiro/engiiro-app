@@ -10,6 +10,7 @@ import {
   handleGetPost,
 } from "./src/routes/posts.ts";
 import { handleLogin, handleLogout } from "./src/routes/sessions.ts";
+import { handleCreateSoothe, handleListSoothes } from "./src/routes/soothes.ts";
 
 // エンドポイント一覧・リクエスト/レスポンス形式は docs/design_doc.md 7章を参照。
 // 増えてきたらフレームワーク（Hono等）の導入も検討する。
@@ -56,10 +57,20 @@ const routes: Route[] = [
   },
   {
     method: "POST",
+    pattern: new URLPattern({ pathname: "/api/posts/:id/comments" }),
+    handler: (req, params) => handleCreateSoothe(req, params.id!),
+  },
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/posts/:id/comments" }),
+    handler: (req, params) => handleListSoothes(req, params.id!),
+  },
+  {
+    method: "POST",
     pattern: new URLPattern({ pathname: "/api/ai/evaluate" }),
     handler: handleEvaluate,
   },
-  // TODO: /api/personas/*, /api/profile/me, /api/posts/:id/comments,
+  // TODO: /api/personas/*, /api/profile/me,
   //       /api/posts/:id/reactions, /api/comments/:id/reactions, /api/follows,
   //       /api/follows/me, /api/ai/transform, /api/stamps を追加していく
 ];
