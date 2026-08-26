@@ -1,5 +1,6 @@
 import { handleCreateAccount } from "./src/routes/accounts.ts";
 import { handleEvaluate } from "./src/routes/ai.ts";
+import { handleTransform } from "./src/routes/aiTransform.ts";
 import { closePool } from "./src/lib/db.ts";
 import {
   handleCreateFollow,
@@ -141,7 +142,11 @@ const routes: Route[] = [
     pattern: new URLPattern({ pathname: "/api/stamps" }),
     handler: handleListStamps,
   },
-  // TODO: /api/ai/transform を追加していく
+  {
+    method: "POST",
+    pattern: new URLPattern({ pathname: "/api/ai/transform" }),
+    handler: handleTransform,
+  },
 ];
 
 async function router(request: Request): Promise<Response> {
