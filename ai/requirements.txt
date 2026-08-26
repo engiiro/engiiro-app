@@ -1,6 +1,11 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
-pydantic==2.9.2
+
+# 2.9.2 から上げた。google-genai 2.19.0 が pydantic>=2.12.5 を要求するため、
+# 2.9.2 のままだと**まっさらな環境で pip install が失敗する。**
+# CI を入れた初回の実行で見つかった。
+# fastapi 0.115.0 は pydantic<3.0.0 を許すので、この組み合わせで動く。
+pydantic==2.13.4
 
 # 文章変換（ai/transform_api.py）
 # Issue #15 の決定により、ローカルモデルではなく
