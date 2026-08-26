@@ -79,7 +79,9 @@ import json
 import os
 import re
 import sys
+import threading
 import time
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import external_moderation
@@ -114,10 +116,81 @@ ALWAYS_BLOCK_CODES = {"self_harm", "harm_others", "harsh_criticism"}
 # 回数と合計時間に上限を置く。上限に達したら諦めて例外にする。
 
 MIN_INTERVAL_SECONDS = 0.0      # 呼び出しの最短間隔。0なら間隔を空けない
-MAX_RETRY_ATTEMPTS = 8          # 429で待ち直す回数の上限
-MAX_TOTAL_WAIT_SECONDS = 600    # 待ち時間の合計上限。ここを超えたら諦める
 DEFAULT_WAIT_SECONDS = 20.0     # APIが待ち時間を教えてくれない場合の初期値
-MAX_WAIT_PER_ATTEMPT = 120.0    # 1回あたりの待ち時間の上限
+
+# 回数・合計秒数・1回あたりの上限は CallLimits へまとめてある（下記）。
+# **単独の定数として置かない。** 呼び出しごとに違う上限を使うため、
+# 定数を書き換えても効かない形になり、調整できると誤解される。
+
+
+# ===== 待ち方の上限（Issue #47 P0-4）=====
+# **HTTPの1リクエストが数分間 worker を占有してはいけない。**
+# CLIでまとめて処理するときは10分待って構わないが、公開された入口で
+# 同じ待ち方をすると、429を起こすだけで worker を埋められる。
+# そこで「CLI用」と「HTTP用」を分ける。
+
+
+@dataclass(frozen=True)
+class CallLimits:
+    """1回の呼び出しに許す待ち方。
+
+    Attributes:
+        max_attempts: 429で呼び直す回数の上限
+        total_wait_seconds: 待ち時間の合計上限
+        max_wait_per_attempt: 1回あたりの待ち時間の上限
+        acquire_timeout_seconds: 同時実行の枠が空くのを待つ上限
+    """
+
+    max_attempts: int
+    total_wait_seconds: float
+    max_wait_per_attempt: float
+    acquire_timeout_seconds: float
+
+
+#: CLI・Colab用。まとめて処理するので長く待ってよい
+CLI_LIMITS = CallLimits(
+    max_attempts=8,
+    total_wait_seconds=600.0,
+    max_wait_per_attempt=120.0,
+    acquire_timeout_seconds=60.0,
+)
+
+#: HTTP用。**合計10秒で諦める。**
+# 変換1回の実測は2〜4秒なので、1回待ち直せる程度の幅にしてある。
+# ここを長くすると、429を誘発するだけで worker を占有できてしまう。
+HTTP_LIMITS = CallLimits(
+    max_attempts=2,
+    total_wait_seconds=10.0,
+    max_wait_per_attempt=5.0,
+    acquire_timeout_seconds=2.0,
+)
+
+# 同時にGeminiへ投げる数の上限。無料枠は1分あたりの回数が少ないので、
+# 並べて投げても速くならず、429を増やすだけである。
+DEFAULT_MAX_CONCURRENT_CALLS = 4
+MAX_CONCURRENT_VAR = "ENGIIRO_MAX_CONCURRENT_CALLS"
+
+_semaphore_lock = threading.Lock()
+_semaphore: threading.BoundedSemaphore | None = None
+_semaphore_size: int | None = None
+
+
+def _call_semaphore() -> threading.BoundedSemaphore:
+    """同時実行の枠。環境変数で数を変えられる。"""
+    global _semaphore, _semaphore_size
+
+    raw = os.getenv(MAX_CONCURRENT_VAR)
+    try:
+        size = int(raw) if raw else DEFAULT_MAX_CONCURRENT_CALLS
+    except ValueError:
+        size = DEFAULT_MAX_CONCURRENT_CALLS
+    size = max(1, size)
+
+    with _semaphore_lock:
+        if _semaphore is None or _semaphore_size != size:
+            _semaphore = threading.BoundedSemaphore(size)
+            _semaphore_size = size
+        return _semaphore
 
 Mode = Literal["baby", "mother"]
 
@@ -500,18 +573,41 @@ def _notify_wait(attempt: int, pause: float, waited_total: float):
     )
 
 
-def call_with_retry(client, system_instruction, contents, *, json_mode=False, on_wait=None):
+def call_with_retry(client, system_instruction, contents, *, json_mode=False,
+                    on_wait=None, limits: "CallLimits | None" = None):
     """APIを呼ぶ。429なら待って呼び直す。
 
     待ち時間は、APIが教えてくれればその値を、なければ20秒から倍々にする。
-    MAX_RETRY_ATTEMPTS 回または合計 MAX_TOTAL_WAIT_SECONDS 秒で打ち切る。
+    limits の回数・合計秒数で打ち切る。
     1日あたりの上限に当たった場合は、待っても回復しないので即座に諦める。
+
+    **同時に投げる数を絞る。** 枠が空かなければ待たずに諦める。
+    公開された入口では、待たせ続けるより早く 503 を返すほうが安全である。
+
+    Args:
+        limits: 待ち方の上限。省略すると CLI_LIMITS（長く待つ）
     """
+    limits = limits or CLI_LIMITS
+    semaphore = _call_semaphore()
+    if not semaphore.acquire(timeout=limits.acquire_timeout_seconds):
+        raise RuntimeError(
+            "変換の同時実行数が上限に達しています。しばらく待ってから再試行してください。"
+        )
+    try:
+        return _call_until_limit(client, system_instruction, contents,
+                                json_mode=json_mode, on_wait=on_wait, limits=limits)
+    finally:
+        semaphore.release()
+
+
+def _call_until_limit(client, system_instruction, contents, *,
+                      json_mode, on_wait, limits: "CallLimits"):
+    """429で待ち直す本体。上限に達したら諦める。"""
     notify = on_wait or _notify_wait
     wait = DEFAULT_WAIT_SECONDS
     waited_total = 0.0
 
-    for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
+    for attempt in range(1, limits.max_attempts + 1):
         _throttle()
         try:
             return _call_api(client, system_instruction, contents, json_mode=json_mode)
@@ -525,20 +621,20 @@ def call_with_retry(client, system_instruction, contents, *, json_mode=False, on
                     "1日あたりの利用上限に達しました。待っても当日中は回復しません。"
                 ) from exc
 
-            pause = min(suggested_wait(message) or wait, MAX_WAIT_PER_ATTEMPT)
+            pause = min(suggested_wait(message) or wait, limits.max_wait_per_attempt)
 
-            if attempt >= MAX_RETRY_ATTEMPTS or waited_total + pause > MAX_TOTAL_WAIT_SECONDS:
+            if (attempt >= limits.max_attempts
+                    or waited_total + pause > limits.total_wait_seconds):
                 raise RuntimeError(
                     f"レート制限が解除されませんでした。"
                     f"{attempt}回待機、合計{waited_total:.0f}秒で諦めました。"
-                    f"（上限: {MAX_RETRY_ATTEMPTS}回 / {MAX_TOTAL_WAIT_SECONDS}秒。"
-                    f"変えたい場合は MAX_RETRY_ATTEMPTS と MAX_TOTAL_WAIT_SECONDS を調整してください）"
+                    f"（上限: {limits.max_attempts}回 / {limits.total_wait_seconds:.0f}秒）"
                 ) from exc
 
             notify(attempt, pause, waited_total)
             time.sleep(pause)
             waited_total += pause
-            wait = min(wait * 2, MAX_WAIT_PER_ATTEMPT)
+            wait = min(wait * 2, limits.max_wait_per_attempt)
 
     raise RuntimeError("到達しない想定の分岐です。")
 
@@ -582,16 +678,21 @@ def _validate_input(mode: str, text: str, limit: int = MAX_TRANSFORM_INPUT_CHARS
         raise ValueError(f"入力は{limit}文字以内です。現在: {len(text)}文字")
 
 
-def transform_text(mode: Mode, text: str, client=None) -> str:
+def transform_text(mode: Mode, text: str, client=None,
+                   limits: "CallLimits | None" = None) -> str:
     """文章を指定のスタイルへ言い換える。判定はしない。
 
     Issue #15 が指定した関数。戻り値は str のまま変えていない。
+
+    Args:
+        limits: 待ち方の上限。HTTPから呼ぶときは HTTP_LIMITS を渡すこと
     """
     _validate_input(mode, text)
     client = client or build_client()
 
     try:
-        response = call_with_retry(client, INSTRUCTIONS[mode], build_contents(mode, text))
+        response = call_with_retry(client, INSTRUCTIONS[mode],
+                                   build_contents(mode, text), limits=limits)
     except Exception as exc:
         _raise_readable(exc)
 
@@ -731,7 +832,8 @@ def moderate_by_llm(text: str, client=None) -> dict:
     return verdict
 
 
-def transform(mode: Mode, text: str, client=None) -> dict:
+def transform(mode: Mode, text: str, client=None,
+              limits: "CallLimits | None" = None) -> dict:
     """判定してから変換する。仕様書 v0.3 の /api/ai/transform に対応する形で返す。
 
     設計書の「モデレーションは変換前と変換後の2回行う」に従い、
@@ -781,7 +883,7 @@ def transform(mode: Mode, text: str, client=None) -> dict:
 
     client = client or build_client()
 
-    converted = transform_text(mode, text, client=client)
+    converted = transform_text(mode, text, client=client, limits=limits)
 
     # **長さを見る前に、必ず変換後の判定を行う。**
     # 仕様書 FR-MOD-002 は変換後の出力もモデレーションの対象としている。

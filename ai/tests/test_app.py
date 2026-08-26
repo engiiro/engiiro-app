@@ -36,7 +36,7 @@ def no_network(monkeypatch):
 @pytest.fixture
 def fake_transform(monkeypatch):
     """変換だけ差し替える。判定は本物を通す。"""
-    def fake(mode, text, client=None):
+    def fake(mode, text, client=None, limits=None):
         return {"baby": "へんかんしたのー", "mother": "そうだったのね 🍀"}[mode]
 
     monkeypatch.setattr(T, "transform_text", fake)
@@ -85,7 +85,8 @@ def test_moderate_150文字まで受ける(no_network):
                        json={"body": "あ" * 150}).status_code == 200
     res = client.post("/moderate", json={"body": "あ" * 151})
     assert res.status_code == 400
-    assert "150" in res.json()["detail"]
+    # 内部の説明は返さない（Issue #47 P1-3）
+    assert res.json()["error"] == "invalid_request"
 
 
 def test_moderate_空文字列は400(no_network):
@@ -115,7 +116,7 @@ def test_transform_入力上限は100文字(fake_transform):
                                            "style": "baby"}).status_code == 200
     res = client.post("/transform", json={"body": "あ" * 101, "style": "baby"})
     assert res.status_code == 400
-    assert "100" in res.json()["detail"]
+    assert res.json()["error"] == "invalid_request"
 
 
 def test_transform_おかしなstyleは400(fake_transform):
@@ -140,13 +141,16 @@ def test_transform_APIが使えないときは503(monkeypatch):
     monkeypatch.setattr(T, "build_client", boom)
     res = client.post("/transform", json={"body": "眠い。", "style": "baby"})
     assert res.status_code == 503
-    assert "GOOGLE_API_KEY" in res.json()["detail"]
+    assert res.json()["error"] == "ai_unavailable"
+    # **設定手順やキーの名前を外へ出さない**（Issue #47 P1-3）
+    assert "GOOGLE_API_KEY" not in res.text
 
 
 def test_transform_変換後が長すぎたら書き直してもらう(monkeypatch):
     monkeypatch.setattr(T, "build_client", lambda: object())
-    monkeypatch.setattr(T, "transform_text",
-                        lambda mode, text, client=None: "あ" * (T.MAX_OUTPUT_CHARS + 1))
+    monkeypatch.setattr(
+        T, "transform_text",
+        lambda mode, text, client=None, limits=None: "あ" * (T.MAX_OUTPUT_CHARS + 1))
     body = client.post("/transform", json={"body": "眠い。", "style": "baby"}).json()
     assert body["action"] == "rewrite_required"
     assert body["transformedText"] is None
