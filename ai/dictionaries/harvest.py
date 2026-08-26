@@ -31,6 +31,17 @@
      （「死ぬ」に品詞「名詞」を当てると一度も当たらないので安全に見える）
   4. **その語の普通の使い方が見つかったもの** … 保留にして人へ見せる
 
+## どの辞書へ入れるかを決められないもの
+
+理由コードから追記先が一つに決まらない語は、**保留にして人へ返す。**
+`personal_data` と `sexual_explicit` には対応する辞書が無く、
+`judge()` は理由コードが空でも語を挙げてくることがあるためである。
+
+決められないものを `rewrite.txt`（マサカリ）へ流すと、
+その語は本番で `harsh_criticism` として弾かれる。**理由コードが変わると、
+弾いたあと利用者へ見せる文言まで変わる。** 個人情報の語で
+マサカリの文言を出すことになるので、黙って一番近い辞書へ入れてはいけない。
+
 4を捨てずに保留にしているのは、無害かどうかの判定が当てにならないためである。
 「ポンコツ」の例文に「彼のポンコツな考え方は理解されにくい」が挙がり、
 これを無害と判定してしまった（実測）。捨てると良い候補まで消える。
@@ -63,6 +74,11 @@ import local_llm
 import moderation_rules as rules
 
 # 理由コードと、追記先の辞書ファイルの対応。
+#
+# **personal_data と sexual_explicit はここに無い。**
+# 個人情報は辞書ではなく規則（find_personal_data）で見るものであり、
+# 性的表現に至っては辞書が無い。手元のLLMはこの2つも返してくるので、
+# 対応先が無いことを _pick_dictionary が見て保留にする。
 CODE_TO_DICTIONARY = {
     "ng_word": "block",
     "harsh_criticism": "rewrite",
@@ -197,7 +213,7 @@ def harvest(sentences: list[str], limit: int | None = None) -> list[dict]:
         if not verdict or verdict["action"] != "block":
             continue
 
-        dictionary = _pick_dictionary(verdict["reasonCodes"])
+        dictionary, hold_reason = _pick_dictionary(verdict["reasonCodes"])
         for word in verdict["words"]:
             if word in already or word in found:
                 continue
@@ -208,14 +224,21 @@ def harvest(sentences: list[str], limit: int | None = None) -> list[dict]:
                 continue
             rule_name, reason = suggestion
 
-            # 通すべき文の集合は、あらゆる語の無害な使い方を網羅できない。
-            # その語の普通の使い方を出してもらい、当たるなら保留にする。
-            innocent = [
-                example for example in innocent_uses(word)
-                if _catches(word, rule_name, example)
-            ]
-            if innocent:
-                print(f"      保留: {word}（普通の使い方かもしれない）", file=sys.stderr)
+            if hold_reason:
+                # 追記先が決まらないものは、この時点で人へ回す。
+                # 例文集めは1語につき25秒かかるので、保留が決まっていれば省く。
+                print(f"      保留: {word}（{hold_reason}）", file=sys.stderr)
+                innocent = []
+            else:
+                # 通すべき文の集合は、あらゆる語の無害な使い方を網羅できない。
+                # その語の普通の使い方を出してもらい、当たるなら保留にする。
+                innocent = [
+                    example for example in innocent_uses(word)
+                    if _catches(word, rule_name, example)
+                ]
+                if innocent:
+                    print(f"      保留: {word}（普通の使い方かもしれない）",
+                          file=sys.stderr)
 
             found[word] = {
                 "word": word,
@@ -224,31 +247,58 @@ def harvest(sentences: list[str], limit: int | None = None) -> list[dict]:
                 "reason": reason,
                 "found_in": sentence,
                 "innocent": innocent,
+                "hold_reason": hold_reason,
             }
     return list(found.values())
 
 
-def _pick_dictionary(codes: list[str]) -> str:
-    """理由コードから追記先を決める。重いものを優先する。"""
-    for code in ("self_harm", "harm_others", "ng_word", "harsh_criticism"):
-        if code in codes:
-            return CODE_TO_DICTIONARY[code]
-    return "rewrite"
+def _pick_dictionary(codes: list[str]) -> tuple[str | None, str]:
+    """理由コードから追記先を決める。決められなければ None と、その理由。
+
+    **決められないものを rewrite.txt へ流してはいけない。**
+    4つの辞書は「当たれば block」までは同じだが、理由コードが変わる。
+    個人情報の語をマサカリ辞書へ入れると、利用者へ見せる文言まで変わる。
+
+    決められないのは次の場合である。
+
+      - 理由コードが空。judge() は words だけでも block を返すので起きる
+      - personal_data / sexual_explicit のように、対応する辞書が無い
+      - 理由コードが複数。どの語がどれに当たるかは、文からは決まらない
+
+    Returns:
+        (追記先, "") または (None, 決められない理由)
+    """
+    known = sorted({c for c in codes if c in CODE_TO_DICTIONARY})
+    unknown = sorted({c for c in codes if c not in CODE_TO_DICTIONARY})
+
+    if len(known) == 1 and not unknown:
+        return CODE_TO_DICTIONARY[known[0]], ""
+    if not known and not unknown:
+        return None, "理由コードが無い"
+    if not known:
+        return None, "対応する辞書が無い: " + "/".join(unknown)
+    return None, "理由コードが複数ある: " + "/".join(known + unknown)
 
 
 def format_lines(candidates: list[dict]) -> str:
     """辞書へ貼れる形にする。3列目は人がレビューするための欄。
 
-    普通の使い方が見つかった語は、**保留として分けて出す。**
-    自動で捨てないのは、無害かどうかの判定が当てにならないためである。
+    次の2つは、**貼れる形にせず保留として分けて出す。**
+
+      - 普通の使い方が見つかった語
+      - 追記先の辞書が決まらなかった語
+
+    前者を自動で捨てないのは、無害かどうかの判定が当てにならないためである。
     「ポンコツ」の例文に「彼のポンコツな考え方は理解されにくい」が挙がり、
     これを無害と判定してしまった（実測）。捨てると良い候補まで消える。
     """
     if not candidates:
         return "候補はありませんでした。"
 
-    clean = [c for c in candidates if not c.get("innocent")]
-    held = [c for c in candidates if c.get("innocent")]
+    clean = [c for c in candidates
+             if c.get("dictionary") and not c.get("innocent")]
+    held = [c for c in candidates
+            if not c.get("dictionary") or c.get("innocent")]
 
     blocks = []
     by_dictionary: dict[str, list[dict]] = {}
@@ -266,15 +316,19 @@ def format_lines(candidates: list[dict]) -> str:
 
     if held:
         lines = [
-            "# --- 保留。普通の使い方があるかもしれない ---",
-            "# 例文を見て、辞書へ入れてよいか人が決めてください。",
+            "# --- 保留。人が見て決めてください ---",
+            "# 行頭が # なので、貼っても辞書には効きません。",
         ]
         for item in held:
             lines.append(
                 f"# {item['word']}\t{item['rule']}\t"
                 f"（出典: {item['found_in'][:20]}）"
             )
-            for example in item["innocent"]:
+            if item.get("hold_reason"):
+                lines.append(
+                    f"#     どの辞書へ入れるか決められない: {item['hold_reason']}"
+                )
+            for example in item.get("innocent") or []:
                 lines.append(f"#     この語をこう使うと弾く: {example}")
         blocks.append("\n".join(lines))
 

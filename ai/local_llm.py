@@ -1,11 +1,22 @@
 """手元のLLMに見てもらう。辞書を育てるための道具。
 
 **判定APIでは使わない。** 人間監督の決定により、判定は形態素解析と辞書だけで行う。
-ここは `transform_api.moderate_by_llm` から呼ばれる開発時の道具である。
+呼んでいるのは `dictionaries/harvest.py` だけである。
+
+**`transform_api.moderate_by_llm()` とは別物なので注意すること。**
+あちらは Gemini と外部モデレーションAPIを使う経路で、ここは組み込まれていない。
 
 外部のモデレーションサービス（external_moderation）と同じ役割だが、
 手元で動くので**利用回数の制限が無い**。投稿候補を何万件流しても構わない。
-外部へ本文を送らないので、秘匿性の面でも都合がよい。
+
+## 本文の送り先
+
+**既定では手元（localhost）にしか本文を送らない。**
+投稿候補には個人情報が混じり得るためである。
+
+接続先は環境変数で変えられるが、**手元以外へ向けた場合は
+`ENGIIRO_LOCAL_LLM_ALLOW_REMOTE=1` を置かないと動かない。**
+設定を1つ書き換えただけで本文が外部へ出ていく形にはしていない。
 
 ## 使い方
 
@@ -15,8 +26,9 @@ Ollama を入れて、モデルを1つ取っておく。
 
 サーバーは Ollama の起動時に立ち上がる。環境変数で上書きできる。
 
-    ENGIIRO_LOCAL_LLM_URL    既定は下の DEFAULT_URL
-    ENGIIRO_LOCAL_LLM_MODEL  既定は下の DEFAULT_MODEL
+    ENGIIRO_LOCAL_LLM_URL           既定は下の DEFAULT_URL
+    ENGIIRO_LOCAL_LLM_MODEL         既定は下の DEFAULT_MODEL
+    ENGIIRO_LOCAL_LLM_ALLOW_REMOTE  手元以外へ送ることを承知した場合に 1
 
 新しい依存は増やしていない。標準ライブラリのHTTPだけを使う。
 
@@ -33,6 +45,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 DEFAULT_URL = "http://localhost:11434"
@@ -89,8 +102,32 @@ JUDGE_INSTRUCTION = """あなたは日本語の投稿を分類する係です。
 MAX_WORD_CHARS = 8
 
 
+# 手元とみなすホスト。ここ以外へは、明示の許可が無いと本文を送らない。
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+ALLOW_REMOTE_VAR = "ENGIIRO_LOCAL_LLM_ALLOW_REMOTE"
+
+
 def _url() -> str:
     return os.getenv("ENGIIRO_LOCAL_LLM_URL", DEFAULT_URL).rstrip("/")
+
+
+def _destination_problem() -> str | None:
+    """送り先が手元でなく、許可も置かれていないなら、その理由を返す。
+
+    **投稿候補の本文には個人情報が混じり得る。**
+    接続先を書き換えただけで本文が外のサーバーへ出ていく形にはしない。
+    承知して使う場合だけ、環境変数で明示してもらう。
+    """
+    host = urllib.parse.urlsplit(_url()).hostname or ""
+    if host in LOCAL_HOSTS:
+        return None
+    if os.getenv(ALLOW_REMOTE_VAR) == "1":
+        return None
+    return (
+        f"接続先が手元ではありません: {_url()}\n"
+        f"  投稿候補の本文をそこへ送ることになります。個人情報が混じり得ます。\n"
+        f"  承知のうえで使うなら {ALLOW_REMOTE_VAR}=1 を置いてください。"
+    )
 
 
 def _model() -> str:
@@ -98,7 +135,12 @@ def _model() -> str:
 
 
 def available() -> bool:
-    """サーバーが動いていて、指定のモデルが入っているか。"""
+    """サーバーが動いていて、指定のモデルが入っているか。
+
+    手元以外へ向いていて許可が無い場合は、**問い合わせもせずに** False を返す。
+    """
+    if _destination_problem():
+        return False
     try:
         with urllib.request.urlopen(f"{_url()}/api/tags", timeout=5) as response:
             tags = json.loads(response.read().decode("utf-8"))
@@ -113,6 +155,10 @@ def available() -> bool:
 
 def describe_setup() -> str:
     """使えないときに、何をすればよいかを返す。"""
+    problem = _destination_problem()
+    if problem:
+        return problem
+
     return (
         f"手元のLLMが使えません。\n"
         f"  1. Ollama を起動する\n"
@@ -132,6 +178,10 @@ def _post_json(path: str, payload: dict) -> dict:
 
 def _ask(instruction: str, text: str) -> str:
     """1回だけ問い合わせる。JSONで返すよう指定する。"""
+    problem = _destination_problem()
+    if problem:
+        raise RuntimeError(problem)
+
     result = _post_json("/api/chat", {
         "model": _model(),
         "messages": [
@@ -188,6 +238,12 @@ def judge(text: str) -> dict | None:
     """
     if not text or not text.strip():
         raise ValueError("空文字列は判定できません。")
+
+    # 送り先の設定ミスは、黙って None を返さずに止める。
+    # 1件ずつ静かに失敗すると、候補が出ないだけに見えてしまう。
+    problem = _destination_problem()
+    if problem:
+        raise RuntimeError(problem)
 
     try:
         raw = _ask(JUDGE_INSTRUCTION, text)

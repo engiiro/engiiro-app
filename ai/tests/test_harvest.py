@@ -206,10 +206,100 @@ def test_危険な語はLLMが挙げても捨てる(fake_llm):
     assert harvest.harvest(["ゴミみたいなコードだ。"]) == []
 
 
-def test_重い理由コードを優先して振り分ける():
-    assert harvest._pick_dictionary(["harsh_criticism", "self_harm"]) == "self_harm"
-    assert harvest._pick_dictionary(["harsh_criticism"]) == "rewrite"
-    assert harvest._pick_dictionary([]) == "rewrite"
+# ============================================================
+# どの辞書へ入れるか
+# ============================================================
+
+def test_理由コードが1つなら追記先が決まる():
+    assert harvest._pick_dictionary(["harsh_criticism"]) == ("rewrite", "")
+    assert harvest._pick_dictionary(["self_harm"]) == ("self_harm", "")
+
+
+@pytest.mark.parametrize("codes", [
+    ["personal_data"],                    # 辞書が無い。規則で見るもの
+    ["sexual_explicit"],                  # 辞書が無い
+    [],                                   # judge は words だけでも block を返す
+    ["harsh_criticism", "self_harm"],     # どの語がどれに当たるか決まらない
+    ["harsh_criticism", "personal_data"],
+])
+def test_決められないものはマサカリ辞書へ流さない(codes):
+    """追記先が決まらないものを rewrite.txt へ落としてはいけない。
+
+    入れれば、その語は本番で `harsh_criticism` として弾かれる。
+    **理由コードが変わると、弾いたあと利用者へ見せる文言まで変わる。**
+    個人情報の語でマサカリの文言を出すことになる。
+    """
+    dictionary, reason = harvest._pick_dictionary(codes)
+    assert dictionary is None
+    assert reason, "決められない理由を返していない"
+
+
+def test_辞書の無い理由コードの語は貼れる形で出さない(fake_llm):
+    """個人情報として挙がった語が rewrite.txt へ貼れる形で出ていた（実測）。"""
+    sentence = "うちのチームの合言葉なの。"
+    assert rules.check_rules(sentence)["action"] != "block", "前提が崩れている"
+
+    fake_llm[sentence] = {
+        "action": "block", "reasonCodes": ["personal_data"], "words": ["合言葉"],
+    }
+    found = harvest.harvest([sentence])
+    assert len(found) == 1
+    assert found[0]["dictionary"] is None
+    assert found[0]["hold_reason"]
+
+    lines = harvest.format_lines(found)
+    assert "rewrite.txt" not in lines, "マサカリ辞書へ振り分けている"
+    assert "保留" in lines
+    for line in lines.splitlines():
+        if "合言葉" in line:
+            assert line.startswith("#"), f"貼れる形で出している: {line}"
+
+
+def test_理由コードが複数なら保留にする(fake_llm):
+    """文全体の理由コードを、全部の語へそのまま当ててはいけない。"""
+    fake_llm["このポンコツが。"] = {
+        "action": "block",
+        "reasonCodes": ["harsh_criticism", "self_harm"],
+        "words": ["ポンコツ"],
+    }
+    found = harvest.harvest(["このポンコツが。"])
+    assert found[0]["dictionary"] is None
+    assert "self_harm.txt" not in harvest.format_lines(found)
+
+
+# ============================================================
+# 本文の送り先
+# ============================================================
+
+def test_手元以外へは本文を送らない(monkeypatch):
+    """接続先を書き換えただけで本文が外へ出ていく形にはしない。
+
+    投稿候補には個人情報が混じり得る。
+    """
+    monkeypatch.setenv("ENGIIRO_LOCAL_LLM_URL", "http://example.com:11434")
+    monkeypatch.delenv(local_llm.ALLOW_REMOTE_VAR, raising=False)
+
+    sent = []
+    monkeypatch.setattr(local_llm, "_post_json",
+                        lambda *a, **k: sent.append(a) or {})
+
+    assert local_llm.available() is False
+    with pytest.raises(RuntimeError):
+        local_llm.judge("つらい。")
+    assert local_llm.usage_examples("つらい") == []
+    assert sent == [], "手元以外へ本文を送っている"
+    assert local_llm.ALLOW_REMOTE_VAR in local_llm.describe_setup()
+
+
+def test_承知したと書けば手元以外へも送れる(monkeypatch):
+    monkeypatch.setenv("ENGIIRO_LOCAL_LLM_URL", "http://example.com:11434")
+    monkeypatch.setenv(local_llm.ALLOW_REMOTE_VAR, "1")
+    assert local_llm._destination_problem() is None
+
+
+def test_既定の送り先は手元(monkeypatch):
+    monkeypatch.delenv("ENGIIRO_LOCAL_LLM_URL", raising=False)
+    assert local_llm._destination_problem() is None
 
 
 def test_候補が無ければそう言う():
