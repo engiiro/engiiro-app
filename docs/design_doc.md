@@ -526,6 +526,7 @@ create table persona_age_estimates (
 | `GET /api/follows/me`                                          | 自分がフォローしているペルソナ一覧の取得（本人のみ参照可。フォロワー一覧・人数を返すAPIは提供しない）             | 必要 |
 | `POST /api/ai/evaluate`                                        | 文章の「赤ちゃん度／お母さん度」を年齢の目安としてAIが評価                                                        | 必要 |
 | `POST /api/ai/transform`                                       | 文章を赤ちゃん言葉・お母さん言葉に変換                                                                            | 必要 |
+| `POST /api/ai/moderate`                                        | 文章を判定（投稿してよいか／赤ちゃん言葉・お母さん言葉になっているか）。外部の推論APIを使わない                   | 必要 |
 
 ### 7.1 リクエスト/レスポンス例
 
@@ -872,6 +873,35 @@ create table persona_age_estimates (
 3. `score`が100未満の場合は`rewrite_required`（`reasonCodes`に`style_mismatch`が入る）
 
 この判定は形態素解析と辞書だけで行い、外部の推論APIを呼ばない。そのため利用回数の制限を受けず、変換用の推論APIが停止していても動作する。利用者が自分で赤ちゃん語を書いた場合は`score`が100になり、変換を経ずに投稿できる。
+
+文字数の上限は、変換を使うかどうかで変える。赤ちゃん言葉へ変換すると漢字をひらがなへ開くぶん文章が1.4〜1.7倍に伸びるため、入力を150文字まで許すと変換結果が必ず150文字（FR-POST-002）を超える。
+
+| | 上限 | 備考 |
+|---|---|---|
+| `POST /api/ai/transform` の入力 | 100文字 | 100文字を超えたらフロントエンドで生成ボタンを押せなくする |
+| `POST /api/ai/moderate` の入力 | 150文字 | 変換を使わず自分で書く場合 |
+| 変換結果 | 150文字 | 超えた場合は作り直さず、`rewrite_required`（`reasonCodes`に`too_long`）を返して書き直してもらう |
+
+**`POST /api/ai/moderate`（文章を判定する。外部の推論APIを使わない）**
+
+```json
+// Request
+{
+  "body": "string",
+  "personaType": "baby | mother | null（nullなら書き方は採点せず、投稿してよいかだけを判定）"
+}
+// Response
+{
+  "action": "allow | rewrite_required | block",
+  "reasonCodes": ["string"],
+  "score": "number | null（0〜100。personaTypeがnullのときはnull）"
+}
+```
+
+- 判定は形態素解析とNG辞書だけで行い、外部の推論APIを呼ばない。利用回数の制限を受けず、変換用の推論APIが停止していても動作する。
+- 保存時のモデレーション（FR-MOD-003）と、変換を使わずに投稿する場合の可否判定に使う。
+- 判定の内訳（どの項目を満たしたか、どのNG語に当たったか）は返さない（FR-MOD-034）。
+
 
 > 評価（evaluate）とは独立した、生成系の補助機能（FR-AI-001）。ユーザーが普通に書いた文章をバブル・あやす作成前に変換して使うことを想定。理由コードの正式一覧、150文字の数え方、伏字回避の正規化、マサカリ表現の判定、HTTPエラーの詳細は、後続のAPI仕様書・モデレーション仕様・セキュリティ設計で定義する。
 

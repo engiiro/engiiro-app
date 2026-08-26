@@ -50,7 +50,8 @@ APIキー:
     このモジュールは、失敗したときに代わりの結果を作らない。
     例外を投げて呼び出し側へ返す。何を表示するかは呼び出し側が決める。
 
-    ValueError   … 入力が不正（空文字列、mode 違い、150文字超）
+    ValueError   … 入力が不正（空文字列、mode 違い、文字数超過）
+                     判定APIは150文字、変換APIは100文字が上限
     RuntimeError … APIが使えない。文面で理由が分かるようにしてある
                      ・レート制限（待っても解除されなかった場合）
                      ・1日あたりの上限（待っても回復しない）
@@ -84,11 +85,17 @@ from moderation_rules import SEVERITY, check_rules, merge_verdicts, severer
 
 
 MODEL_NAME = "gemini-3.5-flash-lite"
-# 文字数の制限は入力側だけに置く。人間監督の決定：
-#   「生成時は150文字を超過していいです。入力のみ150文字制限を設けます」
-# 出力に上限を置くと、超えたときに作り直してAPIを2回呼ぶことになる。
-# 上限を外したことで、変換1回あたりの呼び出しがちょうど1回になった。
-MAX_INPUT_CHARS = 150
+# 文字数の上限。人間監督の決定により、変換を使うときと使わないときで違う。
+#
+#   「生成を押す場合の入力上限を100文字以下にし、かつ変換後150文字超えたら
+#     弾いて書き直させましょう。生成しない自力でやるときは150文字でいいです」
+#
+# 赤ちゃん語へ変換すると、漢字をひらがなへ開くぶん 1.4〜1.7倍に伸びる（実測）。
+# 入力150文字だと出力が確実に150文字を超えるため、変換側だけ100文字にしてある。
+MAX_INPUT_CHARS = 150            # 判定APIの上限。自分で書くときはこちら
+MAX_TRANSFORM_INPUT_CHARS = 100  # 変換APIの上限
+MAX_OUTPUT_CHARS = 150           # 変換結果の上限。超えたら弾いて書き直してもらう
+
 TEMPERATURE = 0.6
 USE_FEWSHOT = True
 
@@ -568,13 +575,13 @@ def clean_output(raw: str) -> str:
     return text.strip()
 
 
-def _validate_input(mode: str, text: str):
+def _validate_input(mode: str, text: str, limit: int = MAX_TRANSFORM_INPUT_CHARS):
     if mode not in ("baby", "mother"):
         raise ValueError(f"mode は 'baby' または 'mother' です。指定: {mode}")
     if not text or not text.strip():
         raise ValueError("空文字列は受け付けません。")
-    if len(text) > MAX_INPUT_CHARS:
-        raise ValueError(f"入力は{MAX_INPUT_CHARS}文字以内です。現在: {len(text)}文字")
+    if len(text) > limit:
+        raise ValueError(f"入力は{limit}文字以内です。現在: {len(text)}文字")
 
 
 def transform_text(mode: Mode, text: str, client=None) -> str:
@@ -640,6 +647,10 @@ def moderate(text: str, mode: Mode | None = None) -> dict:
         raise ValueError("空文字列は判定できません。")
     if mode is not None and mode not in style_score.CHECKS:
         raise ValueError(f"mode は 'baby' または 'mother' です。指定: {mode}")
+    if len(text) > MAX_INPUT_CHARS:
+        raise ValueError(
+            f"入力は{MAX_INPUT_CHARS}文字以内です。現在: {len(text)}文字"
+        )
 
     verdict = check_rules(text)
 
@@ -765,13 +776,21 @@ def transform(mode: Mode, text: str, client=None) -> dict:
     仕様書 FR-AI-TRANS-009 が、変換の応答に判定の内部情報を
     含めないよう求めているためである。
 
+    変換結果が150文字を超えたときは、作り直さずに rewrite_required を返す。
+    人間監督の決定：「変換後150文字超えたら弾いて書き直させましょう」
+    理由コードは too_long。変換結果は返さない。
+
+    入力の上限は変換と判定で違う。
+        変換API  100文字（赤ちゃん語へ開くと1.4〜1.7倍に伸びるため）
+        判定API  150文字（自分で書くときはこちら）
+
     Returns:
         {
           "action": ...,
           "transformedText": str | None,
           "reasonCodes": [...],
           "score": 原文の点数,
-          "transformedScore": 変換結果の点数（block のときは None）,
+          "transformedScore": 変換結果の点数（返さないときは None）,
         }
     """
     _validate_input(mode, text)
@@ -793,8 +812,20 @@ def transform(mode: Mode, text: str, client=None) -> dict:
 
     client = client or build_client()
 
-    # 出力の文字数は見ない。人間監督の決定により上限は入力側だけに置く。
     converted = transform_text(mode, text, client=client)
+
+    # 変換結果が長すぎたら、作り直さずに書き直してもらう。
+    # 人間監督の決定：「変換後150文字超えたら弾いて書き直させましょう」
+    # 作り直すとAPIを2回呼ぶことになる。入力を100文字までにしてあるので、
+    # ここへ来るのは稀なはずである。
+    if len(converted) > MAX_OUTPUT_CHARS:
+        return {
+            "action": "rewrite_required",
+            "transformedText": None,
+            "reasonCodes": sorted(set(before["reasonCodes"] + ["too_long"])),
+            "score": before["score"],
+            "transformedScore": None,
+        }
 
     after = moderate(converted, mode)
     reason_codes = sorted(set(before["reasonCodes"] + after["reasonCodes"]))

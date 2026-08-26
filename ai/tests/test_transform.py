@@ -153,11 +153,11 @@ def test_おかしな入力はAPIを呼ぶ前にValueError(calls, mode, text):
     assert calls["log"] == [], "検査より先にAPIを呼んでいる"
 
 
-def test_入力の上限ちょうどは通る(calls):
-    calls["script"].append("へんかんしたよ")
-    result = T.transform("baby", "あ" * T.MAX_INPUT_CHARS, client=object())
+def test_変換APIの入力上限ちょうどは通る(calls):
+    calls["script"].append("へんかんしたのー")
+    result = T.transform("baby", "あ" * T.MAX_TRANSFORM_INPUT_CHARS, client=object())
     assert result["action"] != "block", "上限ちょうどは弾かれない"
-    assert result["transformedText"] == "へんかんしたよ"
+    assert result["transformedText"] == "へんかんしたのー"
 
 
 # ============================================================
@@ -248,26 +248,50 @@ def test_規則でblockなら1回も呼ばない(calls):
 #   「生成時は150文字を超過していいです。入力のみ150文字制限を設けます」
 # 出力に上限を置くと、超えたときに作り直してAPIを2回呼ぶことになっていた。
 
-def test_出力が長くても作り直さない(calls):
-    long = "あ" * (T.MAX_INPUT_CHARS * 3)
+def test_出力が長すぎたら作り直さず書き直してもらう(calls):
+    """人間監督の決定：「変換後150文字超えたら弾いて書き直させましょう」
+
+    作り直すとAPIを2回呼ぶことになるので、作り直さない。
+    """
+    long = "あ" * (T.MAX_OUTPUT_CHARS + 1)
     calls["script"].append(long)
-    result = T.transform("baby", "テストです", client=object())
+    result = T.transform("baby", "ねむいのー", client=object())
 
-    assert result["transformedText"] == long, "切り詰めも作り直しもしない"
-    assert len(calls["log"]) == 1, "変換の1回だけ"
+    assert result["action"] == "rewrite_required"
+    assert result["transformedText"] is None, "弾くので変換結果は返さない"
+    assert "too_long" in result["reasonCodes"]
+    assert len(calls["log"]) == 1, "作り直さないので変換の1回だけ"
 
 
-def test_入力の上限は150文字(calls):
+def test_出力の上限ちょうどは通る(calls):
+    exact = "あ" * T.MAX_OUTPUT_CHARS
+    calls["script"].append(exact)
+    result = T.transform("baby", "ねむいのー", client=object())
+    assert result["transformedText"] == exact
+    assert "too_long" not in result["reasonCodes"]
+
+
+def test_入力の上限は判定150文字_変換100文字(calls):
+    """人間監督の決定：
+
+    「生成を押す場合の入力上限を100文字以下にし、（中略）
+      生成しない自力でやるときは150文字でいいです」
+    """
     assert T.MAX_INPUT_CHARS == 150
+    assert T.MAX_TRANSFORM_INPUT_CHARS == 100
+
     with pytest.raises(ValueError) as err:
-        T.transform("baby", "あ" * 151, client=object())
-    assert "150" in str(err.value)
+        T.transform("baby", "あ" * 101, client=object())
+    assert "100" in str(err.value)
     assert calls["log"] == []
 
 
-def test_出力の上限は持たない():
-    assert not hasattr(T, "MAX_OUTPUT_CHARS"), \
-        "出力に上限を戻すと、作り直しでAPIを2回呼ぶことになる"
+def test_判定APIは150文字まで受ける(no_network):
+    T.moderate("あ" * 150, "baby")
+    with pytest.raises(ValueError) as err:
+        T.moderate("あ" * 151, "baby")
+    assert "150" in str(err.value)
+
 
 
 # ============================================================

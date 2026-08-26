@@ -1,34 +1,60 @@
+"""docs/design_doc.md 7章の POST /api/ai/transform に対応する変換ロジック。
+
+中身は `ai/transform_api.py` にある。ここは薄い入口である。
+
+置き換え前は「疲れた→つかれたぁ〜」のような3語の置換だけを行う
+プレースホルダーだった。人間監督の指示により、Gemini を使う実装へ差し替えた。
 """
-docs/design_doc.md 7章の POST /api/ai/transform に対応する変換ロジック。
 
-最初は簡易的な置換ベースのプレースホルダー。
-生成AI（外部API or ローカルLLM）に差し替えるかは design_doc.md 10章の
-オープンイシューとして未決定。
-"""
+from __future__ import annotations
 
-BABY_REPLACEMENTS = {
-    "疲れた": "つかれたぁ〜",
-    "つらい": "しんどいよぉ",
-    "無理": "むりぃ〜",
-}
+import sys
+from pathlib import Path
 
-MOTHER_REPLACEMENTS = {
-    "疲れた": "よく頑張ったね、おつかれさま",
-    "つらい": "しんどかったね、よしよし",
-    "無理": "無理しなくていいよ、大丈夫",
-}
+# app.py と同じ階層に transform_api.py がある。
+# uvicorn は ai/ を作業ディレクトリにして起動するので通常は通るが、
+# 別の場所から読み込まれても動くようにしておく。
+_AI_DIR = str(Path(__file__).resolve().parent.parent)
+if _AI_DIR not in sys.path:
+    sys.path.insert(0, _AI_DIR)
+
+import transform_api
 
 
-def transform(body: str, style: str) -> str:
+def transform(body: str, style: str) -> dict:
+    """文章を赤ちゃん言葉・お母さん言葉へ変換し、判定つきで返す。
+
+    Args:
+        body: 変換したい文章。100文字以内
+        style: "baby" または "mother"
+
+    Returns:
+        {"action", "transformedText", "reasonCodes", "score", "transformedScore"}
+
+    Raises:
+        ValueError: 入力が不正（空文字列、style 違い、100文字超）
+        RuntimeError: 変換APIが使えない（レート制限、認証、空応答など）
     """
-    body の文章を赤ちゃん言葉 / お母さん言葉に変換するプレースホルダー実装。
-    style: "baby" | "mother"
+    return transform_api.transform(style, body)
+
+
+def moderate(body: str, persona_type: str | None = None) -> dict:
+    """文章を判定する。**通信しない。**
+
+    persona_type を渡すと、赤ちゃん語・ママ語の書き方になっている度合いを
+    0〜100で採点する。100点なら allow、100点未満は rewrite_required、
+    問題のある語があれば点数に関わらず block。
+
+    変換APIが止まっていても動く。利用回数の制限も受けない。
+
+    Args:
+        body: 判定したい文章。150文字以内
+        persona_type: "baby" / "mother" / None（採点しない）
+
+    Returns:
+        {"action", "reasonCodes", "score", "styleChecks"}
+
+    Raises:
+        ValueError: 入力が不正（空文字列、persona_type 違い、150文字超）
     """
-    replacements = BABY_REPLACEMENTS if style == "baby" else MOTHER_REPLACEMENTS
-
-    result = body
-    for original, replaced in replacements.items():
-        result = result.replace(original, replaced)
-
-    # TODO: 実際は生成AI（外部API or ローカルLLM）に置き換える
-    return result
+    return transform_api.moderate(body, persona_type)
