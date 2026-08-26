@@ -1,5 +1,6 @@
 import { closePool } from "./src/lib/db.ts";
 import { handleCreateAccount } from "./src/routes/accounts.ts";
+import { handleEvaluate } from "./src/routes/ai.ts";
 import { handleHealth } from "./src/routes/health.ts";
 import { handleCreatePost, handleFeed } from "./src/routes/posts.ts";
 import { handleLogin, handleLogout } from "./src/routes/sessions.ts";
@@ -33,9 +34,13 @@ async function router(req: Request): Promise<Response> {
     return await handleFeed(req);
   }
 
+  if (pathname === "/api/ai/evaluate" && req.method === "POST") {
+    return await handleEvaluate(req);
+  }
+
   // TODO: /api/personas/*, /api/profile/me, /api/posts/:id, /api/posts/:id/comments,
   //       /api/posts/:id/reactions, /api/comments/:id/reactions, /api/follows,
-  //       /api/follows/me, /api/ai/evaluate, /api/ai/transform, /api/stamps を追加していく
+  //       /api/follows/me, /api/ai/transform, /api/stamps を追加していく
 
   return Response.json({ error: "Not Found" }, { status: 404 });
 }
