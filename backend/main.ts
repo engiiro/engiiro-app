@@ -1,6 +1,11 @@
 import { handleCreateAccount } from "./src/routes/accounts.ts";
 import { handleEvaluate } from "./src/routes/ai.ts";
 import { closePool } from "./src/lib/db.ts";
+import {
+  handleCreateFollow,
+  handleDeleteFollow,
+  handleListFollows,
+} from "./src/routes/follows.ts";
 import { error, type Route } from "./src/lib/http.ts";
 import { handleHealth } from "./src/routes/health.ts";
 import {
@@ -98,8 +103,22 @@ const routes: Route[] = [
     pattern: new URLPattern({ pathname: "/api/ai/evaluate" }),
     handler: handleEvaluate,
   },
-  // TODO: /api/personas/*, /api/profile/me, /api/follows,
-  //       /api/follows/me, /api/ai/transform, /api/stamps を追加していく
+  {
+    method: "POST",
+    pattern: new URLPattern({ pathname: "/api/follows" }),
+    handler: handleCreateFollow,
+  },
+  {
+    method: "DELETE",
+    pattern: new URLPattern({ pathname: "/api/follows" }),
+    handler: handleDeleteFollow,
+  },
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/follows/me" }),
+    handler: handleListFollows,
+  },
+  // TODO: /api/personas/*, /api/profile/me, /api/ai/transform, /api/stamps を追加していく
 ];
 
 async function router(request: Request): Promise<Response> {
