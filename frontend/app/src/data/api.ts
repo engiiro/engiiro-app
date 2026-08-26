@@ -2,11 +2,11 @@ import { mockAiEvaluate, monthsToLabel } from "../lib/mockAiEvaluate";
 import { AiUnavailableError } from "../lib/mockAiTransform";
 import { moderate } from "../lib/mockModeration";
 import { BUBBLE_MAX_LENGTH, REACTION_MAX_PER_USER, countChars } from "./constants";
-import { BUBBLE_SEEDS } from "./bubbles";
-import { BABY_PERSONAS, ME, MOTHER_PERSONAS, PERSONA_BY_ID, setMe } from "./personas";
+import { loadMockSource } from "./mockSource";
+import { ME, PERSONA_BY_ID, registerPersonas, setMe } from "./personas";
+import { registerStamps } from "./stampCatalog";
 import { isReactionAllowed } from "./reactions";
-import { SOOTHE_SEEDS } from "./soothes";
-import { STAMP_CATALOG } from "./stamps";
+import { STAMP_CATALOG } from "./stampCatalog";
 import type {
   Bubble,
   BubbleDetail,
@@ -34,23 +34,27 @@ import type {
  *
  * 実 API に差し替えるときは、ここの各関数の中身を fetch に置き換える。画面側は触らない。
  * 対応する口は docs/design_doc.md §7：
- *   createAccount      → POST /api/accounts（S1。設計書に未記載。FR-ACCOUNT-001/002 の受け皿）
- *   login / logout     → POST /api/sessions / DELETE /api/sessions（同）
- *   fetchMe            → GET  /api/profile/me
- *   fetchMyProfile      → GET  /api/profile/me（S8。両ペルソナのステータス付き）
- *   fetchMyActivity     → GET  /api/profile/me/activity（設計書に未記載）
- *   fetchPublicProfile  → GET  /api/personas/:id（S6。設計書に未記載。FR-PROFILE-005 の受け皿）
- *   fetchPublicActivity → GET  /api/personas/:id/activity（同）
- *   fetchLikedPersonas  → GET  /api/profile/me/following（S7。本人だけが引ける）
- *   setLiked            → POST / DELETE /api/personas/:id/follow
- *   fetchFeed          → GET  /api/posts/feed
- *   fetchBubbleDetail  → GET  /api/posts/:id（+ あやす一覧。読み取り系は Issue #8 で未確定）
- *   createBubble       → POST /api/posts
- *   createSoothe       → POST /api/posts/:id/comments
- *   addReaction        → POST /api/posts/:id/reactions
- *   fetchStamps        → GET  /api/stamps
- *   deleteBubble       → DELETE /api/posts/:id（設計書に未記載。FR-POST-006 の受け皿）
+ *   createAccount       → POST   /api/accounts
+ *   login / logout      → POST   /api/sessions / DELETE /api/sessions
+ *   fetchMe             → GET    /api/profile/me
+ *   fetchMyProfile      → GET    /api/profile/me（S8。両ペルソナのステータス付き）
+ *   fetchPublicProfile  → GET    /api/personas/baby/:id / mother/:id
+ *   fetchFeed           → GET    /api/posts/feed
+ *   fetchBubbleDetail   → GET    /api/posts/:id ＋ GET /api/posts/:id/comments
+ *   createBubble        → POST   /api/posts
+ *   createSoothe        → POST   /api/posts/:id/comments
+ *   addReaction         → POST   /api/posts/:id/reactions
+ *   deleteBubble        → DELETE /api/posts/:id
+ *   fetchStamps         → GET    /api/stamps
+ *   fetchLikedPersonas  → GET    /api/follows/me（本人だけが引ける）
+ *   setLiked            → POST   /api/follows
  *
+ * ★ 設計書 §7 にまだ無いもの（Issue #30 の B-1 / B-2。要否を確かめている最中）：
+ *   fetchMyActivity     → GET    /api/profile/me/activity
+ *   fetchPublicActivity → GET    /api/personas/{kind}/:id/activity
+ *   setLiked(false)     → DELETE /api/follows（解除の口が §7 に無い）
+ *
+ * データの中身は public/data/*.json（PO の指示、2026-08-26）。
  * ここで返す形は「外部向けレスポンス」と同じ制約に従う。accountId を持たせない
  * （FR-COMMON-005）。フォロワーに相当する情報も返さない（OUT-004）。
  */
@@ -114,29 +118,78 @@ function sleep(ms: number): Promise<void> {
  * モックの保存先。画面側から直接書き換えず、必ず下の関数を通す。
  * サーバが持っている状態のつもりで扱う。
  */
-let bubbles: Bubble[] = BUBBLE_SEEDS.map((seed) => ({
-  id: seed.id,
-  author: seed.author,
-  body: seed.body,
-  createdAt: isoMinutesAgo(seed.minutesAgo),
-  reactions: seed.reactions,
-  isMine: seed.isMine,
-  read: seed.read,
-  affinity: seed.affinity,
-  sootheCount: seed.sootheCount,
-}));
+let bubbles: Bubble[] = [];
+let soothes: Soothe[] = [];
+let birthday = "";
 
-let soothes: Soothe[] = SOOTHE_SEEDS.map((seed) => ({
-  id: seed.id,
-  bubbleId: seed.bubbleId,
-  author: seed.author,
-  body: seed.body,
-  createdAt: isoMinutesAgo(seed.minutesAgo),
-  reactions: seed.reactions,
-  // 自分のあやすには自分でリアクションできない。判定に使うだけの真偽値で、識別子ではない
-  isMine: seed.author.id === ME.baby.id || seed.author.id === ME.mother.id,
-  replyToSootheId: seed.replyToSootheId,
-}));
+/*
+ * public/data/*.json の読み込み。
+ *
+ * サーバが起動時にデータを持っている状態の代わりなので、1回だけ走らせて使い回す。
+ * 下の各関数はこれを await してから中身を触る。読めなければ画面は空になるが、
+ * 握りつぶさずに投げる（データが無いことを「0件」に見せない）。
+ */
+let loading: Promise<void> | null = null;
+
+function ready(): Promise<void> {
+  loading ??= (async () => {
+    const source = await loadMockSource();
+    registerPersonas(source.personas);
+    setMe({ baby: source.me.baby, mother: source.me.mother });
+    birthday = source.me.birthday;
+    registerStamps(source.stamps);
+    for (const id of source.following) {
+      following.add(id);
+    }
+
+    soothes = source.soothes.flatMap((seed) => {
+      const author = PERSONA_BY_ID[seed.authorPersonaId];
+      // 知らない id は落とす。存在しない人のあやすを画面に出さない
+      if (!author) {
+        return [];
+      }
+      return [
+        {
+          id: seed.id,
+          bubbleId: seed.bubbleId,
+          author,
+          body: seed.body,
+          createdAt: isoMinutesAgo(seed.minutesAgo),
+          reactions: seed.reactions,
+          // 自分のあやすには自分でリアクションできない。判定用の真偽値で、識別子ではない
+          isMine: isMinePersona(seed.authorPersonaId),
+          replyToSootheId: seed.replyToSootheId,
+        },
+      ];
+    });
+
+    bubbles = source.bubbles.flatMap((seed) => {
+      const author = PERSONA_BY_ID[seed.authorPersonaId];
+      if (!author) {
+        return [];
+      }
+      return [
+        {
+          id: seed.id,
+          author,
+          body: seed.body,
+          createdAt: isoMinutesAgo(seed.minutesAgo),
+          reactions: seed.reactions,
+          isMine: isMinePersona(seed.authorPersonaId),
+          read: seed.read,
+          affinity: seed.affinity,
+          // あやすの件数は数え直す。JSON に持たせると、消したときに合わなくなる
+          sootheCount: soothes.filter((soothe) => soothe.bubbleId === seed.id).length,
+        },
+      ];
+    });
+  })();
+  return loading;
+}
+
+function isMinePersona(personaId: string): boolean {
+  return personaId === ME.baby.id || personaId === ME.mother.id;
+}
 
 let idCounter = 0;
 
@@ -161,6 +214,7 @@ export type FeedResult = {
  * 上位のいくつかを帯として切り出す。本物のロジックは backend 側の担当。
  */
 export async function fetchFeed(): Promise<FeedResult> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
 
   const scored = bubbles.map((bubble) => {
@@ -184,11 +238,13 @@ export async function fetchFeed(): Promise<FeedResult> {
 
 /** 空のフィードを見るためのモック用。実 API 差し替え時には消える */
 export async function fetchEmptyFeed(): Promise<FeedResult> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
   return { recommended: [], rest: [] };
 }
 
 export async function fetchBubbleDetail(bubbleId: string): Promise<BubbleDetail | null> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
   const bubble = bubbles.find((item) => item.id === bubbleId);
   if (!bubble) {
@@ -202,6 +258,7 @@ export async function fetchBubbleDetail(bubbleId: string): Promise<BubbleDetail 
 
 /** 本人専用。両ペルソナをまとめて返すのはこの口だけ（FR-PERSONA-005） */
 export async function fetchMe(): Promise<Me> {
+  await ready();
   return ME;
 }
 
@@ -212,23 +269,13 @@ export async function fetchMe(): Promise<Me> {
  * 両ペルソナが同じ戻り値に入るのはここだけで、公開系の口へ持ち出さない（FR-PERSONA-005）。
  */
 
-/** 生年月日。仕様書に項目が無い（人間の指示、2026-08-25 のモック）ので固定値 */
-const MY_BIRTHDAY = "2023-04-15";
-
 /**
  * フォロー「中」のペルソナ。本人だけが引ける（FR-FOLLOW-003）。
  *
  * ★ 「誰が自分をフォローしているか」を持つ入れ物は、この先も作らない。
  *   フォロワー一覧もフォロワー数も、本人を含む誰にも出さない（FR-FOLLOW-004/005、OUT-004）。
  */
-const following = new Set<string>([
-  BABY_PERSONAS.sheep.id,
-  BABY_PERSONAS.taputapu.id,
-  BABY_PERSONAS.yowane.id,
-  BABY_PERSONAS.puni.id,
-  MOTHER_PERSONAS.okan.id,
-  MOTHER_PERSONAS.yoshiyoshi.id,
-]);
+const following = new Set<string>();
 
 /**
  * S8 本人専用プロフィール（GET /api/profile/me 相当）。
@@ -243,6 +290,7 @@ const following = new Set<string>([
  *          プロフィールそのものは読めるままにする。
  */
 export async function fetchMyProfile(): Promise<MyProfile> {
+  await ready();
   const babyTexts = textsFor(ME.baby.id, "baby");
   const motherTexts = textsFor(ME.mother.id, "mother");
 
@@ -254,7 +302,7 @@ export async function fetchMyProfile(): Promise<MyProfile> {
   return {
     baby: { persona: ME.baby, status: baby },
     mother: { persona: ME.mother, status: mother },
-    birthday: MY_BIRTHDAY,
+    birthday,
     followingBabyCount: countFollowing("baby"),
     followingMotherCount: countFollowing("mother"),
   };
@@ -265,6 +313,7 @@ export async function fetchMyProfile(): Promise<MyProfile> {
  * 新しい順に並べる（自分の記録なので、ここは新着順でよい。FR-FEED-002 はタイムラインの要件）。
  */
 export async function fetchMyActivity(tab: ActivityTab): Promise<readonly ActivityEntry[]> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
   const personaId = tab === "motherSoothes" ? ME.mother.id : ME.baby.id;
   return activityOf(personaId, tab);
@@ -389,6 +438,7 @@ export type CreateBubbleResult =
  * 返す reason は表示の切り替えに使う粗い区分で、判定の内部情報ではない（FR-MOD-034）。
  */
 export async function createBubble(input: CreateBubbleInput): Promise<CreateBubbleResult> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
 
   const body = input.body.trim();
@@ -443,6 +493,7 @@ export type CreateSootheResult =
  * （本番では同じ判定をサーバ側で必ず行う。フロントの判定は保証にならない）
  */
 export async function createSoothe(input: CreateSootheInput): Promise<CreateSootheResult> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
 
   const body = input.body.trim();
@@ -519,6 +570,7 @@ function personaOf(kind: PersonaKind): PublicPersona {
 
 /** スタンプのカタログ（FR-STAMP-001） */
 export async function fetchStamps(): Promise<readonly Stamp[]> {
+  await ready();
   return STAMP_CATALOG;
 }
 
@@ -543,6 +595,7 @@ export type AddReactionResult =
  * 画面側もボタンを止めるが、止めるのはこちら。
  */
 export async function addReaction(input: AddReactionInput): Promise<AddReactionResult> {
+  await ready();
   if (!isReactionAllowed(input.targetKind, input.reaction)) {
     return { ok: false, reason: "not_allowed" };
   }
@@ -593,6 +646,7 @@ function bump(state: ReactionState, reaction: ReactionType): ReactionState {
 
 /** FR-POST-006/007：自分のバブルだけ削除できる。不可逆 */
 export async function deleteBubble(bubbleId: string): Promise<{ readonly ok: boolean }> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
   const target = bubbles.find((bubble) => bubble.id === bubbleId);
   if (!target || !target.isMine) {
@@ -622,6 +676,7 @@ export function markRead(bubbleId: string): void {
  * もう一方のペルソナ。どれも「画面で出さない」ではなく「応答に含めない」で落とす。
  */
 export async function fetchPublicProfile(personaId: string): Promise<PublicProfile | null> {
+  await ready();
   const persona = PERSONA_BY_ID[personaId];
   if (!persona) {
     return null;
@@ -640,6 +695,7 @@ export async function fetchPublicActivity(
   personaId: string,
   tab: ActivityTab,
 ): Promise<readonly ActivityEntry[]> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
   return activityOf(personaId, tab);
 }
@@ -656,6 +712,7 @@ export type SetLikedResult = { readonly ok: boolean; readonly liked: boolean };
  *   この関数が書き換えるのは、閲覧者本人の following だけ。
  */
 export async function setLiked(personaId: string, liked: boolean): Promise<SetLikedResult> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
   if (personaId === ME.baby.id || personaId === ME.mother.id) {
     return { ok: false, liked: false };
@@ -684,6 +741,7 @@ export async function fetchLikedPersonas(): Promise<{
   readonly baby: readonly PublicPersona[];
   readonly mother: readonly PublicPersona[];
 }> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
   const liked: PublicPersona[] = [];
   for (const id of following) {
@@ -737,6 +795,7 @@ export const ACCOUNT_ID_RULE_TEXT = "半角の 英小文字・数字・_ で 3�
  *   同じ名前が両方に出ると、それだけで同一人物の手がかりになる（FR-PERSONA-003）。
  */
 export async function createAccount(input: CreateAccountInput): Promise<CreateAccountResult> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
 
   const accountId = input.accountId.trim();
@@ -775,8 +834,6 @@ export async function createAccount(input: CreateAccountInput): Promise<CreateAc
     mother: { ...ME.mother, nickname: mother },
   };
   setMe(next);
-  PERSONA_BY_ID[next.baby.id] = next.baby;
-  PERSONA_BY_ID[next.mother.id] = next.mother;
   bubbles = bubbles.map((bubble) =>
     bubble.author.id === next.baby.id ? { ...bubble, author: next.baby } : bubble,
   );
@@ -802,6 +859,7 @@ export type LoginResult =
  *   どの ID が存在するかを外から数えられる。
  */
 export async function login(accountId: string, password: string): Promise<LoginResult> {
+  await ready();
   await sleep(MOCK_LATENCY_MS);
   if (!ACCOUNT_ID_PATTERN.test(accountId.trim()) || password.length < PASSWORD_MIN_LENGTH) {
     return { ok: false, reason: "invalid" };

@@ -1,7 +1,9 @@
 # えんじいろ UI モック（frontend/app）
 
 **PC を主にした 3 カラム構成**の UI モック。React + TypeScript + Vite。
-**データは静的ダミーで、backend には接続しない。**
+**データは `public/data/*.json` のダミーで、backend には接続しない。**
+JSON を書き換えて再読み込みすれば画面が変わる（ビルド不要）。詳しくは
+[`public/data/README.md`](public/data/README.md)。
 
 ```
 ┌──────────┬────────────────┬──────────────┐
@@ -61,17 +63,24 @@ src/
     motion.css       動きのトークンと5つの keyframes、reduced-motion
     base.css         余白・レイアウト・フォーカス・共通の地ならし
   components/  共通部品（LeftRail / RightRail / ReactionRow / BubbleCard / BubbleBody …）
-  screens/     TimelineScreen / BubbleDetailScreen / ComposePanel / PlaceholderScreen
-  data/        静的ダミーデータ
+  screens/     TimelineScreen / BubbleDetailScreen / ComposePanel /
+               MyProfileScreen / PublicProfileScreen / FavoritesScreen /
+               SignUpScreen / LoginScreen / IntroScreen / PlaceholderScreen
+  data/        データ層
     api.ts           ★ サーバとの境界。実 API 差し替え時はここだけ触る
+    mockSource.ts    public/data/*.json を読みに行くだけの層。実 API 差し替え時に消える
     types.ts         ドメイン型（accountId 相当のフィールドを持たない）
     reactions.ts     ★ 対象別リアクションの唯一の定義
-  lib/         mockAiTransform / mockModeration / 相対時刻 / テーマ / あやすの返信規則
+  lib/         mockAiTransform / mockAiEvaluate / mockModeration / 相対時刻 /
+               生年月日 / テーマ / あやすの返信規則
+
+public/data/   ★ ダミーデータの実体（JSON）。書き換えると画面が変わる
 ```
 
 差し替えるときに触る場所は 2 つだけ：
 
-- **API 接続**：`src/data/api.ts` の各関数の中身を `fetch` にする。画面側は触らない
+- **API 接続**：`src/data/api.ts` の各関数の中身を実 API への `fetch` にする。
+  `src/data/mockSource.ts` と `public/data/` はそのとき消える。画面側は触らない
 - **配色の確定**（DESIGN.md §2.2 のノーマルが未確定）：`src/tokens/theme.css` の
   素の `:root` の値。コンポーネントに hex は 1 つも無い
 

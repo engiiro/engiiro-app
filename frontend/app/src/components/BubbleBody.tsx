@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import { STAMP_MARKER } from "../data/constants";
-import { STAMP_CATALOG } from "../data/stamps";
+import { STAMP_CATALOG } from "../data/stampCatalog";
 import { cx } from "../lib/cx";
 import "./BubbleBody.css";
 
@@ -15,7 +15,10 @@ import "./BubbleBody.css";
  * そもそも URL は保存されないので、リンク化の処理そのものを置かない。
  */
 
-const STAMP_IDS = new Set(STAMP_CATALOG.map((stamp) => stamp.id));
+/* カタログは読み込み後に入るので、毎回引く。モジュール読み込み時にはまだ空 */
+function isKnownStamp(id: string): boolean {
+  return STAMP_CATALOG.some((stamp) => stamp.id === id);
+}
 
 export function BubbleBody({
   body,
@@ -45,7 +48,7 @@ function renderWithStamps(body: string): (string | ReactElement)[] {
   const pattern = new RegExp(STAMP_MARKER.source, "g");
   let match = pattern.exec(body);
   while (match !== null) {
-    if (!STAMP_IDS.has(match[1])) {
+    if (!isKnownStamp(match[1])) {
       match = pattern.exec(body);
       continue;
     }

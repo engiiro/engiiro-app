@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createBubble, createSoothe } from "../data/api";
 import { isOverLimit } from "../data/constants";
 import { BLOCK_DEMO_INPUT, REWRITE_DEMO_INPUT } from "../data/moderationSamples";
-import { STAMP_CATALOG } from "../data/stamps";
+import { STAMP_CATALOG } from "../data/stampCatalog";
 import type { Me, PersonaKind } from "../data/types";
 import { cx } from "../lib/cx";
 import { AiUnavailableError, mockAiTransform } from "../lib/mockAiTransform";

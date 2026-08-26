@@ -7,6 +7,7 @@ import {
   fetchEmptyFeed,
   fetchFeed,
   fetchLikedPersonas,
+  fetchMe,
   fetchMyActivity,
   fetchMyProfile,
   fetchPublicActivity,
@@ -18,12 +19,12 @@ import {
   setSessionGuest,
 } from "./data/api";
 import type { FeedResult } from "./data/api";
-import { ME } from "./data/personas";
 import { reactionTargetOfSoothe } from "./data/reactions";
 import type {
   BubbleDetail,
   ActivityEntry,
   ActivityTab,
+  Me,
   MyProfile,
   PersonaKind,
   PublicPersona,
@@ -108,6 +109,17 @@ export function App() {
    * 既定はゲスト（人間の指示、2026-08-26）。初めて来た人と同じ状態から始める。
    */
   const [isGuest, setIsGuest] = useState(true);
+
+  /*
+   * 閲覧者自身。モックデータ（public/data/profile-me.json）の読み込みが終わってから入る。
+   * 画面が data/personas.ts の ME を直接見ないための状態。
+   * 直接見ていると、読み込みが終わるまで空のニックネームが出る。
+   */
+  const [me, setMe] = useState<Me | null>(null);
+
+  useEffect(() => {
+    void fetchMe().then(setMe);
+  }, []);
 
 
   const [gate, setGate] = useState<GuestAction | null>(null);
@@ -681,10 +693,11 @@ export function App() {
         </main>
 
         <div className="eg-layout__right">
-          {compose ? (
+          {/* 閲覧者が読めるまでは開かない。ペルソナの名前が無いまま出さない */}
+          {compose && me ? (
             <ComposePanel
               mode={compose}
-              me={ME}
+              me={me}
               aiEvaluateAvailable={aiEvaluateAvailable}
               aiTransformAvailable={aiTransformAvailable}
               onClose={() => setCompose(null)}
@@ -697,7 +710,7 @@ export function App() {
           ) : (
             <RightRail
               isGuest={isGuest}
-              babyNickname={ME.baby.nickname}
+              babyNickname={me ? me.baby.nickname : ""}
               onLogin={() => setEntry("login")}
               onLogout={() => void leave()}
             />
