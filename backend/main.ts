@@ -8,12 +8,14 @@ import {
 } from "./src/routes/follows.ts";
 import { error, type Route } from "./src/lib/http.ts";
 import { handleHealth } from "./src/routes/health.ts";
+import { handleGetPublicPersona } from "./src/routes/personas.ts";
 import {
   handleCreatePost,
   handleDeletePost,
   handleFeed,
   handleGetPost,
 } from "./src/routes/posts.ts";
+import { handleGetMyProfile } from "./src/routes/profile.ts";
 import {
   handleCreateCommentReaction,
   handleCreatePostReaction,
@@ -118,7 +120,22 @@ const routes: Route[] = [
     pattern: new URLPattern({ pathname: "/api/follows/me" }),
     handler: handleListFollows,
   },
-  // TODO: /api/personas/*, /api/profile/me, /api/ai/transform, /api/stamps を追加していく
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/profile/me" }),
+    handler: handleGetMyProfile,
+  },
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/personas/baby/:id" }),
+    handler: (req, params) => handleGetPublicPersona(req, "baby", params.id!),
+  },
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/personas/mother/:id" }),
+    handler: (req, params) => handleGetPublicPersona(req, "mother", params.id!),
+  },
+  // TODO: /api/ai/transform, /api/stamps を追加していく
 ];
 
 async function router(request: Request): Promise<Response> {

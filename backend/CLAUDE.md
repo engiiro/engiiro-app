@@ -123,6 +123,19 @@ deno task dev
 `deno check`は正規表現の構文エラーを検出しないため、`RegExp`を動的に組み立てる
 コードを変更したら、実際にサーバを起動して確認する。
 
+`accounts.birth_date`はPostgresの`date`型。`npm:pg`のデフォルト型パーサーは
+これをJSの`Date`へ変換するため、素の`select birth_date`だと`JSON.stringify`で
+`"1995-05-19T15:00:00.000Z"`のようなタイムスタンプになってしまう
+（design_doc.md 7.2章が期待するのは`"1995-05-20"`というYYYY-MM-DDの文字列）。
+`select to_char(birth_date, 'YYYY-MM-DD') as birth_date`のようにSQL側で
+文字列化する（`routes/profile.ts`を参照）。`date`型を新しく扱うクエリを
+書いたら、レスポンスを実際に確認する。
+
+`query<T>()`にインライン・匿名オブジェクト型（`query<{ body: string }>(...)`）を
+渡すと、`.rows.map((row) => ...)`のコールバック引数が`any`型に落ちて
+`deno check`が通らないことがある（原因未特定）。名前付きの型エイリアスを
+先に定義してから渡すと解消する（`personaStatus.ts`の`BodyRow`を参照）。
+
 ## 変更したら
 
 `deno task check`を通す。`deno check`と`deno lint`と`deno fmt --check`を
