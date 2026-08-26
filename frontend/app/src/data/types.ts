@@ -55,6 +55,10 @@ export type Bubble = {
   readonly read: boolean;
   /** タイムラインの優先表示の材料（FR-FEED-003）。新着順のみにしないため */
   readonly affinity: number;
+  /**
+   * このバブルに直接ついたあやすの件数。
+   * あやすへの返信は数に入れない。そちらは Soothe.replyCount が持つ。
+   */
   readonly sootheCount: number;
 };
 
@@ -70,11 +74,55 @@ export type Soothe = {
   readonly isMine: boolean;
   /** あやすへの返信のとき、その相手。返信できるペルソナの判定に使う（FR-COMMENT-005） */
   readonly replyToSootheId?: string;
+  /**
+   * このあやすに直接ついたあやすの件数（人間の指示、2026-08-26）。
+   *
+   * 件数だけで、誰が返したかは持たない。一覧を開けば発信ペルソナは見えるが、
+   * それは開いた1画面のなかの話で、件数の側に人を持たせない。
+   */
+  readonly replyCount: number;
 };
 
+/**
+ * バブル1件と、それに直接ついたあやす。
+ *
+ * ★ `soothes` に入るのは replyToSootheId を持たないものだけ。
+ *   あやすへの返信は、そのあやすの詳細（SootheDetail）側に入る。
+ *   混ぜて平らに並べると、何件ついているのかも、誰への返事なのかも読めない。
+ */
 export type BubbleDetail = {
   readonly bubble: Bubble;
   readonly soothes: readonly Soothe[];
+};
+
+/**
+ * あやす1件と、それに直接ついたあやす（人間の指示、2026-08-26）。
+ *
+ * バブル詳細と同じ形にそろえてある。あやすもタッチで開けて、
+ * その先で「誰があやしているか」を一覧で見られる。
+ *
+ * ★ 持たせていないもの：
+ *   - 元のバブルの発信者。文脈を思い出すための抜粋だけを渡す。
+ *     あやすの発信者と バブルの発信者を、この画面の主役として並べない
+ *     （バブル詳細では並ぶが、あちらはバブルが主役の画面）
+ *   - 親をさかのぼる連鎖。1階層ずつ開く。ここに祖先を全部積むと、
+ *     ひとつの応答に関係者が芋づるで並ぶ
+ */
+export type SootheDetail = {
+  readonly soothe: Soothe;
+  /** 元のバブル。「もとの バブルへ」で戻るために id だけ持つ */
+  readonly bubbleId: string;
+  /** 元のバブル本文の抜粋。本文そのものではない */
+  readonly bubbleExcerpt: string;
+  /**
+   * 元のバブルが閲覧者自身のものか。
+   * 返信に使えるペルソナの判定に要る（soothePersonaRule）。識別子ではない。
+   */
+  readonly bubbleIsMine: boolean;
+  /** このあやす自体が返信のとき、その相手のニックネーム */
+  readonly replyToNickname?: string;
+  /** このあやすに直接ついたあやす */
+  readonly replies: readonly Soothe[];
 };
 
 /**

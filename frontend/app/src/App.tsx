@@ -12,6 +12,7 @@ import {
   fetchMyProfile,
   fetchPublicActivity,
   fetchPublicProfile,
+  fetchSootheDetail,
   logout,
   markRead,
   setAiEvaluateAvailability,
@@ -30,6 +31,7 @@ import type {
   PublicPersona,
   PublicProfile,
   ReactionType,
+  SootheDetail,
 } from "./data/types";
 import { LeftRail } from "./components/LeftRail";
 import type { CenterView } from "./components/LeftRail";
@@ -54,6 +56,7 @@ import { MyProfileScreen } from "./screens/MyProfileScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
 import { PublicProfileScreen } from "./screens/PublicProfileScreen";
 import { SignUpScreen } from "./screens/SignUpScreen";
+import { SootheDetailScreen } from "./screens/SootheDetailScreen";
 import { TimelineScreen } from "./screens/TimelineScreen";
 import "./App.css";
 
@@ -69,6 +72,16 @@ import "./App.css";
  *
  * データの読み書きは必ず data/api.ts を通す。ここで直接ダミーデータを書き換えない。
  */
+
+/** いま開いている詳細1つぶん。中身ではなく「どれを開いているか」だけを持つ */
+type DetailRef =
+  | { readonly kind: "bubble"; readonly id: string }
+  | { readonly kind: "soothe"; readonly id: string };
+
+/** 引き直した中身。画面の出しわけは kind だけで決める */
+type OpenDetail =
+  | { readonly kind: "bubble"; readonly value: BubbleDetail }
+  | { readonly kind: "soothe"; readonly value: SootheDetail };
 
 export function App() {
   const { theme, setTheme } = useTheme();
@@ -125,11 +138,24 @@ export function App() {
   const [gate, setGate] = useState<GuestAction | null>(null);
 
   const [view, setView] = useState<CenterView>("timeline");
-  const [detailBubbleId, setDetailBubbleId] = useState<string | null>(null);
   const [feed, setFeed] = useState<FeedResult | null>(null);
   const [feedLoading, setFeedLoading] = useState(true);
-  const [detail, setDetail] = useState<BubbleDetail | null>(null);
+
+  /*
+   * いま開いている詳細の積み重ね（人間の指示、2026-08-26）。
+   *
+   * バブル → あやす → そのあやすへのあやす、と1階層ずつ潜っていける。
+   * 「もどる」は1つ戻すだけで、空になったらタイムラインへ帰る。
+   *
+   * ★ 1本の配列にしているのは、戻り先を画面ごとに覚えさせないため。
+   *   画面側に「どこから来たか」を持たせると、増やすたびに分岐が増える。
+   *   ここに入るのは種別と id だけで、中身は開くたびに引き直す
+   *   （リアクションや返信で数が変わるので、積んだ古い中身は当てにしない）。
+   */
+  const [detailStack, setDetailStack] = useState<readonly DetailRef[]>([]);
+  const [detail, setDetail] = useState<OpenDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const openDetail = detailStack.length > 0 ? detailStack[detailStack.length - 1] : null;
   const [compose, setCompose] = useState<ComposeMode | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -186,10 +212,15 @@ export function App() {
 
   const showFeedSkeleton = feedLoading || feedMode === "loading";
 
-  const loadDetail = useCallback(async (bubbleId: string) => {
+  const loadDetail = useCallback(async (ref: DetailRef) => {
     setDetailLoading(true);
-    const result = await fetchBubbleDetail(bubbleId);
-    setDetail(result);
+    if (ref.kind === "bubble") {
+      const result = await fetchBubbleDetail(ref.id);
+      setDetail(result ? { kind: "bubble", value: result } : null);
+    } else {
+      const result = await fetchSootheDetail(ref.id);
+      setDetail(result ? { kind: "soothe", value: result } : null);
+    }
     setDetailLoading(false);
   }, []);
 
@@ -231,7 +262,7 @@ export function App() {
     setLikedBaby([]);
     setLikedMother([]);
     setView("timeline");
-    setDetailBubbleId(null);
+    setDetailStack([]);
     setDetail(null);
     setPublicPersonaId(null);
     setPublicProfile(null);
@@ -319,23 +350,51 @@ export function App() {
     setPublicProfile(null);
   }, []);
 
+  /** バブルを開く。ここが詳細の起点なので、積み上げは作り直す */
   const openBubble = useCallback(
     (bubbleId: string) => {
       markRead(bubbleId);
-      setDetailBubbleId(bubbleId);
-      void loadDetail(bubbleId);
+      const ref: DetailRef = { kind: "bubble", id: bubbleId };
+      setDetailStack([ref]);
+      void loadDetail(ref);
+    },
+    [loadDetail],
+  );
+
+  /** あやすを開く（人間の指示、2026-08-26）。いまの画面の上に積む */
+  const openSootheDetail = useCallback(
+    (sootheId: string) => {
+      const ref: DetailRef = { kind: "soothe", id: sootheId };
+      setDetailStack((current) => [...current, ref]);
+      void loadDetail(ref);
     },
     [loadDetail],
   );
 
   const backToTimeline = useCallback(() => {
-    setDetailBubbleId(null);
+    setDetailStack([]);
     setDetail(null);
     if (feedMode !== "loading") {
       setFeedLoading(true);
       void loadFeed();
     }
   }, [feedMode, loadFeed]);
+
+  /**
+   * 「もどる」。1つだけ戻す。
+   *
+   * 戻った先は開き直す。潜っているあいだにリアクションや返信で数が変わっているので、
+   * 積んだときの中身をそのまま出さない。
+   */
+  const backFromDetail = useCallback(() => {
+    const rest = detailStack.slice(0, -1);
+    if (rest.length === 0) {
+      backToTimeline();
+      return;
+    }
+    setDetailStack(rest);
+    void loadDetail(rest[rest.length - 1]);
+  }, [backToTimeline, detailStack, loadDetail]);
 
   const navigate = useCallback(
     (next: CenterView) => {
@@ -345,7 +404,7 @@ export function App() {
         return;
       }
       setView(next);
-      setDetailBubbleId(null);
+      setDetailStack([]);
       setDetail(null);
       setPublicPersonaId(null);
       setPublicProfile(null);
@@ -370,12 +429,12 @@ export function App() {
       await Promise.all([loadProfile(), loadActivity(activityTab)]);
       return;
     }
-    if (detailBubbleId) {
-      await loadDetail(detailBubbleId);
+    if (openDetail) {
+      await loadDetail(openDetail);
     } else if (feedMode !== "loading") {
       await loadFeed();
     }
-  }, [activityTab, detailBubbleId, feedMode, loadActivity, loadDetail, loadFeed, loadProfile, view]);
+  }, [activityTab, feedMode, loadActivity, loadDetail, loadFeed, loadProfile, openDetail, view]);
 
   const reactToBubble = useCallback(
     async (bubbleId: string, reaction: ReactionType) => {
@@ -448,6 +507,21 @@ export function App() {
     [closeProfile, openBubble],
   );
 
+  /**
+   * プロフィールの一覧からあやすを開く（人間の指示、2026-08-26）。
+   * バブルを経由しない。押したものがそのまま主役になる画面へ移る。
+   */
+  const openSootheFromProfile = useCallback(
+    (sootheId: string) => {
+      closeProfile();
+      setView("timeline");
+      const ref: DetailRef = { kind: "soothe", id: sootheId };
+      setDetailStack([ref]);
+      void loadDetail(ref);
+    },
+    [closeProfile, loadDetail],
+  );
+
   const openReply = useCallback(
     (target: SootheTarget) => {
       guard("soothe", () => setCompose({ kind: "reply", target }));
@@ -476,11 +550,14 @@ export function App() {
   // 画面を入れ替えたら中央を先頭へ戻す
   useEffect(() => {
     document.querySelector(".eg-center")?.scrollTo({ top: 0 });
-  }, [view, detailBubbleId, publicPersonaId]);
+    // 潜るたび・戻るたびに先頭へ。詳細は id で区別する（深さだけだと同じ階層の移動で戻らない）
+  }, [view, openDetail, publicPersonaId]);
 
   /** S6 を開いているあいだは、左サイドの選択に関わらず中央を S6 にする */
   const showPublicProfile = publicPersonaId !== null;
   const showTimeline = view === "timeline" && !showPublicProfile;
+  /* 詳細（バブル／あやす）を実際に出しているか。下端に貼りつくものの出しわけに使う */
+  const showDetail = showTimeline && openDetail !== null;
 
   if (entry !== "app") {
     return (
@@ -597,6 +674,7 @@ export function App() {
               }}
               onToggleLike={(next) => guard("like", () => void toggleLike(next))}
               onOpenBubble={openBubbleFromProfile}
+              onOpenSoothe={openSootheFromProfile}
               onBack={() => {
                 closeProfile();
                 setView(publicBackTo);
@@ -631,6 +709,7 @@ export function App() {
                 void loadActivity(next);
               }}
               onOpenBubble={openBubbleFromProfile}
+              onOpenSoothe={openSootheFromProfile}
               onDeleteBubble={(bubbleId) => void removeBubble(bubbleId)}
               onOpenFollowing={() => {
                 navigate("favorites");
@@ -639,7 +718,7 @@ export function App() {
             />
           ) : null}
 
-          {showTimeline && detailBubbleId === null ? (
+          {showTimeline && !showDetail ? (
             <TimelineScreen
               feed={feed}
               loading={showFeedSkeleton}
@@ -654,31 +733,48 @@ export function App() {
             />
           ) : null}
 
-          {showTimeline && detailBubbleId !== null ? (
+          {showDetail ? (
             detailLoading || detail === null ? (
               <div className="eg-center__loading">
                 <SkeletonFeed count={1} />
               </div>
-            ) : (
+            ) : detail.kind === "bubble" ? (
               <BubbleDetailScreen
-                detail={detail}
-                onBack={backToTimeline}
+                detail={detail.value}
+                onBack={backFromDetail}
                 onOpenProfile={(personaId) => void openProfile(personaId)}
                 onReactToBubble={(bubbleId, reaction) => reactToBubbleGuarded(bubbleId, reaction)}
                 onReactToSoothe={(sootheId, authorKind, reaction) =>
                   reactToSootheGuarded(sootheId, authorKind, reaction)
                 }
                 onOpenSoothe={openReply}
+                onOpenSootheDetail={openSootheDetail}
                 onDelete={(bubbleId) => void removeBubble(bubbleId)}
+              />
+            ) : (
+              <SootheDetailScreen
+                detail={detail.value}
+                onBack={backFromDetail}
+                onOpenProfile={(personaId) => void openProfile(personaId)}
+                onOpenBubble={openBubble}
+                onOpenSoothe={openSootheDetail}
+                onReact={(sootheId, authorKind, reaction) =>
+                  reactToSootheGuarded(sootheId, authorKind, reaction)
+                }
+                onReply={openReply}
               />
             )
           ) : null}
 
           {/*
             中央の右下。押すと右の列が投稿パネルに入れ替わる。
-            高さ 0 のスロットに入れて下端へ固定する（中身の長さで位置が動かないように）
+            下端のスロットに入れて固定する（中身の長さで位置が動かないように。App.css の注記）。
+
+            ★ 詳細を開いているあいだは出さない（人間の指摘、2026-08-26）。
+              あちらは下端いっぱいの「あやす」が主操作で、そこへ重ねると押し間違える。
+              下端に貼りつくものは、1画面につき1つだけにする。
           */}
-          {compose === null ? (
+          {compose === null && !showDetail ? (
             <div className="eg-fab-slot">
               <button
                 type="button"

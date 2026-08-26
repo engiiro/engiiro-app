@@ -26,6 +26,7 @@ import type {
   ReactionTargetKind,
   ReactionType,
   Soothe,
+  SootheDetail,
   Stamp,
 } from "./types";
 
@@ -53,6 +54,8 @@ import type {
  *   fetchMyActivity     → GET    /api/profile/me/activity
  *   fetchPublicActivity → GET    /api/personas/{kind}/:id/activity
  *   setLiked(false)     → DELETE /api/follows（解除の口が §7 に無い）
+ *   fetchSootheDetail   → GET    /api/comments/:id ＋ GET /api/comments/:id/comments
+ *                         （あやすへのあやすの一覧。人間の指示 2026-08-26。§7 に無い）
  *
  * データの中身は public/data/*.json（PO の指示、2026-08-26）。
  * ここで返す形は「外部向けレスポンス」と同じ制約に従う。accountId を持たせない
@@ -94,6 +97,31 @@ export function setSessionGuest(guest: boolean): void {
 /** 閲覧者から見た形にして返す。ゲストには「自分のもの」が無い */
 function asViewer<T extends { readonly isMine: boolean }>(item: T): T {
   return viewerIsGuest ? { ...item, isMine: false } : item;
+}
+
+/*
+ * 件数は保存せず、返す直前に数える。
+ *
+ * 保存しておくと、消したとき・返信を足したときに合わなくなる（bubbles の sootheCount で
+ * 一度それをやって、あちこちで加算し忘れる形になっていた）。
+ * モックなので件数は多くない。実 API では SQL 側が数える。
+ */
+function directSootheCount(bubbleId: string): number {
+  return soothes.filter(
+    (item) => item.bubbleId === bubbleId && item.replyToSootheId === undefined,
+  ).length;
+}
+
+function replyCountOf(sootheId: string): number {
+  return soothes.filter((item) => item.replyToSootheId === sootheId).length;
+}
+
+function bubbleForViewer(bubble: Bubble): Bubble {
+  return asViewer({ ...bubble, sootheCount: directSootheCount(bubble.id) });
+}
+
+function sootheForViewer(soothe: Soothe): Soothe {
+  return asViewer({ ...soothe, replyCount: replyCountOf(soothe.id) });
 }
 
 export function setAiEvaluateAvailability(available: boolean): void {
@@ -159,6 +187,8 @@ function ready(): Promise<void> {
           // 自分のあやすには自分でリアクションできない。判定用の真偽値で、識別子ではない
           isMine: isMinePersona(seed.authorPersonaId),
           replyToSootheId: seed.replyToSootheId,
+          // 返す直前に数え直す。ここは器を埋めるだけ
+          replyCount: 0,
         },
       ];
     });
@@ -178,8 +208,8 @@ function ready(): Promise<void> {
           isMine: isMinePersona(seed.authorPersonaId),
           read: seed.read,
           affinity: seed.affinity,
-          // あやすの件数は数え直す。JSON に持たせると、消したときに合わなくなる
-          sootheCount: soothes.filter((soothe) => soothe.bubbleId === seed.id).length,
+          // 返す直前に数え直す。ここは器を埋めるだけ
+          sootheCount: 0,
         },
       ];
     });
@@ -229,10 +259,10 @@ export async function fetchFeed(): Promise<FeedResult> {
   const bandIds = new Set(band.map((entry) => entry.bubble.id));
 
   return {
-    recommended: band.map((entry) => asViewer(entry.bubble)),
+    recommended: band.map((entry) => bubbleForViewer(entry.bubble)),
     rest: scored
       .filter((entry) => !bandIds.has(entry.bubble.id))
-      .map((entry) => asViewer(entry.bubble)),
+      .map((entry) => bubbleForViewer(entry.bubble)),
   };
 }
 
@@ -243,6 +273,14 @@ export async function fetchEmptyFeed(): Promise<FeedResult> {
   return { recommended: [], rest: [] };
 }
 
+/**
+ * S4 バブル詳細。
+ *
+ * ★ 返すあやすは「バブルに直接ついたもの」だけ（人間の指示、2026-08-26）。
+ *   あやすへの返信は、そのあやすの詳細（fetchSootheDetail）で出す。
+ *   以前は全部を平らに並べていたので、何件ついているのかも、
+ *   どれが誰への返事なのかも読めなかった。
+ */
 export async function fetchBubbleDetail(bubbleId: string): Promise<BubbleDetail | null> {
   await ready();
   await sleep(MOCK_LATENCY_MS);
@@ -251,8 +289,43 @@ export async function fetchBubbleDetail(bubbleId: string): Promise<BubbleDetail 
     return null;
   }
   return {
-    bubble: asViewer(bubble),
-    soothes: soothes.filter((item) => item.bubbleId === bubbleId).map(asViewer),
+    bubble: bubbleForViewer(bubble),
+    soothes: soothes
+      .filter((item) => item.bubbleId === bubbleId && item.replyToSootheId === undefined)
+      .map(sootheForViewer),
+  };
+}
+
+/**
+ * S4b あやす詳細（人間の指示、2026-08-26）。
+ *
+ * 「あやすに対してあやしている人たち」を見る画面のためのデータ。
+ * 設計書 §7 には対応する口がまだ無い（Issue #30 で確認する）。
+ * 実 API では `GET /api/comments/:id` ＋ `GET /api/comments/:id/comments` の形になる想定。
+ *
+ * ★ 親をさかのぼった連鎖は返さない。1階層ずつ開く。
+ */
+export async function fetchSootheDetail(sootheId: string): Promise<SootheDetail | null> {
+  await ready();
+  await sleep(MOCK_LATENCY_MS);
+  const soothe = soothes.find((item) => item.id === sootheId);
+  if (!soothe) {
+    return null;
+  }
+  const replyTo = soothe.replyToSootheId
+    ? soothes.find((item) => item.id === soothe.replyToSootheId)
+    : undefined;
+  const sourceBubble = bubbles.find((item) => item.id === soothe.bubbleId);
+  return {
+    soothe: sootheForViewer(soothe),
+    bubbleId: soothe.bubbleId,
+    bubbleExcerpt: excerptOf(soothe.bubbleId),
+    // 消えたバブルへのあやすなら false。返信ペルソナの規則がゆるむ方向には倒さない
+    bubbleIsMine: !viewerIsGuest && (sourceBubble?.isMine ?? false),
+    replyToNickname: replyTo?.author.nickname,
+    replies: soothes
+      .filter((item) => item.replyToSootheId === sootheId)
+      .map(sootheForViewer),
   };
 }
 
@@ -329,12 +402,16 @@ function activityOf(personaId: string, tab: ActivityTab): readonly ActivityEntry
   const items: ActivityEntry[] = [];
   if (tab === "babyBubbles" || tab === "babyAll") {
     for (const bubble of bubblesOf(personaId)) {
-      items.push({ kind: "bubble", bubble });
+      items.push({ kind: "bubble", bubble: bubbleForViewer(bubble) });
     }
   }
   if (tab === "babyAll" || tab === "motherSoothes") {
     for (const soothe of soothesOf(personaId)) {
-      items.push({ kind: "soothe", soothe, toBubbleExcerpt: excerptOf(soothe.bubbleId) });
+      items.push({
+        kind: "soothe",
+        soothe: sootheForViewer(soothe),
+        toBubbleExcerpt: excerptOf(soothe.bubbleId),
+      });
     }
   }
   items.sort((a, b) => timeOf(b) - timeOf(a));
@@ -524,11 +601,10 @@ export async function createSoothe(input: CreateSootheInput): Promise<CreateSoot
     reactions: { counts: {}, mine: {} },
     isMine: true,
     replyToSootheId: input.replyToSootheId,
+    replyCount: 0,
   };
   soothes = [...soothes, soothe];
-  bubbles = bubbles.map((bubble) =>
-    bubble.id === input.bubbleId ? { ...bubble, sootheCount: bubble.sootheCount + 1 } : bubble,
-  );
+  // 件数はここで足さない。返すときに数え直す（directSootheCount / replyCountOf）
   return { ok: true, soothe };
 }
 

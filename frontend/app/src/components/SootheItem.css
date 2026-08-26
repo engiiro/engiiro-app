@@ -1,6 +1,8 @@
 /* あやす1件。お母さんのあやすは地を mother-soft にして役割を面でも示す */
 
 .eg-soothe {
+  /* 本文ボタンの当たり判定を1件の全面へ広げるための基準（下の __open::after） */
+  position: relative;
   padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
   border: var(--border-width) solid var(--hairline);
   border-radius: var(--rounded-md);
@@ -12,16 +14,73 @@
   border-color: var(--mother);
 }
 
+/*
+ * 広げた当たり判定より前に出す。
+ * ここを上げないと、ニックネームも リアクションも「あやす」も押せなくなる
+ * （BubbleCard.css と同じ作り）。
+ */
+.eg-soothe__head,
+.eg-soothe__foot {
+  position: relative;
+  z-index: 1;
+}
+
 .eg-soothe__quote {
+  position: relative;
+  z-index: 1;
   margin-top: var(--space-xs);
   padding-left: var(--space-xs);
   border-left: var(--border-width) solid var(--hairline);
   color: var(--muted);
 }
 
-.eg-soothe__body {
+/* 本文＝あやす詳細を開くボタン。当たり判定は1件の全面（人間の指示、2026-08-26） */
+.eg-soothe__open {
+  display: block;
+  width: 100%;
   margin-top: var(--space-xs);
+  text-align: start;
+  border-radius: var(--rounded-sm);
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-soothe__open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--rounded-md);
+}
+
+.eg-soothe__open:active {
+  background: var(--card);
+}
+
+/* 枠線は1件の角に合わせる（擬似要素の側に出る） */
+.eg-soothe__open:focus-visible {
+  outline: none;
+}
+
+.eg-soothe__open:focus-visible::after {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+
+/* button の中では span で描いているので、ブロックとして流す */
+.eg-soothe__body {
+  display: block;
   color: var(--body);
+}
+
+/*
+ * このあやすに何件ついているか（人間の指示、2026-08-26）。
+ * 0 のときも場所を空けたままにしない。「まだ あやされてない」と書く
+ * ＝ 押せば開くことが、件数が無くても分かる。
+ */
+.eg-soothe__count {
+  display: block;
+  margin-top: var(--space-xs);
+  text-align: end;
+  color: var(--muted);
 }
 
 .eg-soothe__foot {

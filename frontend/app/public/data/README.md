@@ -26,6 +26,7 @@ npm run dev
 | `personas.json` | `GET /api/personas/baby/:id` / `mother/:id` | あり |
 | `bubbles.json` | `GET /api/posts/feed` / `GET /api/posts/:id` | あり |
 | `soothes.json` | `GET /api/posts/:id/comments` | あり |
+| `soothes.json`（`replyToSootheId` 付き） | `GET /api/comments/:id/comments` | **無い** |
 | `stamps.json` | `GET /api/stamps` | あり |
 | `follows-me.json` | `GET /api/follows/me` | あり |
 
@@ -53,6 +54,10 @@ npm run dev
   - お母さんとしてのあやす … `babu` のみ
   - 違う組み合わせを書いても、画面には出ません
 - `mine` は「自分が押した回数」で、上限は5回です（FR-REACT-010/011）
+- **`replyToSootheId` を書くと「あやすへのあやす」になります**（人間の指示、2026-08-26）。
+  そのあやすはバブル詳細の一覧には出ず、返信先のあやすを押して開いた先（あやす詳細）に入ります。
+  返信先が**お母さんとしてのあやす**のときは、`authorPersonaId` に赤ちゃんペルソナしか書けません
+  （FR-COMMENT-005/006）。お母さんを書いても、本物のサーバは保存しません
 - **`accountId` に相当する項目は、どのファイルにも書きません。** 書いた時点で、
   赤ちゃんとお母さんが同じ人だと分かる形になります（FR-PERSONA-003 / FR-COMMON-005）
 - 本文に URL・連絡先・待ち合わせを書くと、モデレーションの確認用データになってしまいます。

@@ -102,3 +102,11 @@
   display: block;
   color: var(--body);
 }
+
+/* 何件ついているか。フィードのカードと同じ位置・同じ言い回しにそろえる */
+.eg-activity__count {
+  display: block;
+  margin-top: var(--space-xs);
+  text-align: end;
+  color: var(--muted);
+}
