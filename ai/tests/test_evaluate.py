@@ -99,6 +99,13 @@ def test_invisible_format_characters_do_not_change_evaluation(invisible: str) ->
     assert evaluate(f"ねむい{invisible}のー", "baby") == evaluate("ねむいのー", "baby")
 
 
+def test_nfkc_fullwidth_technical_fragment_does_not_change_evaluation() -> None:
+    ascii_text = evaluate("React.js つらい", "baby")
+    fullwidth_text = evaluate("Ｒｅａｃｔ．ｊｓ つらい", "baby")
+
+    assert fullwidth_text == ascii_text
+
+
 @pytest.mark.parametrize("persona_type", ["baby", "mother"])
 def test_evaluation_is_deterministic(persona_type: str) -> None:
     text = "きょうはReact.jsの実装ができたよ"
