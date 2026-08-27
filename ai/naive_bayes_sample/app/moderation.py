@@ -1,59 +1,28 @@
-"""明示的な攻撃表現を分類前に遮断する決定的モデレーション。"""
+"""分類器向けの決定的モデレーションアダプター。"""
 
 from __future__ import annotations
 
-import re
-import unicodedata
+import sys
+from pathlib import Path
 
-# 学習データだけでは未知の罵倒を保証できないため、明示的な攻撃表現は
-# 確率計算より先に「その他」へ固定する。語彙はレビュー可能な最小辞書とし、
-# 新しい表現はこの一覧へ追加する。
-ABUSE_PATTERNS: tuple[str, ...] = (
-    "死ね",
-    "消えろ",
-    "殺す",
-    "殺してやる",
-    "死んでほしい",
-    "くたばれ",
-    "黙れ",
-    "うせろ",
-    "失せろ",
-    "無能",
-    "役立たず",
-    "能無し",
-    "ゴミ",
-    "クズ",
-    "屑",
-    "カス",
-    "馬鹿",
-    "バカ",
-    "アホ",
-    "間抜け",
-    "キモい",
-    "きもい",
-    "キモイ",
-    "うざい",
-    "頭おかしい",
-    "頭悪い",
-    "低能",
-)
+_AI_ROOT = Path(__file__).resolve().parents[2]
+if str(_AI_ROOT) not in sys.path:
+    sys.path.insert(0, str(_AI_ROOT))
 
-_SPACE = re.compile(r"\s+")
+from moderation_rules import check_rules, normalize_for_check  # noqa: E402
 
 
 def normalize_for_moderation(text: str) -> str:
-    """NFKC・小文字化・ゼロ幅文字と空白の除去を行う。"""
-    normalized = unicodedata.normalize("NFKC", text).casefold()
-    normalized = "".join(
-        char for char in normalized if unicodedata.category(char) != "Cf"
-    )
-    return _SPACE.sub("", normalized)
+    """ひらがな・カタカナ・伏字・空白を統一した判定用文字列を返す。"""
+    return normalize_for_check(text)
 
 
 def find_abuse(text: str) -> tuple[str, ...]:
-    """入力に含まれる登録済み攻撃表現を返す（未検出なら空 tuple）。"""
-    normalized = normalize_for_moderation(text)
-    return tuple(pattern for pattern in ABUSE_PATTERNS if pattern.casefold() in normalized)
+    """登録済みのブロック／強い批判表現を返す。"""
+    verdict = check_rules(text)
+    if verdict["action"] not in {"block", "rewrite_required"}:
+        return ()
+    return tuple(verdict["details"]["ng_word"] + verdict["details"]["harsh_criticism"])
 
 
 def is_abusive(text: str) -> bool:
