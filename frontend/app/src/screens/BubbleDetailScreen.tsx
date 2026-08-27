@@ -66,14 +66,23 @@ export function BubbleDetailScreen({
       <ScreenHeader title="バブル" onBack={onBack} />
 
       <div className={cx("eg-column", "eg-detail")}>
+        {/*
+          フィードのカードと同じ並びにする（UI刷新 2026-08-26）。
+          吹き出しの中に本文、しっぽの先に書いた人。
+          一覧で見ていたものが、開いても同じ形のまま大きくなる。
+        */}
         <article className="eg-detail__bubble">
-          <PersonaChip
-            persona={bubble.author}
-            createdAt={bubble.createdAt}
-            showRole={false}
-            onOpenProfile={onOpenProfile}
-          />
-          <BubbleBody body={bubble.body} className="eg-detail__body" />
+          <div className="eg-detail__balloon">
+            <BubbleBody body={bubble.body} className="eg-detail__body" />
+          </div>
+          <div className="eg-detail__who">
+            <PersonaChip
+              persona={bubble.author}
+              createdAt={bubble.createdAt}
+              showRole={false}
+              onOpenProfile={onOpenProfile}
+            />
+          </div>
           <div className="eg-detail__reactions">
             <ReactionRow
               targetKind="bubble"

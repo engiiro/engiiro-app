@@ -27,7 +27,6 @@ export type BubbleSeed = {
   /** 何分前か。絶対時刻は持たない（DESIGN.md §0.1-5） */
   readonly minutesAgo: number;
   readonly reactions: ReactionState;
-  readonly read: boolean;
   /** 閲覧者の赤ちゃんペルソナとの近さ。AI 文章評価の結果の代わり（FR-FEED-003） */
   readonly affinity: number;
 };

@@ -2,12 +2,15 @@ import { useState } from "react";
 
 import {
   ACCOUNT_ID_RULE_TEXT,
+  BIRTHDAY_MIN,
   NICKNAME_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   createAccount,
+  todayIsoDate,
 } from "../data/api";
 import type { CreateAccountResult } from "../data/types";
 import { cx } from "../lib/cx";
+import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/Button";
 import { NoteBox } from "../components/NoteBox";
 import { PersonaAvatar } from "../components/PersonaAvatar";
@@ -20,6 +23,13 @@ import "./SignUpScreen.css";
  * FR-ACCOUNT-001：1回の登録で赤ちゃんとお母さんの2ペルソナが同時にできる。
  * FR-ACCOUNT-002：ニックネームはそれぞれ設定する。
  * FR-ACCOUNT-003：認証情報は内部情報。画面に出したまま残さない。
+ *
+ * ★ 生年月日を受け取る（人間の指示、2026-08-27）。
+ *   S8 本人専用プロフィールに出す項目なのに、入れる場所がどこにも無かった。
+ *   これはアカウントの情報で、**ペルソナの情報ではない**。
+ *   公開プロフィール（S6）の型にこの項目は無く、AI へも渡らない
+ *   （FR-PRIV-003/004）。そのことを、入力欄のすぐ下に書いておく。
+ *   ここで隠すと「なぜ要るのか」が分からないまま個人の情報を書かせることになる。
  *
  * ★ 認証の仕様は未確定（Issue #7、status:needs-human）。
  *   ここに書いてある規則（ID の形・パスワードの長さ）は画面を動かすための仮置きで、
@@ -37,6 +47,7 @@ const ERROR_TEXT: Readonly<Record<Extract<CreateAccountResult, { ok: false }>["r
     account_id_invalid: "ID は " + ACCOUNT_ID_RULE_TEXT + " で つけてください。",
     account_id_taken: "その ID は すでに つかわれています。べつの ID に してください。",
     password_weak: "パスワードは " + String(PASSWORD_MIN_LENGTH) + " 文字以上に してください。",
+    birthday_invalid: "生年月日を たしかめてください。きょうより あとの日は えらべません。",
     nickname_empty: "ふたつとも ニックネームを 入れてください。",
     nickname_too_long:
       "ニックネームは " + String(NICKNAME_MAX_LENGTH) + " 文字までに してください。",
@@ -60,6 +71,7 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
   const [accountId, setAccountId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [birthday, setBirthday] = useState("");
   const [babyNickname, setBabyNickname] = useState("");
   const [motherNickname, setMotherNickname] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -68,13 +80,20 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
   const filled =
     accountId.trim() !== "" &&
     password !== "" &&
+    birthday !== "" &&
     babyNickname.trim() !== "" &&
     motherNickname.trim() !== "";
 
   async function submit() {
     setSending(true);
     setError(null);
-    const result = await createAccount({ accountId, password, babyNickname, motherNickname });
+    const result = await createAccount({
+      accountId,
+      password,
+      birthday,
+      babyNickname,
+      motherNickname,
+    });
     setSending(false);
     if (!result.ok) {
       setError(ERROR_TEXT[result.reason]);
@@ -95,6 +114,7 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
         }}
       >
         <header className="eg-signup__head">
+          <BrandMark className="eg-signup__mark" />
           <p className={cx("eg-signup__brand", "t-display")}>はじめまして</p>
           <button type="button" className={cx("eg-signup__back", "t-label")} onClick={onBack}>
             説明に もどる
@@ -134,6 +154,17 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
             {showPassword ? "かくす" : "みる"}
           </button>
         </div>
+
+        <TextField
+          label="生年月日"
+          hint="自分のプロフィールにだけ 出ます。ほかの人からは 見えません"
+          type="date"
+          value={birthday}
+          autoComplete="bday"
+          min={BIRTHDAY_MIN}
+          max={todayIsoDate()}
+          onChange={(event) => setBirthday(event.target.value)}
+        />
 
         <fieldset className="eg-signup__names">
           <legend className={cx("eg-signup__legend", "t-heading")}>ふたつの ニックネーム</legend>

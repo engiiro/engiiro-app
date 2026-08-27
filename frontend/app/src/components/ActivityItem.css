@@ -84,8 +84,17 @@
   border-radius: var(--radius-blob);
 }
 
-.eg-activity__open:active {
-  background: var(--card);
+/* 当たり判定と同じ範囲を光らせる（理由は SootheItem.css の注記） */
+.eg-activity__open::after {
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-activity__open:hover::after {
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), transparent);
+}
+
+.eg-activity__open:active::after {
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
 }
 
 .eg-activity__open:focus-visible {

@@ -52,7 +52,6 @@ export type Bubble = {
   readonly reactions: ReactionState;
   /** 削除を出すかの判定だけに使う（FR-POST-006/007）。識別子ではない */
   readonly isMine: boolean;
-  readonly read: boolean;
   /** タイムラインの優先表示の材料（FR-FEED-003）。新着順のみにしないため */
   readonly affinity: number;
   /**
@@ -261,6 +260,15 @@ export type PublicProfile = {
 export type CreateAccountInput = {
   readonly accountId: string;
   readonly password: string;
+  /**
+   * 生年月日（ISO8601 の日付 "YYYY-MM-DD"）。
+   *
+   * ★ アカウントに紐づく本人の情報で、**公開側には一切渡らない**。
+   *   MyProfile だけが持ち（S8 でしか出さない）、PublicPersona / PublicProfile の
+   *   型にはこの項目そのものを置かない（FR-PRIV-004）。
+   *   AI にも渡さない（FR-AI-003 / FR-PRIV-003）。
+   */
+  readonly birthday: string;
   readonly babyNickname: string;
   readonly motherNickname: string;
 };
@@ -279,6 +287,7 @@ export type CreateAccountResult =
         | "account_id_taken"
         | "account_id_invalid"
         | "password_weak"
+        | "birthday_invalid"
         | "nickname_empty"
         | "nickname_too_long"
         | "nickname_same"

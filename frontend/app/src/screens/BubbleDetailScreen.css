@@ -4,25 +4,55 @@
   padding-top: var(--space-md);
 }
 
+/*
+ * 主役のバブル。フィードのカードと同じ「吹き出し＋しっぽの先の書いた人」。
+ * 違うのは大きさと、下に付く操作の数だけ。
+ */
 .eg-detail__bubble {
-  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  display: flex;
+  flex-direction: column;
+}
+
+.eg-detail__balloon {
+  position: relative;
+  padding: var(--space-lg) var(--space-md);
   border: var(--border-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
+  border-radius: var(--radius-balloon);
   background: var(--surface);
   box-shadow: var(--elevation-offset);
 }
 
+/* しっぽ。作りは BubbleCard.css と同じ */
+.eg-detail__balloon::after {
+  content: "";
+  position: absolute;
+  left: var(--balloon-tail-inset);
+  bottom: calc(var(--balloon-tail-size) / -2);
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: var(--surface);
+  border-right: var(--border-width) solid var(--hairline);
+  border-bottom: var(--border-width) solid var(--hairline);
+  border-bottom-right-radius: var(--rounded-xs);
+  transform: rotate(45deg);
+}
+
 .eg-detail__body {
-  margin-top: var(--space-sm);
   color: var(--body);
+}
+
+.eg-detail__who {
+  margin-top: calc(var(--balloon-tail-size) / 2 + var(--space-xxs));
+  padding-left: var(--space-xs);
 }
 
 .eg-detail__reactions {
   margin-top: var(--space-md);
+  padding-left: var(--space-xs);
 }
 
 .eg-detail__own {
-  margin-top: var(--space-sm);
+  margin-top: var(--space-md);
   padding-top: var(--space-sm);
   border-top: var(--border-width) solid var(--hairline);
 }
@@ -43,7 +73,7 @@
 }
 
 .eg-detail__soothes {
-  margin-top: var(--space-lg);
+  margin-top: var(--space-xl);
 }
 
 .eg-detail__soothes-title {

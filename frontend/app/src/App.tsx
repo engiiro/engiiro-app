@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   addReaction,
@@ -14,7 +14,6 @@ import {
   fetchPublicProfile,
   fetchSootheDetail,
   logout,
-  markRead,
   setAiEvaluateAvailability,
   setLiked,
   setSessionGuest,
@@ -33,13 +32,17 @@ import type {
   ReactionType,
   SootheDetail,
 } from "./data/types";
+import { Button } from "./components/Button";
+import { EmptyState } from "./components/EmptyState";
 import { LeftRail } from "./components/LeftRail";
 import type { CenterView } from "./components/LeftRail";
 import { LoginPrompt } from "./components/LoginPrompt";
 import type { GuestAction } from "./components/LoginPrompt";
 import { MockControls } from "./components/MockControls";
 import type { EntryStage, FeedMode } from "./components/MockControls";
+import { NoteBox } from "./components/NoteBox";
 import { RightRail } from "./components/RightRail";
+import { ScreenHeader } from "./components/ScreenHeader";
 import { SkeletonFeed } from "./components/Skeleton";
 import { Toast } from "./components/Toast";
 import { IconPen } from "./components/icons";
@@ -73,15 +76,38 @@ import "./App.css";
  * データの読み書きは必ず data/api.ts を通す。ここで直接ダミーデータを書き換えない。
  */
 
-/** いま開いている詳細1つぶん。中身ではなく「どれを開いているか」だけを持つ */
-type DetailRef =
+/**
+ * 中央に出せる場所ひとつぶん。中身ではなく「どこに居るか」だけを持つ。
+ *
+ *   view   … 左サイドで選ぶ画面（ホーム／おきにいり／プロフィール…）
+ *   public … S6 他人の公開プロフィール
+ *   bubble … バブルの詳細
+ *   soothe … あやすの詳細
+ */
+type Location =
+  | { readonly kind: "view"; readonly view: CenterView }
+  | { readonly kind: "public"; readonly personaId: string }
   | { readonly kind: "bubble"; readonly id: string }
   | { readonly kind: "soothe"; readonly id: string };
 
-/** 引き直した中身。画面の出しわけは kind だけで決める */
+/** 引き直した詳細の中身。画面の出しわけは kind だけで決める */
 type OpenDetail =
   | { readonly kind: "bubble"; readonly value: BubbleDetail }
   | { readonly kind: "soothe"; readonly value: SootheDetail };
+
+/** 履歴の底。ここより前には戻れない */
+const HOME: Location = { kind: "view", view: "timeline" };
+
+/** 左サイドの選択の見た目に使う「いまの画面」。潜っていても、来た列が光ったままになる */
+function currentView(history: readonly Location[]): CenterView {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const entry = history[i];
+    if (entry.kind === "view") {
+      return entry.view;
+    }
+  }
+  return "timeline";
+}
 
 export function App() {
   const { theme, setTheme } = useTheme();
@@ -129,33 +155,66 @@ export function App() {
    * 直接見ていると、読み込みが終わるまで空のニックネームが出る。
    */
   const [me, setMe] = useState<Me | null>(null);
+  /*
+   * 起動時の読み込みが失敗したか（public/data/*.json が読めない等）。
+   * 失敗を握りつぶさず、やり直せるようにする（人間の指摘、モックデータ取得失敗時に
+   * 画面が読み込み中のまま固まっていた）。
+   */
+  const [bootError, setBootError] = useState(false);
+  const [bootAttempt, setBootAttempt] = useState(0);
 
   useEffect(() => {
-    void fetchMe().then(setMe);
-  }, []);
+    let cancelled = false;
+    fetchMe()
+      .then((result) => {
+        if (!cancelled) {
+          setMe(result);
+          setBootError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBootError(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bootAttempt]);
 
 
   const [gate, setGate] = useState<GuestAction | null>(null);
 
-  const [view, setView] = useState<CenterView>("timeline");
+  /*
+   * 通ってきた道（人間の指摘、2026-08-27）。
+   *
+   * 以前は「左サイドの選択（view）」「詳細の積み重ね（detailStack）」
+   * 「S6 を閉じたときの戻り先（publicBackTo）」の3つを別々に持っていた。
+   * そのため おきにいり → 公開プロフィール → バブル と潜ったあと、
+   * 「もどる」が **ホームに着地する** ことになっていた。
+   * 途中で view を timeline に書き換えていて、来た道がどこにも残っていなかったため。
+   *
+   * ★ 3つを1本の配列にまとめる。中央に出せるものは、左サイドの画面も
+   *   公開プロフィールも詳細も、すべて等しく「場所」として1段積む。
+   *   「もどる」は種類を問わず1段外すだけ。戻り先を覚える変数はもう要らない。
+   *
+   * 底は常にホーム。左サイドを押したときだけ、積み上げを捨てて底から始め直す
+   * （タブを押したのに前の道が残っていると、そのほうが驚く）。
+   *
+   * 入るのは種別と id だけ。中身は着くたびに引き直す
+   * （潜っているあいだにリアクションや返信で数が変わるので、積んだ中身は当てにしない）。
+   */
+  const [history, setHistory] = useState<readonly Location[]>([HOME]);
+  const here = history[history.length - 1];
+  const view = currentView(history);
+
   const [feed, setFeed] = useState<FeedResult | null>(null);
   const [feedLoading, setFeedLoading] = useState(true);
+  /** フィードの読み込みそのものが失敗したか。0件（空フィード）とは別の状態 */
+  const [feedError, setFeedError] = useState(false);
 
-  /*
-   * いま開いている詳細の積み重ね（人間の指示、2026-08-26）。
-   *
-   * バブル → あやす → そのあやすへのあやす、と1階層ずつ潜っていける。
-   * 「もどる」は1つ戻すだけで、空になったらタイムラインへ帰る。
-   *
-   * ★ 1本の配列にしているのは、戻り先を画面ごとに覚えさせないため。
-   *   画面側に「どこから来たか」を持たせると、増やすたびに分岐が増える。
-   *   ここに入るのは種別と id だけで、中身は開くたびに引き直す
-   *   （リアクションや返信で数が変わるので、積んだ古い中身は当てにしない）。
-   */
-  const [detailStack, setDetailStack] = useState<readonly DetailRef[]>([]);
   const [detail, setDetail] = useState<OpenDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const openDetail = detailStack.length > 0 ? detailStack[detailStack.length - 1] : null;
   const [compose, setCompose] = useState<ComposeMode | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -177,15 +236,13 @@ export function App() {
    * 持つのはペルソナ id ひとつだけ。ここに accountId を置かない。
    * 開いているペルソナから もう一方へ移る道を、状態の形としても作らない（FR-PERSONA-004）。
    */
-  const [publicPersonaId, setPublicPersonaId] = useState<string | null>(null);
+  const publicPersonaId = here.kind === "public" ? here.personaId : null;
   const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
   const [publicLoading, setPublicLoading] = useState(true);
   const [publicTab, setPublicTab] = useState<ActivityTab>("babyBubbles");
   const [publicActivity, setPublicActivity] = useState<readonly ActivityEntry[]>([]);
   const [publicActivityLoading, setPublicActivityLoading] = useState(true);
   const [likePending, setLikePending] = useState(false);
-  /** S6 を閉じたときに戻る先 */
-  const [publicBackTo, setPublicBackTo] = useState<CenterView>("timeline");
 
   /*
    * S7 おきにいり ＝ 大好きな人の一覧（FR-FOLLOW-003）。
@@ -197,9 +254,15 @@ export function App() {
   const [unlikingId, setUnlikingId] = useState<string | null>(null);
 
   const loadFeed = useCallback(async () => {
-    const result = feedMode === "empty" ? await fetchEmptyFeed() : await fetchFeed();
-    setFeed(result);
-    setFeedLoading(false);
+    try {
+      const result = feedMode === "empty" ? await fetchEmptyFeed() : await fetchFeed();
+      setFeed(result);
+      setFeedError(false);
+    } catch {
+      setFeedError(true);
+    } finally {
+      setFeedLoading(false);
+    }
   }, [feedMode]);
 
   useEffect(() => {
@@ -212,13 +275,27 @@ export function App() {
 
   const showFeedSkeleton = feedLoading || feedMode === "loading";
 
-  const loadDetail = useCallback(async (ref: DetailRef) => {
+  /*
+   * 詳細読み込みの世代カウンタ（人間の指摘、素早く連続で開き直すと古い応答が
+   * あとから勝って表示が入れ替わる競合があった）。
+   * 呼ぶたびに増やし、応答が来た時点で世代が古ければその結果は捨てる。
+   */
+  const detailRequestRef = useRef(0);
+
+  const loadDetail = useCallback(async (ref: Extract<Location, { kind: "bubble" | "soothe" }>) => {
+    const requestId = (detailRequestRef.current += 1);
     setDetailLoading(true);
     if (ref.kind === "bubble") {
       const result = await fetchBubbleDetail(ref.id);
+      if (requestId !== detailRequestRef.current) {
+        return;
+      }
       setDetail(result ? { kind: "bubble", value: result } : null);
     } else {
       const result = await fetchSootheDetail(ref.id);
+      if (requestId !== detailRequestRef.current) {
+        return;
+      }
       setDetail(result ? { kind: "soothe", value: result } : null);
     }
     setDetailLoading(false);
@@ -261,10 +338,9 @@ export function App() {
     setProfile(null);
     setLikedBaby([]);
     setLikedMother([]);
-    setView("timeline");
-    setDetailStack([]);
+    // 通ってきた道ごと捨てる。本人専用の画面へ「もどる」で帰れてはいけない
+    setHistory([HOME]);
     setDetail(null);
-    setPublicPersonaId(null);
     setPublicProfile(null);
     // 「自分のバブル」の印が残らないよう、閲覧者が変わったら読み直す
     setFeedLoading(true);
@@ -307,16 +383,14 @@ export function App() {
   }, []);
 
   /**
-   * S6 を開く。
+   * S6 の中身を引く。
    *
    * ★ 渡すのはペルソナ id ひとつ。どのペルソナから来たかも、
    *   その人のもう一方のペルソナも、この関数は受け取らない（FR-PERSONA-004）。
    *   一覧の初期タブは、開いたペルソナの種類だけで決まる。
    */
-  const openProfile = useCallback(
+  const loadPublicProfile = useCallback(
     async (personaId: string) => {
-      setPublicBackTo(view);
-      setPublicPersonaId(personaId);
       setPublicLoading(true);
       setPublicActivityLoading(true);
 
@@ -333,7 +407,7 @@ export function App() {
       setPublicActivity(await fetchPublicActivity(personaId, first));
       setPublicActivityLoading(false);
     },
-    [view],
+    [],
   );
 
   const loadPublicActivity = useCallback(
@@ -345,57 +419,74 @@ export function App() {
     [],
   );
 
-  const closeProfile = useCallback(() => {
-    setPublicPersonaId(null);
-    setPublicProfile(null);
-  }, []);
-
-  /** バブルを開く。ここが詳細の起点なので、積み上げは作り直す */
-  const openBubble = useCallback(
-    (bubbleId: string) => {
-      markRead(bubbleId);
-      const ref: DetailRef = { kind: "bubble", id: bubbleId };
-      setDetailStack([ref]);
-      void loadDetail(ref);
+  /**
+   * その場所に着いたときの読み込み。
+   *
+   * ★ 進むときと戻るときで、同じ関数を通す。
+   *   戻り先を「積んだときの中身」で描き直すと、潜っているあいだに増えた
+   *   リアクションやあやすが消えたように見える。着くたびに引き直す。
+   */
+  const enter = useCallback(
+    (location: Location) => {
+      if (location.kind === "view") {
+        if (location.view === "timeline" && feedMode !== "loading") {
+          setFeedLoading(true);
+          void loadFeed();
+        }
+        if (location.view === "profile") {
+          // 評価が落ちている／戻った直後でもその時点の状態を出したいので、開くたびに引き直す
+          void loadProfile();
+          void loadActivity(activityTab);
+        }
+        if (location.view === "favorites") {
+          void loadLiked();
+        }
+        return;
+      }
+      if (location.kind === "public") {
+        void loadPublicProfile(location.personaId);
+        return;
+      }
+      void loadDetail(location);
     },
-    [loadDetail],
+    [
+      activityTab,
+      feedMode,
+      loadActivity,
+      loadDetail,
+      loadFeed,
+      loadLiked,
+      loadProfile,
+      loadPublicProfile,
+    ],
   );
 
-  /** あやすを開く（人間の指示、2026-08-26）。いまの画面の上に積む */
-  const openSootheDetail = useCallback(
-    (sootheId: string) => {
-      const ref: DetailRef = { kind: "soothe", id: sootheId };
-      setDetailStack((current) => [...current, ref]);
-      void loadDetail(ref);
+  /** 1段 潜る。どこから来たかは配列が覚えるので、呼ぶ側は行き先だけを渡す */
+  const push = useCallback(
+    (location: Location) => {
+      setHistory((current) => [...current, location]);
+      enter(location);
     },
-    [loadDetail],
+    [enter],
   );
-
-  const backToTimeline = useCallback(() => {
-    setDetailStack([]);
-    setDetail(null);
-    if (feedMode !== "loading") {
-      setFeedLoading(true);
-      void loadFeed();
-    }
-  }, [feedMode, loadFeed]);
 
   /**
-   * 「もどる」。1つだけ戻す。
+   * 「もどる」。通ってきた道を1段だけ外す。
    *
-   * 戻った先は開き直す。潜っているあいだにリアクションや返信で数が変わっているので、
-   * 積んだときの中身をそのまま出さない。
+   * 詳細から一覧へ、公開プロフィールから おきにいりへ、と種類を問わず同じ動き。
+   * 底（ホーム）に居るときは何もしない。
    */
-  const backFromDetail = useCallback(() => {
-    const rest = detailStack.slice(0, -1);
-    if (rest.length === 0) {
-      backToTimeline();
+  const back = useCallback(() => {
+    if (history.length <= 1) {
       return;
     }
-    setDetailStack(rest);
-    void loadDetail(rest[rest.length - 1]);
-  }, [backToTimeline, detailStack, loadDetail]);
+    const rest = history.slice(0, -1);
+    setHistory(rest);
+    setDetail(null);
+    enter(rest[rest.length - 1]);
+  }, [enter, history]);
 
+  /** 左サイド。押されたら、通ってきた道は捨てて底から始め直す */
   const navigate = useCallback(
     (next: CenterView) => {
       // 本人専用の画面（FR-FOLLOW-003 / FR-PERSONA-005）はゲストでは開かない
@@ -403,46 +494,94 @@ export function App() {
         setGate(next);
         return;
       }
-      setView(next);
-      setDetailStack([]);
+      const location: Location = { kind: "view", view: next };
+      setHistory(next === "timeline" ? [HOME] : [HOME, location]);
       setDetail(null);
-      setPublicPersonaId(null);
       setPublicProfile(null);
-      if (next === "timeline" && feedMode !== "loading") {
-        setFeedLoading(true);
-        void loadFeed();
-      }
-      if (next === "profile") {
-        // 評価が落ちている／戻った直後でもその時点の状態を出したいので、開くたびに引き直す
-        void loadProfile();
-        void loadActivity(activityTab);
-      }
-      if (next === "favorites") {
-        void loadLiked();
-      }
+      enter(location);
     },
-    [activityTab, feedMode, isGuest, loadActivity, loadFeed, loadLiked, loadProfile],
+    [enter, isGuest],
   );
 
+  /**
+   * S6 他人の公開プロフィールへ。
+   * どのペルソナから来たかは渡さない（FR-PERSONA-004）。積むのは id ひとつだけ。
+   */
+  const openProfile = useCallback(
+    (personaId: string) => {
+      push({ kind: "public", personaId });
+    },
+    [push],
+  );
+
+  /** バブルの詳細へ */
+  const openBubble = useCallback(
+    (bubbleId: string) => {
+      push({ kind: "bubble", id: bubbleId });
+    },
+    [push],
+  );
+
+  /** あやすの詳細へ（人間の指示、2026-08-26）。バブルを経由しない */
+  const openSootheDetail = useCallback(
+    (sootheId: string) => {
+      push({ kind: "soothe", id: sootheId });
+    },
+    [push],
+  );
+
+  /** いま居る場所だけを引き直す。移動はしない */
   const refresh = useCallback(async () => {
-    if (view === "profile") {
+    if (here.kind === "bubble" || here.kind === "soothe") {
+      await loadDetail(here);
+      return;
+    }
+    if (here.kind === "public") {
+      // 一覧の切り替えは そのまま。開いていたタブが勝手に戻らないようにする
+      await loadPublicActivity(here.personaId, publicTab);
+      return;
+    }
+    if (here.view === "profile") {
       await Promise.all([loadProfile(), loadActivity(activityTab)]);
       return;
     }
-    if (openDetail) {
-      await loadDetail(openDetail);
-    } else if (feedMode !== "loading") {
+    if (here.view === "favorites") {
+      await loadLiked();
+      return;
+    }
+    if (feedMode !== "loading") {
       await loadFeed();
     }
-  }, [activityTab, feedMode, loadActivity, loadDetail, loadFeed, loadProfile, openDetail, view]);
+  }, [
+    activityTab,
+    feedMode,
+    here,
+    loadActivity,
+    loadDetail,
+    loadFeed,
+    loadLiked,
+    loadProfile,
+    loadPublicActivity,
+    publicTab,
+  ]);
 
+  /*
+   * addReaction の失敗（max_reached 等）は Issue #19 で backend と共有済みの区分
+   * （「6回目は保存しない。返す区分は max_reached」）。ボタンの disabled は
+   * まだ反映されていないローカルの mine 値を見ているため、往復中に連打すると
+   * サーバ側では正しく弾かれているのに画面には何も出ない状態になっていた
+   * （人間の指摘）。ここで理由を拾って一言だけ出す。
+   */
   const reactToBubble = useCallback(
     async (bubbleId: string, reaction: ReactionType) => {
-      await addReaction({
+      const result = await addReaction({
         target: { type: "bubble", id: bubbleId },
         targetKind: "bubble",
         reaction,
       });
+      if (!result.ok && result.reason === "max_reached") {
+        setToast("もう 5回 おくったよ");
+      }
       await refresh();
     },
     [refresh],
@@ -450,12 +589,15 @@ export function App() {
 
   const reactToSoothe = useCallback(
     async (sootheId: string, authorKind: PersonaKind, reaction: ReactionType) => {
-      await addReaction({
+      const result = await addReaction({
         target: { type: "soothe", id: sootheId },
         // 対象の種類は発信ペルソナから決まる。ここで種類を選び直さない
         targetKind: reactionTargetOfSoothe(authorKind),
         reaction,
       });
+      if (!result.ok && result.reason === "max_reached") {
+        setToast("もう 5回 おくったよ");
+      }
       await refresh();
     },
     [refresh],
@@ -465,14 +607,18 @@ export function App() {
     async (bubbleId: string) => {
       await deleteBubble(bubbleId);
       setToast("バブルを けしました");
-      if (view === "profile") {
-        // S8 からの削除では画面を移さない。消えたことがその場で分かるように引き直すだけ
-        await Promise.all([loadProfile(), loadActivity(activityTab)]);
+      /*
+       * 詳細を開いたまま消したときだけ、来た道を1段戻る。
+       * 一覧（S8 など）から消したときは画面を移さない。
+       * 消えたことがその場で分かるように、いまの場所を引き直すだけにする。
+       */
+      if (here.kind === "bubble") {
+        back();
         return;
       }
-      backToTimeline();
+      await refresh();
     },
-    [activityTab, backToTimeline, loadActivity, loadProfile, view],
+    [back, here, refresh],
   );
 
   /**
@@ -497,30 +643,13 @@ export function App() {
     [loadLiked, publicPersonaId],
   );
 
-  /** プロフィールの一覧からバブルを開く。詳細はタイムライン側の画面なので、そちらへ移る */
-  const openBubbleFromProfile = useCallback(
-    (bubbleId: string) => {
-      closeProfile();
-      setView("timeline");
-      openBubble(bubbleId);
-    },
-    [closeProfile, openBubble],
-  );
-
-  /**
-   * プロフィールの一覧からあやすを開く（人間の指示、2026-08-26）。
-   * バブルを経由しない。押したものがそのまま主役になる画面へ移る。
+  /*
+   * ★ 「プロフィールの一覧から開く」ための専用の関数を置かなくなった
+   *   （人間の指摘、2026-08-27）。
+   *   以前は、開く前に公開プロフィールを閉じて view を timeline へ書き換えていた。
+   *   その書き換えが、まさに「もどるとホームに着く」の原因だった。
+   *   いまはどの画面から開いても push するだけで、来た道は履歴に残る。
    */
-  const openSootheFromProfile = useCallback(
-    (sootheId: string) => {
-      closeProfile();
-      setView("timeline");
-      const ref: DetailRef = { kind: "soothe", id: sootheId };
-      setDetailStack([ref]);
-      void loadDetail(ref);
-    },
-    [closeProfile, loadDetail],
-  );
 
   const openReply = useCallback(
     (target: SootheTarget) => {
@@ -547,17 +676,14 @@ export function App() {
     [guard, reactToSoothe],
   );
 
-  // 画面を入れ替えたら中央を先頭へ戻す
+  // 場所が変わったら中央を先頭へ戻す
   useEffect(() => {
     document.querySelector(".eg-center")?.scrollTo({ top: 0 });
-    // 潜るたび・戻るたびに先頭へ。詳細は id で区別する（深さだけだと同じ階層の移動で戻らない）
-  }, [view, openDetail, publicPersonaId]);
+    // 潜るたび・戻るたびに先頭へ。here は配列の要素そのものなので、同じ階層の移動でも変わる
+  }, [here]);
 
-  /** S6 を開いているあいだは、左サイドの選択に関わらず中央を S6 にする */
-  const showPublicProfile = publicPersonaId !== null;
-  const showTimeline = view === "timeline" && !showPublicProfile;
-  /* 詳細（バブル／あやす）を実際に出しているか。下端に貼りつくものの出しわけに使う */
-  const showDetail = showTimeline && openDetail !== null;
+  /* 詳細（バブル／あやす）を出しているか。下端に貼りつくものの出しわけに使う */
+  const showDetail = here.kind === "bubble" || here.kind === "soothe";
 
   if (entry !== "app") {
     return (
@@ -622,7 +748,7 @@ export function App() {
   }
 
   return (
-    <div className={cx("eg-app", compose && "is-composing")}>
+    <div className={cx("eg-app", "eg-app--shell", compose && "is-composing")}>
       <MockControls
         theme={theme}
         onThemeChange={setTheme}
@@ -643,13 +769,67 @@ export function App() {
         onEntryChange={setEntry}
       />
 
+      {/*
+        起動時の読み込み失敗（人間の指摘、public/data/*.json が読めないときに
+        画面全体が無反応の読み込み中のまま固まっていた）。
+        me が無いままでも読むこと自体はできるので、アプリ全体は止めずバナーで知らせる。
+      */}
+      {bootError ? (
+        <div className="eg-column">
+          <NoteBox variant="reject" role="alert" title="よみこめませんでした">
+            通信が ふあんていかもしれません。
+          </NoteBox>
+          <Button variant="quiet" onClick={() => setBootAttempt((count) => count + 1)}>
+            もう一度 ためす
+          </Button>
+        </div>
+      ) : null}
+
       <div className="eg-layout">
         <div className="eg-layout__left">
           <LeftRail current={view} onNavigate={navigate} />
         </div>
 
+        {/*
+          「バブる」（人間の決定、2026-08-27「常に表示されている状態を優先」）。
+
+          ★ フィードより **前** に置いている。見た目は中央の右下のままで、DOM 上の位置だけが違う。
+            このボタンは中央の列の中に居ないので、どれだけ送っても動かない。
+            ずっと画面にあるものは、読みものの流れの一部ではない。
+            列の最後に置くと、キーボードだけで操作する人はカードを全部通り過ぎてからしか
+            届かなかった（実測で 30 タブ以上）。いまは左サイドの直後で届く。
+
+          ★ 中央の列（.eg-center）の外に出しているので、列をどれだけ送っても位置が変わらない。
+            置き場所は CSS の grid で「2列目・下端・右寄せ」と決めている（App.css）。
+
+          ★ 詳細を開いているあいだは出さない（人間の指摘、2026-08-26）。
+            あちらは下端いっぱいの「あやす」が主操作で、そこへ重ねると押し間違える。
+            下端に貼りつくものは、1画面につき1つだけにする。
+
+          ★ 立ちのぼる3つのバブルは飾り（人間の指示、2026-08-27）。
+            押せる場所でも情報でもないので aria-hidden。
+            読み上げに渡るのは「バブる」の1語だけのままにする。
+        */}
+        {compose === null && !showDetail ? (
+          <div className="eg-fab-dock">
+            <button
+              type="button"
+              className={cx("eg-bubble-fab", "t-button")}
+              onClick={() => startBubble()}
+            >
+              <span className="eg-bubble-fab__drift" aria-hidden="true">
+                <span className="eg-bubble-fab__drop" />
+                <span className="eg-bubble-fab__drop" />
+                <span className="eg-bubble-fab__drop" />
+              </span>
+              <IconPen />
+              バブる
+            </button>
+          </div>
+        ) : null}
+
         <main className="eg-center">
-          {showPublicProfile ? (
+          {here.kind === "public" ? (
             <PublicProfileScreen
               /*
                 ゲストには「大好き済み」も「これは自分」も無い。
@@ -673,31 +853,32 @@ export function App() {
                 }
               }}
               onToggleLike={(next) => guard("like", () => void toggleLike(next))}
-              onOpenBubble={openBubbleFromProfile}
-              onOpenSoothe={openSootheFromProfile}
-              onBack={() => {
-                closeProfile();
-                setView(publicBackTo);
-              }}
+              onOpenBubble={openBubble}
+              onOpenSoothe={openSootheDetail}
+              /* 通ってきた道を1段戻る。おきにいりから来たなら おきにいりへ帰る */
+              onBack={back}
             />
           ) : null}
 
-          {!showPublicProfile && view === "favorites" ? (
+          {here.kind === "view" && here.view === "favorites" ? (
             <FavoritesScreen
               baby={likedBaby}
               mother={likedMother}
               loading={likedLoading}
               pendingId={unlikingId}
-              onOpenProfile={(personaId) => void openProfile(personaId)}
+              onOpenProfile={openProfile}
               onUnlike={(personaId) => void unlike(personaId)}
             />
           ) : null}
 
-          {!showPublicProfile && !showTimeline && view !== "profile" && view !== "favorites" ? (
-            <PlaceholderScreen view={view} />
+          {here.kind === "view" &&
+          here.view !== "timeline" &&
+          here.view !== "favorites" &&
+          here.view !== "profile" ? (
+            <PlaceholderScreen view={here.view} />
           ) : null}
 
-          {!showPublicProfile && view === "profile" ? (
+          {here.kind === "view" && here.view === "profile" ? (
             <MyProfileScreen
               profile={profile}
               activity={activity}
@@ -708,8 +889,8 @@ export function App() {
                 setActivityTab(next);
                 void loadActivity(next);
               }}
-              onOpenBubble={openBubbleFromProfile}
-              onOpenSoothe={openSootheFromProfile}
+              onOpenBubble={openBubble}
+              onOpenSoothe={openSootheDetail}
               onDeleteBubble={(bubbleId) => void removeBubble(bubbleId)}
               onOpenFollowing={() => {
                 navigate("favorites");
@@ -718,31 +899,62 @@ export function App() {
             />
           ) : null}
 
-          {showTimeline && !showDetail ? (
-            <TimelineScreen
-              feed={feed}
-              loading={showFeedSkeleton}
-              onOpenBubble={openBubble}
-              onOpenProfile={(personaId) => void openProfile(personaId)}
-              onRefresh={() => {
-                setFeedLoading(true);
-                void loadFeed();
-              }}
-              onReact={(bubbleId, reaction) => reactToBubbleGuarded(bubbleId, reaction)}
-              onCompose={() => startBubble()}
-            />
+          {here.kind === "view" && here.view === "timeline" ? (
+            feedError ? (
+              <>
+                <ScreenHeader title="ホーム" />
+                <div className="eg-column">
+                  <EmptyState
+                    lines={["よみこめませんでした。", "つうしんが ふあんていかも しれません。"]}
+                    action={
+                      <Button
+                        onClick={() => {
+                          setFeedLoading(true);
+                          void loadFeed();
+                        }}
+                      >
+                        もう一度 よみこむ
+                      </Button>
+                    }
+                  />
+                </div>
+              </>
+            ) : (
+              <TimelineScreen
+                feed={feed}
+                loading={showFeedSkeleton}
+                onOpenBubble={openBubble}
+                onOpenProfile={openProfile}
+                onRefresh={() => {
+                  setFeedLoading(true);
+                  void loadFeed();
+                }}
+                onReact={(bubbleId, reaction) => reactToBubbleGuarded(bubbleId, reaction)}
+                onCompose={() => startBubble()}
+              />
+            )
           ) : null}
 
           {showDetail ? (
-            detailLoading || detail === null ? (
+            detailLoading ? (
               <div className="eg-center__loading">
                 <SkeletonFeed count={1} />
               </div>
+            ) : detail === null ? (
+              <>
+                <ScreenHeader title={here.kind === "bubble" ? "バブル" : "あやす"} onBack={back} />
+                <div className="eg-column">
+                  <EmptyState
+                    lines={["この さきは もう ありません。", "けされたか、見つからない ページです。"]}
+                    action={<Button onClick={back}>もどる</Button>}
+                  />
+                </div>
+              </>
             ) : detail.kind === "bubble" ? (
               <BubbleDetailScreen
                 detail={detail.value}
-                onBack={backFromDetail}
-                onOpenProfile={(personaId) => void openProfile(personaId)}
+                onBack={back}
+                onOpenProfile={openProfile}
                 onReactToBubble={(bubbleId, reaction) => reactToBubbleGuarded(bubbleId, reaction)}
                 onReactToSoothe={(sootheId, authorKind, reaction) =>
                   reactToSootheGuarded(sootheId, authorKind, reaction)
@@ -754,8 +966,8 @@ export function App() {
             ) : (
               <SootheDetailScreen
                 detail={detail.value}
-                onBack={backFromDetail}
-                onOpenProfile={(personaId) => void openProfile(personaId)}
+                onBack={back}
+                onOpenProfile={openProfile}
                 onOpenBubble={openBubble}
                 onOpenSoothe={openSootheDetail}
                 onReact={(sootheId, authorKind, reaction) =>
@@ -767,24 +979,14 @@ export function App() {
           ) : null}
 
           {/*
-            中央の右下。押すと右の列が投稿パネルに入れ替わる。
-            下端のスロットに入れて固定する（中身の長さで位置が動かないように。App.css の注記）。
+            ボタンぶんの場所取り。中身は無い。
 
-            ★ 詳細を開いているあいだは出さない（人間の指摘、2026-08-26）。
-              あちらは下端いっぱいの「あやす」が主操作で、そこへ重ねると押し間違える。
-              下端に貼りつくものは、1画面につき1つだけにする。
+            ボタン自体は列の外（上の .eg-fab-dock）に居るので、これが無いと
+            いちばん下まで送りきったとき、最後のカードがボタンの下に隠れる。
+            親（.eg-center）に padding-bottom を戻さないための実体でもある（App.css の注記）。
           */}
           {compose === null && !showDetail ? (
-            <div className="eg-fab-slot">
-              <button
-                type="button"
-                className={cx("eg-bubble-fab", "t-button")}
-                onClick={() => startBubble()}
-              >
-                <IconPen />
-                バブる
-              </button>
-            </div>
+            <div className="eg-fab-slot" aria-hidden="true" />
           ) : null}
         </main>
 

@@ -23,6 +23,18 @@
     color var(--duration-quick) var(--ease-in-out);
 }
 
+.eg-segmented__item:hover {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
+  color: var(--body);
+}
+
+/* 選択中の地は accent-soft。混ぜる先をそちらに合わせる */
+.eg-segmented__item.is-current:hover {
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--accent-soft));
+  color: var(--accent-line);
+}
+
 .eg-segmented__item:active {
   transform: scale(var(--press-scale));
 }
