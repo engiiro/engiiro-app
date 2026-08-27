@@ -245,6 +245,15 @@ export function IconChevronRight({ className }: IconProps) {
   );
 }
 
+/** えらばれている印。色だけで「いまこれ」を示さないために置く（DESIGN.md §2.5） */
+export function IconCheck({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M3.2 8.6 6.4 11.8 12.8 4.6" />
+    </svg>
+  );
+}
+
 /** すきな相手：フォロー中の行に置く。フォロワー側には使わない（OUT-004） */
 export function IconHeart({ className }: IconProps) {
   return (
