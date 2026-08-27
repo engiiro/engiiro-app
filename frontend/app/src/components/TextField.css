@@ -28,6 +28,15 @@
   font-family: inherit;
 }
 
+.eg-field__input {
+  transition: border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* 触れる場所であることを、focus の前に枠で返す */
+.eg-field__input:hover {
+  border-color: var(--accent-line);
+}
+
 .eg-field__input::placeholder {
   color: var(--muted);
 }

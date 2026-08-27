@@ -1,27 +1,113 @@
-/* あやす1件。お母さんのあやすは地を mother-soft にして役割を面でも示す */
+/*
+ * あやす1件。
+ *
+ * ★ お母さんのあやすの「地の緑」をやめた（人間の決定 2026-08-26 §0-2、
+ *   docs/color_and_ui_findings.md §2）。
+ *
+ *   赤ちゃんのバブルより お母さんのあやすに目が行く、という症状の原因は3つあり、
+ *   輝度・補色（臙脂との色相差 152°）・塗り面積 のうち、明度を下げて直るのは輝度だけ。
+ *   面積はここでしか削れない。カード1枚ぶんの地＋枠1周が、いちばん大きい面だった。
+ *
+ *   役割の区別は DESIGN.md §2.5 の二重化（色＋文字）を満たしたまま：
+ *     アバターの「母」＋ ロールバッジの文字「お母さん」（地は mother-soft のまま）
+ *   面で示す3重目は、識別には要らない。
+ */
 
 .eg-soothe {
+  /* 本文ボタンの当たり判定を1件の全面へ広げるための基準（下の __open::after） */
+  position: relative;
   padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
   border: var(--border-width) solid var(--hairline);
-  border-radius: var(--rounded-md);
+  /* バブルと左右を反転した形。返事であることを形でも示す（theme.css の注記） */
+  border-radius: var(--radius-reply);
   background: var(--surface);
 }
 
-.eg-soothe.is-mother {
-  background: var(--mother-soft);
-  border-color: var(--mother);
+/*
+ * ★ is-mother に地と枠の色を当てない。
+ *   クラス自体は残してある（役割で分岐する場所がここだと分かるように）。
+ *   もう一度 面で示したくなったときは、面積のいちばん小さいところ
+ *   ―― バッジか細い線 ―― から足すこと。カード全面には戻さない。
+ */
+
+/*
+ * 広げた当たり判定より前に出す。
+ * ここを上げないと、ニックネームも リアクションも「あやす」も押せなくなる
+ * （BubbleCard.css と同じ作り）。
+ */
+.eg-soothe__head,
+.eg-soothe__foot {
+  position: relative;
+  z-index: 1;
 }
 
-.eg-soothe__quote {
+/* 本文＝あやす詳細を開くボタン。当たり判定は1件の全面（人間の指示、2026-08-26） */
+.eg-soothe__open {
+  display: block;
+  width: 100%;
   margin-top: var(--space-xs);
-  padding-left: var(--space-xs);
-  border-left: var(--border-width) solid var(--hairline);
-  color: var(--muted);
+  text-align: start;
+  border-radius: var(--rounded-sm);
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
 }
 
+.eg-soothe__open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-reply);
+}
+
+/*
+ * ★ 反応させるのはボタン自身ではなく、全面に敷いた擬似要素のほう。
+ *
+ *   このボタンの当たり判定は ::after で1件の全面に広がっているのに、
+ *   ボタン自身の面は本文のところにしかない。ボタン側を光らせると、
+ *   カードのどこにカーソルを置いても内側の四角だけが光って、
+ *   押せる範囲と光る範囲がずれる。
+ *
+ *   ::after は inset: 0 ＋ カードと同じ角丸なので、こちらを透かしで覆えば
+ *   光る範囲＝押せる範囲になる。ニックネームとリアクション行は z-index で
+ *   手前に出ているので、透かしの下に沈まない。
+ */
+.eg-soothe__open::after {
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-soothe__open:hover::after {
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), transparent);
+}
+
+.eg-soothe__open:active::after {
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+/* 枠線は1件の角に合わせる（擬似要素の側に出る） */
+.eg-soothe__open:focus-visible {
+  outline: none;
+}
+
+.eg-soothe__open:focus-visible::after {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+
+/* button の中では span で描いているので、ブロックとして流す */
 .eg-soothe__body {
-  margin-top: var(--space-xs);
+  display: block;
   color: var(--body);
+}
+
+/*
+ * このあやすに何件ついているか（人間の指示、2026-08-26）。
+ * 0 のときも場所を空けたままにしない。「まだ あやされてない」と書く
+ * ＝ 押せば開くことが、件数が無くても分かる。
+ */
+.eg-soothe__count {
+  display: block;
+  margin-top: var(--space-xs);
+  text-align: end;
+  color: var(--muted);
 }
 
 .eg-soothe__foot {

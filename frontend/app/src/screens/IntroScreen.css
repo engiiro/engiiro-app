@@ -1,34 +1,143 @@
-/* 登録の前に読む説明（S1 の手前） */
-
+/*
+ * 登録の前に読む説明（S1 の手前）。UI刷新 2026-08-26 で「表紙」の構成にした。
+ *
+ * 広い画面（960px 以上）… 左に表紙（名乗り・ひとこと・イラスト）／右に説明カード
+ * 狭い画面            … 上に表紙（縮めたイラスト）／下に説明カード
+ *
+ * ★ カードの大きさをページごとに変えない（人間の指示、2026-08-26）。
+ *   以前は本文の長さで箱が伸び縮みし、「つぎへ」が毎回ちがう位置に来ていた。
+ *   先に高さを決めて、収まらないぶんは中（__body）だけをスクロールさせる。
+ *   図・見出し・脚も、それぞれ動かない高さを持たせる。この規則は刷新後も変えていない。
+ */
 .eg-intro {
+  /* この画面だけの寸法。骨格のトークンから組む */
+  --intro-sheet-height: 560px;
+  /* いちばん背の高い図（アバター＋ラベル＋注記の縦積み）が収まる高さ */
+  --intro-figure-height: calc(var(--avatar-size-lg) * 2);
+  /* 見出しは 1 行のものと 2 行のものが混ざる。2 行ぶんで固定する */
+  --intro-title-height: calc(var(--size-heading) * var(--leading-heading) * 2);
+  /*
+   * 狭い画面で表紙が占める高さ。カードの高さ計算がこれを差し引く。
+   * 広い画面では横に並ぶので 0 にする。
+   */
+  --intro-cover-height: 132px;
+
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: var(--space-lg) var(--gutter);
   background: var(--canvas);
+  /*
+   * 横だけ切る。縦を切ると、見積もりより表紙が高くなった端末で
+   * カードの脚（つぎへ）が画面の外に出たまま届かなくなる。
+   * 縦は伸ばして、足りなければページごとスクロールさせる。
+   */
+  overflow-x: clip;
 }
 
-.eg-intro__sheet {
-  display: flex;
-  flex-direction: column;
+/* 地の上の光。App.css の背景と同じ作りで、この画面だけ自前で持つ */
+.eg-intro::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(56% 46% at 10% 0%, var(--aura-warm), transparent 68%),
+    radial-gradient(52% 44% at 96% 88%, var(--aura-cool), transparent 70%);
+}
+
+.eg-intro__stage {
+  position: relative;
+  display: grid;
   gap: var(--space-lg);
   width: 100%;
   max-width: 520px;
-  padding: var(--space-lg);
-  border: var(--border-width) solid var(--hairline);
-  border-radius: var(--radius-blob);
-  background: var(--surface);
 }
 
-.eg-intro__head {
+/* ── 表紙 ─────────────────────────────────────────────────────────────── */
+
+/*
+ * 狭い画面では横一列にする。
+ * 表紙を縦に積むと、それだけで 250px 以上を使ってしまい、
+ * 「つぎへ の位置を動かさない」ためのカードの高さが取れなくなる。
+ */
+.eg-intro__cover {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-md);
+}
+
+.eg-intro__cover-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.eg-intro__brandline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.eg-intro__mark {
+  --brandmark-size: 30px;
 }
 
 .eg-intro__brand {
   color: var(--accent-line);
+}
+
+.eg-intro__tagline {
+  color: var(--body);
+}
+
+.eg-intro__art {
+  flex: none;
+  /* 横一列のときは左に置く。絵が先、ことばがあと */
+  width: 132px;
+  order: -1;
+}
+
+/* ── 説明カード ───────────────────────────────────────────────────────── */
+
+.eg-intro__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+  /* 低い画面でははみ出させない。そこまでは伸ばさず縮めるだけ（dvh 未対応には vh を残す） */
+  height: min(
+    var(--intro-sheet-height),
+    calc(100vh - var(--space-lg) * 2 - var(--intro-cover-height))
+  );
+  height: min(
+    var(--intro-sheet-height),
+    calc(100dvh - var(--space-lg) * 2 - var(--intro-cover-height))
+  );
+  padding: var(--space-lg);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+  box-shadow: var(--elevation-modal);
+}
+
+.eg-intro__sheet-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: none;
+}
+
+.eg-intro__step-count {
+  padding: var(--space-xxs) var(--space-sm);
+  border-radius: var(--rounded-pill);
+  background: var(--card);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .eg-intro__skip {
@@ -47,17 +156,25 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-  /* 短い画面でも高さが跳ねないよう、下限だけ決める */
-  min-height: 320px;
+  /* 余りを全部ここが引き受ける。箱の高さは変えない */
+  flex: 1 1 auto;
+  /* flex の子は既定で min-height:auto。0 にしないと縮まず、箱を押し広げる */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .eg-intro__figure {
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding: var(--space-sm) 0;
+  /* 図の大きさはページごとに違う。枠の高さは固定して、見出しの位置を動かさない */
+  flex: none;
+  height: var(--intro-figure-height);
 }
 
 .eg-intro__title {
+  flex: none;
+  min-height: var(--intro-title-height);
   color: var(--ink);
 }
 
@@ -65,6 +182,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  flex: none;
 }
 
 .eg-intro__line {
@@ -151,10 +269,17 @@
   color: var(--accent-line);
 }
 
+/*
+ * 脚。ここが動かないことがこの画面のいちばんの要件。
+ * 箱の高さが固定で、上の __body が余りを吸うので、ページを送っても位置が変わらない。
+ */
 .eg-intro__foot {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  flex: none;
+  /* ボタン 1 個ぶんの高さを先に確保する。1枚目で「もどる」が無くても縦に揺れない */
+  min-height: var(--control-min-height);
 }
 
 .eg-intro__dots {
@@ -167,9 +292,14 @@
   height: var(--space-xs);
   border-radius: var(--rounded-pill);
   background: var(--card);
+  transition:
+    width var(--duration-quick) var(--ease-smooth-out),
+    background-color var(--duration-quick) var(--ease-smooth-out);
 }
 
+/* いま何枚目かは、色だけでなく形（長さ）でも示す（DESIGN.md §2.5） */
 .eg-intro__dot.is-current {
+  width: var(--space-lg);
   background: var(--accent-line);
 }
 
@@ -179,8 +309,71 @@
   margin-inline-start: auto;
 }
 
+/* ── 広い画面：表紙とカードを横に並べる ───────────────────────────────── */
+
+@media (min-width: 960px) {
+  .eg-intro {
+    --intro-cover-height: 0px;
+  }
+
+  .eg-intro__stage {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--space-xxl);
+    max-width: 1000px;
+  }
+
+  /* 広い画面では縦積みに戻し、表紙として大きく置く */
+  .eg-intro__cover {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-md);
+  }
+
+  /* 名乗りは画面の主役。display スケールより一段大きくする */
+  .eg-intro__brand {
+    font-size: clamp(30px, 3.2vw, 42px);
+  }
+
+  .eg-intro__mark {
+    --brandmark-size: 40px;
+  }
+
+  .eg-intro__tagline {
+    font-size: var(--size-heading);
+    line-height: var(--leading-heading);
+    color: var(--ink);
+  }
+
+  .eg-intro__art {
+    width: 100%;
+    max-width: 460px;
+    /* 縦積みでは絵をことばの下に置く。読む順は 名乗り → ひとこと → 絵 */
+    order: 0;
+    margin-top: var(--space-xs);
+    margin-inline-start: calc(var(--space-lg) * -1);
+  }
+}
+
+/* ── 低い画面：表紙のぶんを削って、カードの高さを守る ─────────────────── */
+
+/* 低い画面では表紙をさらに削る。カードの高さを守るほうを優先する */
+@media (max-height: 640px) and (max-width: 959px) {
+  .eg-intro {
+    --intro-cover-height: 104px;
+  }
+
+  .eg-intro__art {
+    width: 96px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .eg-intro__line {
     animation: none;
+  }
+
+  .eg-intro__dot {
+    transition: none;
   }
 }

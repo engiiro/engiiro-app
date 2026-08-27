@@ -104,6 +104,39 @@
   }
 }
 
+/* 満タン（5回目）の合図。アイコンが一度だけ跳ねる。
+ * 拡大の原資は --pop-scale なので、reduced motion では自動で無害になる（DESIGN.md §7.5）。 */
+@keyframes eg-reaction-cheer {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(calc(var(--distance-micro) * -1)) scale(var(--pop-scale));
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/*
+ * 満タンの粒。ボタンの上へ立ちのぼって消える（bubble-call の drift と同じ作り）。
+ * 上がる高さ（--spark-rise）は粒ごとに変える。移動の原資は --distance-medium なので、
+ * reduced motion では 0 に潰れる（DESIGN.md §7.5）。
+ */
+@keyframes eg-reaction-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.4);
+  }
+  30% {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, var(--spark-rise)) scale(1);
+  }
+}
+
 /* ── 3. toast：下から 400ms、消えるのは 350ms ─────────────────────────────── */
 @keyframes eg-toast-in {
   from {
@@ -206,6 +239,42 @@
   }
 }
 
+/* ── 6. bubble-call：「バブる」の登場と、押す前の誘い ─────────────────────
+ *
+ * 人間の指示（2026-08-27）：
+ *   「一番押してほしいボタンはバブル。そこにアクションやアニメーションを追加して」
+ *
+ * ★ 常時は動かさない（§7.2）。動くのは次の2つの瞬間だけ。
+ *   1. 画面に着いたとき … 一度だけ浮かび上がり、輪が2回ひろがって止まる
+ *   2. カーソル／フォーカスが乗ったとき … 小さなバブルが3つ立ちのぼる
+ *   押したあとの反応は press の scale（§7.4）が持つので、ここには置かない。
+ */
+@keyframes eg-fab-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-medium)) scale(var(--scale-modal));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 立ちのぼる小さなバブル。--drift-rise / --drift-delay は要素ごとに変える */
+@keyframes eg-fab-drift {
+  from {
+    opacity: 0;
+    transform: translateY(0) scale(0.4);
+  }
+  40% {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--drift-rise)) scale(1);
+  }
+}
+
 /* ── 5. texts-reveal：12px + blur 3px を 40ms ずらし。合計 300ms 未満 ─────── */
 @keyframes eg-texts-reveal {
   from {
@@ -240,8 +309,19 @@
     --ease-bounce: var(--ease-smooth-out);
   }
 
-  /* 粒子は等価物が無いので出さない */
-  .eg-burst {
+  /* 粒子は等価物が無いので出さない。満タンで立ちのぼる粒も同じ */
+  .eg-burst,
+  .eg-reaction__spark {
+    display: none;
+  }
+
+  /*
+   * 「バブる」の輪と立ちのぼるバブルも同じ。
+   * 移動の原資を 0 に潰すと、その場で点滅するだけの意味の無い動きになる。
+   * 消しても失われる情報は無い（何のボタンかは文字とアイコンが言っている）。
+   */
+  .eg-bubble-fab::before,
+  .eg-bubble-fab__drift {
     display: none;
   }
 }

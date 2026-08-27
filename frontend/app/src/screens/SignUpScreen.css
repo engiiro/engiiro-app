@@ -1,15 +1,39 @@
 /* S1 アカウント登録 */
 
+/* 入口も本編と同じ地の上に置く。光の層は Intro と同じ作り */
 .eg-signup {
+  position: relative;
   display: flex;
-  align-items: center;
+  /*
+   * ★ align-items: center にしない。
+   *   紙が画面より高いとき、中央ぞろえは紙の上端を画面の外へ押し出し、
+   *   そこはスクロールでも取り返せない（生年月日を足して紙が伸び、
+   *   「はじめまして」が読めなくなって気づいた。2026-08-27）。
+   *   代わりに紙側の margin-block: auto で中央に寄せる。
+   *   余白があるときだけ中央に来て、足りないときは上端から素直に始まる。
+   */
+  align-items: flex-start;
   justify-content: center;
   min-height: 100vh;
   padding: var(--space-lg) var(--gutter);
   background: var(--canvas);
+  overflow-x: clip;
+}
+
+.eg-signup::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(58% 44% at 6% 0%, var(--aura-warm), transparent 68%),
+    radial-gradient(52% 42% at 98% 92%, var(--aura-cool), transparent 70%);
 }
 
 .eg-signup__sheet {
+  position: relative;
+  /* 余白が余っているときだけ中央へ。足りないときは上端に付く（上の注記） */
+  margin-block: auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
@@ -19,6 +43,11 @@
   border: var(--border-width) solid var(--hairline);
   border-radius: var(--radius-blob);
   background: var(--surface);
+  box-shadow: var(--elevation-modal);
+}
+
+.eg-signup__mark {
+  --brandmark-size: 30px;
 }
 
 .eg-signup__head {

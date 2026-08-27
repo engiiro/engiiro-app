@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { ACCOUNT_ID_RULE_TEXT, PASSWORD_MIN_LENGTH, login } from "../data/api";
 import { cx } from "../lib/cx";
+import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/Button";
 import { NoteBox } from "../components/NoteBox";
 import { TextField } from "../components/TextField";
@@ -61,6 +62,7 @@ export function LoginScreen({
         }}
       >
         <header className="eg-signup__head">
+          <BrandMark className="eg-signup__mark" />
           <p className={cx("eg-signup__brand", "t-display")}>おかえりなさい</p>
           <button type="button" className={cx("eg-signup__back", "t-label")} onClick={onGuest}>
             ログインせずに よむ

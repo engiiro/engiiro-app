@@ -6,13 +6,31 @@
 .eg-compose {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  /* 右の列の高さいっぱい。viewport から取ると上に積まれたぶんだけ下へはみ出す */
+  height: 100%;
   padding: var(--space-lg) var(--space-md);
   border-left: var(--border-width) solid var(--hairline);
   background: var(--surface);
   /* 起点は右。出た経路で帰す（DESIGN.md §7.4） */
   transform-origin: right center;
   animation: eg-panel-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+/*
+ * パネルの地にも、ごく弱い光を1つ置く（UI刷新 2026-08-26）。
+ * 面が真っ平らだと、右から出てきたときに「別のページ」に見える。
+ * 光があると、同じ場の一部が手前に来ただけに見える。
+ */
+.eg-compose::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(70% 34% at 50% 0%, var(--aura-warm), transparent 72%);
+}
+
+.eg-compose > * {
+  position: relative;
 }
 
 .eg-compose.is-leaving {
@@ -83,6 +101,16 @@
 .eg-compose__send {
   min-height: var(--touch-target-min);
   padding: var(--space-xs) var(--space-md);
+}
+
+/*
+ * 送れる状態に変わった瞬間だけ、一度 pop する（ComposePanel.tsx の注記）。
+ * 型は既存の eg-like-pop を使い回す（DESIGN.md §7.3「MVP で入れる動きは5つだけ」）。
+ * 幅は控えめにして、リアクションの pop（1.08〜1.26）より弱くする。主役の序列を崩さない。
+ */
+.eg-compose__send.is-just-sendable {
+  --pop-scale: 1.06;
+  animation: eg-like-pop var(--duration-medium) var(--ease-smooth-out);
 }
 
 /* ペルソナ変更 */
@@ -160,12 +188,69 @@
   overflow-y: auto;
 }
 
+/*
+ * 入力欄（＝この画面の主役）。
+ *
+ * 吹き出しの形にして、書いているものが そのまま バブルになることを形で示す。
+ * しっぽの作りは BubbleCard.css と同じ。
+ */
+.eg-compose__field {
+  position: relative;
+  margin-bottom: calc(var(--balloon-tail-size) / 2);
+}
+
 .eg-compose__body .eg-textarea {
-  min-height: calc(var(--space-xxl) * 3);
+  /* 道具や注記より先に目に入る大きさにする（刷新の優先順位 3） */
+  min-height: calc(var(--space-xxl) * 4);
+  border-radius: var(--radius-balloon);
+  padding: var(--space-md);
   resize: none;
 }
 
+.eg-compose__field::after {
+  content: "";
+  position: absolute;
+  left: var(--balloon-tail-inset);
+  bottom: calc(var(--balloon-tail-size) / -2);
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: var(--surface);
+  border-right: var(--border-width) var(--input-border-style) var(--hairline);
+  border-bottom: var(--border-width) var(--input-border-style) var(--hairline);
+  transform: rotate(45deg);
+  transition: border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* 超過中もしっぽまで色を合わせる。輪郭が途中で切り替わらないように */
+.eg-compose__field:has(.eg-textarea.is-over)::after {
+  border-color: var(--accent-line);
+}
+
+/*
+ * 入力前だけ出る「しずくのバブル」。
+ *
+ * ★ 要素は消さずに opacity だけ落とす。取り除くと、1文字目を打った瞬間に
+ *   下の注記が飛び上がってしまう。
+ * ★ Illustration の登場アニメーション（fill: both）は opacity を固定してしまうので、
+ *   ここでは切って transition に任せる。
+ */
+.eg-compose__field-art {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-md);
+  width: min(180px, 56%);
+  transform: translateX(-50%);
+  animation: none;
+  transition: opacity var(--duration-fast) var(--ease-smooth-out);
+}
+
+.eg-compose__field.is-filled .eg-compose__field-art {
+  opacity: 0;
+}
+
+/* モック専用の足場。製品の UI ではないので、いちばん静かな見た目にして最後に置く */
 .eg-compose__mock {
+  margin-top: auto;
   padding-top: var(--space-sm);
   border-top: var(--border-width) dashed var(--hairline);
   color: var(--muted);
@@ -262,9 +347,47 @@
   color: var(--muted);
 }
 
+/*
+ * スタンプの見え方（人間の指示 2026-08-28）。
+ *
+ * 入力欄と同じ幅の箱に、出したあとの本文を出す。
+ * バブルカードの吹き出しには寄せない。ここは「確認」であって、投稿されたものではない。
+ * 枠を破線にして、これがまだ下書きだと形でも分かるようにする。
+ */
+.eg-compose__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin-top: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--border-width) dashed var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.eg-compose__preview-label {
+  color: var(--muted);
+}
+
+.eg-compose__preview-body {
+  color: var(--ink);
+}
+
+/* スタンプ一覧：棚のタブ ─ 絵の並び ─ 使い方の一行（人間の指示 2026-08-27 / 28） */
+
+.eg-stamps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
 .eg-stamp-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  /*
+   * 絵（52px）＋名前が収まる幅。細い引き出しでも2列は残る。
+   * 棚で絞ってあるので、1つの棚は3個ずつしか並ばない。
+   */
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
   gap: var(--space-xs);
 }
 
@@ -272,24 +395,51 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--space-xxs);
-  padding: var(--space-xs);
+  padding: var(--space-xs) var(--space-xxs);
   border: var(--border-width) solid var(--hairline);
-  border-radius: var(--rounded-md);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--muted);
   transition:
     border-color var(--duration-quick) var(--ease-smooth-out),
-    background-color var(--duration-quick) var(--ease-smooth-out);
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-micro) var(--ease-smooth-out);
 }
 
-.eg-stamp-pick:hover {
+/* 自分の面を持つので、自分の面色に ink を混ぜて1段持ち上げる（base.css の --hover-veil） */
+.eg-stamp-pick:not(:disabled):hover {
   border-color: var(--accent-line);
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
+  color: var(--body);
 }
 
-.eg-stamp-pick:active {
+.eg-stamp-pick:not(:disabled):active {
   transform: scale(var(--press-scale-strong));
+}
+
+/* 上限に届いて押せないとき。押せないことを枠の形でも示す */
+.eg-stamp-pick:disabled {
+  border-style: dashed;
+  cursor: default;
+}
+
+.eg-stamp-pick__name {
+  /* 「ほにゅうびん」で折り返しても、名前の行で高さが揃うようにする */
+  text-align: center;
+  line-height: 1.3;
+}
+
+.eg-stamps__hint {
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-stamp-pick {
+    transition: none;
+  }
 }
 
 /* 赤ちゃん度・お母さん度（DESIGN.md §4 Meter） */
@@ -347,6 +497,8 @@
     right: 0;
     bottom: 0;
     z-index: 40;
+    /* ここは列から出て画面に重なるので、高さも画面から取り直す */
+    height: 100dvh;
     width: min(var(--compose-width), 100vw);
     box-shadow: var(--elevation-modal);
   }

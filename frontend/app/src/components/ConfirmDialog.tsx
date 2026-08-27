@@ -20,6 +20,32 @@ type ConfirmDialogProps = {
   readonly onCancel: () => void;
 };
 
+/**
+ * バブルを消すときの確認（DESIGN.md §4 バブルの削除）。
+ *
+ * ★ 文言を画面ごとに書かない。バブル詳細（S4）と マイプロフィール（S8）の2か所から
+ *   同じ確認を出すので、別々に書くと片方だけ言い回しが変わる。
+ *   確認を出してよい唯一の操作なので、その事実もこの部品が持つ。
+ */
+export function BubbleDeleteConfirm({
+  onCancel,
+  onConfirm,
+}: {
+  readonly onCancel: () => void;
+  readonly onConfirm: () => void;
+}) {
+  return (
+    <ConfirmDialog
+      title="このバブル、消しちゃう？"
+      body="元には戻せないよ。あやしてくれた ことばも いっしょに 消えます。"
+      confirmLabel="けす"
+      cancelLabel="やめる"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    />
+  );
+}
+
 export function ConfirmDialog({
   title,
   body,

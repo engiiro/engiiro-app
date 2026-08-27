@@ -1,6 +1,7 @@
 import type { ActivityEntry } from "../data/types";
 import { cx } from "../lib/cx";
 import { relativeTimeText } from "../lib/relativeTime";
+import { sootheCountText } from "../lib/sootheCountText";
 import { BubbleBody } from "./BubbleBody";
 import { PersonaAvatar } from "./PersonaAvatar";
 import { IconTrash } from "./icons";
@@ -23,17 +24,31 @@ import "./ActivityItem.css";
 
 type ActivityItemProps = {
   readonly item: ActivityEntry;
-  readonly onOpen: (bubbleId: string) => void;
+  readonly onOpenBubble: (bubbleId: string) => void;
+  /**
+   * あやすを押したとき（人間の指示、2026-08-26）。そのあやすの詳細へ。
+   * バブルと同じで、押せば開く。一覧の中だけ別の行き先にしない。
+   */
+  readonly onOpenSoothe: (sootheId: string) => void;
   /** 自分のバブルにだけ渡る。あやすの削除は仕様に無いので口を作っていない（FR-POST-006） */
   readonly onDelete?: (bubbleId: string) => void;
 };
 
 const KIND_LABEL = { bubble: "バブル", soothe: "あやす" } as const;
 
-export function ActivityItem({ item, onOpen, onDelete }: ActivityItemProps) {
+/** 何件ついているか。バブルは直接のあやす、あやすはそれへのあやす */
+function countTextOf(item: ActivityEntry): string {
+  return sootheCountText(item.kind === "bubble" ? item.bubble.sootheCount : item.soothe.replyCount);
+}
+
+export function ActivityItem({
+  item,
+  onOpenBubble,
+  onOpenSoothe,
+  onDelete,
+}: ActivityItemProps) {
   const isBubble = item.kind === "bubble";
   const entry = isBubble ? item.bubble : item.soothe;
-  const bubbleId = isBubble ? item.bubble.id : item.soothe.bubbleId;
 
   return (
     <li className={cx("eg-activity", "is-" + entry.author.kind)}>
@@ -64,8 +79,17 @@ export function ActivityItem({ item, onOpen, onDelete }: ActivityItemProps) {
         </p>
       ) : null}
 
-      <button type="button" className="eg-activity__open" onClick={() => onOpen(bubbleId)}>
+      <button
+        type="button"
+        className="eg-activity__open"
+        onClick={() =>
+          item.kind === "bubble" ? onOpenBubble(item.bubble.id) : onOpenSoothe(item.soothe.id)
+        }
+      >
         <BubbleBody body={entry.body} className="eg-activity__body" as="span" />
+        <span className={cx("eg-activity__count", "t-caption")}>
+          {countTextOf(item)}
+        </span>
       </button>
     </li>
   );

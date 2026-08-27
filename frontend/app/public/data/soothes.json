@@ -3,7 +3,7 @@
     "id": "soothe_01",
     "bubbleId": "bubble_01",
     "authorPersonaId": "bp_taputapu",
-    "body": "わかるよぉ。ぼくも きのう おなじだった。30こは おおすぎるよぉ。",
+    "body": "わかるよぉ。:wakaru: ぼくも きのう おなじだった。30こは おおすぎるよぉ。",
     "minutesAgo": 18,
     "reactions": { "counts": { "ogya": 2, "yoshiyoshi": 5, "manma": 9 }, "mine": {} }
   },
@@ -44,7 +44,7 @@
     "id": "soothe_06",
     "bubbleId": "bubble_04",
     "authorPersonaId": "bp_babubabu",
-    "body": "ぼくも おなじ。いっしょに ねよ。",
+    "body": "ぼくも おなじ。いっしょに ねよ。:suki:",
     "minutesAgo": 63,
     "reactions": { "counts": { "ogya": 4, "yoshiyoshi": 2, "manma": 6 }, "mine": {} }
   },
@@ -79,5 +79,60 @@
     "body": "なれても いいんだよ。なれたって、しんどいのは かわらないから。",
     "minutesAgo": 480,
     "reactions": { "counts": { "babu": 2 }, "mine": {} }
+  }
+  ,
+  {
+    "id": "soothe_11",
+    "bubbleId": "bubble_01",
+    "authorPersonaId": "bp_mikan",
+    "body": "30こも みつけてもらえたって ことだよ。ぼくは 2こで ないちゃった。",
+    "minutesAgo": 12,
+    "reactions": { "counts": { "ogya": 3, "yoshiyoshi": 4, "manma": 8 }, "mine": {} },
+    "replyToSootheId": "soothe_01"
+  },
+  {
+    "id": "soothe_12",
+    "bubbleId": "bubble_01",
+    "authorPersonaId": "mp_yoshiyoshi",
+    "body": "ふたりとも えらいねぇ。かぞえた ぶんだけ 見てるってことだよ。",
+    "minutesAgo": 10,
+    "reactions": { "counts": { "babu": 9 }, "mine": {} },
+    "replyToSootheId": "soothe_01"
+  },
+  {
+    "id": "soothe_13",
+    "bubbleId": "bubble_01",
+    "authorPersonaId": "bp_sheep",
+    "body": "ぼくも かぞえるの やめられない。いっしょに やめよ。",
+    "minutesAgo": 7,
+    "reactions": { "counts": { "ogya": 1, "yoshiyoshi": 2, "manma": 5 }, "mine": {} },
+    "replyToSootheId": "soothe_01"
+  },
+  {
+    "id": "soothe_14",
+    "bubbleId": "bubble_01",
+    "authorPersonaId": "bp_puni",
+    "body": "ばれてる なかまが いると あんしんする。",
+    "minutesAgo": 6,
+    "reactions": { "counts": { "ogya": 0, "yoshiyoshi": 3, "manma": 2 }, "mine": {} },
+    "replyToSootheId": "soothe_03"
+  },
+  {
+    "id": "soothe_15",
+    "bubbleId": "bubble_04",
+    "authorPersonaId": "bp_taputapu",
+    "body": "あしたの ぼくに まかせる。いま きめた。",
+    "minutesAgo": 55,
+    "reactions": { "counts": { "ogya": 2, "yoshiyoshi": 1, "manma": 4 }, "mine": {} },
+    "replyToSootheId": "soothe_05"
+  },
+  {
+    "id": "soothe_16",
+    "bubbleId": "bubble_01",
+    "authorPersonaId": "bp_babubabu",
+    "body": "ぜんぶ 直さなくて いいって いってもらえるの、はじめてだった。",
+    "minutesAgo": 8,
+    "reactions": { "counts": { "ogya": 1, "yoshiyoshi": 6, "manma": 3 }, "mine": {} },
+    "replyToSootheId": "soothe_02"
   }
 ]

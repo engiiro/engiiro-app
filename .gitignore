@@ -19,3 +19,13 @@ ai/models/*.safetensors
 # Editor
 .vscode/*
 !.vscode/settings.json
+
+# Build
+frontend/color-check/dist/
+
+# 画像素材の未加工の原本置き場（高解像度・大容量）。
+# 圧縮・リネーム後に frontend/images/ へ取り込んだものだけをコミットする。
+/スタンプ用/
+
+# Vercel CLIのローカルプロジェクトリンク設定
+frontend/app/.vercel/
