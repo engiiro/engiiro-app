@@ -18,12 +18,22 @@ baby_fallback.pyの感嘆詞選択と同じ）。
 
 大量の語彙を人間やAIが追記していく前提のため、Pythonの辞書リテラルではなく
 JSONにしている（構文エラーを起こしにくく、差分レビューもしやすい）。
+
+**訛り変換とのエイリアス自動登録**：`baby_fallback.py`は辞書変換より前に
+`toddler_accent.apply_toddler_accent()`を入力文全体へ適用する（例：
+「うさぎ」→「うしゃぎ」）。そのため、辞書のキーが「うさぎ」のままだと、
+訛った後の文字列「うしゃぎ」とは一致しなくなってしまう。`load_variant_dictionary()`
+はこれを避けるため、各キーに`apply_toddler_accent()`を適用した結果が元の
+キーと異なる場合、その訛った形も同じ値で追加登録する。辞書ファイル自体に
+「うしゃぎ」のようなキーを手で書き足す必要は無い。
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+
+from src.fallback.toddler_accent import apply_toddler_accent
 
 DICTIONARIES_DIR = Path(__file__).resolve().parent.parent.parent / "dictionaries"
 
@@ -66,6 +76,17 @@ def load_variant_dictionary(filename: str) -> dict[str, str]:
         else:
             # 1階層形式：value がそのまま候補のリスト
             flattened[key] = _pick_variant(key, value)
+
+    # 訛り変換で元のキーと異なる文字列になるものは、その訛った形も同じ値で
+    # 追加登録する（辞書ファイル自体は変更しない）。既存キーと衝突する場合は
+    # 上書きしない（意図しない語の変換結果を壊さないため）。
+    accented_aliases: dict[str, str] = {}
+    for word, replacement in flattened.items():
+        accented_word = apply_toddler_accent(word)
+        if accented_word != word and accented_word not in flattened:
+            accented_aliases[accented_word] = replacement
+    flattened.update(accented_aliases)
+
     return flattened
 
 

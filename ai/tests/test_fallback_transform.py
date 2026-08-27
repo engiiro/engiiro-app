@@ -23,8 +23,40 @@ from src.fallback.dictionary_loader import load_flat_dictionary, load_variant_di
 from src.fallback.dictionary_match import replace_longest_match
 from src.fallback.mother_fallback import to_mother_words
 from src.fallback.sentence_split import split_sentences
+from src.fallback.toddler_accent import apply_toddler_accent
 from src.fallback.token_match import replace_by_token
 from src.transform import transform
+
+
+class ApplyToddlerAccentTest(unittest.TestCase):
+    def test_rule1_t_row_plus_s_row_becomes_t_row(self) -> None:
+        # 「た」の直後の「し」が「ち」に変わる（わたし→わたち）。
+        self.assertEqual(apply_toddler_accent("わたし"), "あたち")
+
+    def test_rule2_k_row_at_word_head_becomes_t_row(self) -> None:
+        # 単語の先頭の「き」が「ち」に変わる（きのう→ちのう）。
+        self.assertEqual(apply_toddler_accent("きのう"), "ちのう")
+
+    def test_rule2_only_applies_to_the_head_of_each_word(self) -> None:
+        # 単語の先頭以外の「か行」は変わらない（「かぼちゃ」の「ちゃ」等）。
+        result = apply_toddler_accent("かぼちゃ")
+
+        self.assertEqual(result, "たぼちゃ")
+
+    def test_rule3_wa_and_wo_lose_their_consonant(self) -> None:
+        self.assertEqual(apply_toddler_accent("わたし"), "あたち")  # わ→あ
+        self.assertEqual(apply_toddler_accent("かばんを見た"), "たばんお見た")  # を→お
+
+    def test_rule4_sa_becomes_sya(self) -> None:
+        self.assertEqual(apply_toddler_accent("うさぎ"), "うしゃぎ")
+
+    def test_katakana_is_left_untouched(self) -> None:
+        # カタカナ語（外来語）は対象外。辞書のキー「セダン」「カレー」等を
+        # 壊さないための挙動でもある。
+        self.assertEqual(apply_toddler_accent("セダンとカレー"), "セダンとカレー")
+
+    def test_kanji_is_left_untouched(self) -> None:
+        self.assertEqual(apply_toddler_accent("私は疲れた"), "私は疲れた")
 
 
 class LoadVariantDictionaryTest(unittest.TestCase):
@@ -39,6 +71,14 @@ class LoadVariantDictionaryTest(unittest.TestCase):
         second = load_variant_dictionary("baby_daily_words.json")
 
         self.assertEqual(first["ママ"], second["ママ"])
+
+    def test_registers_the_accented_form_of_a_key_as_an_alias(self) -> None:
+        # 「うさぎ」は幼児語訛り（規則4）で「うしゃぎ」になる。辞書変換は
+        # 訛り変換の後に行われるため、訛った形も同じ値で登録されている必要がある。
+        dictionary = load_variant_dictionary("baby_daily_words.json")
+
+        self.assertIn("うしゃぎ", dictionary)
+        self.assertEqual(dictionary["うしゃぎ"], dictionary["うさぎ"])
 
     def test_excludes_keys_starting_with_underscore(self) -> None:
         dictionary = load_variant_dictionary("baby_daily_words.json")
@@ -134,7 +174,8 @@ class SplitSentencesTest(unittest.TestCase):
 
 class ToBabyWordsTest(unittest.TestCase):
     def test_converts_category_words(self) -> None:
-        self.assertEqual(to_baby_words("カツカレーを食べました。"), "まんまを食べたのー。")
+        # 助詞「を」は幼児語訛り（規則3）で「お」に変わる（意図した挙動）。
+        self.assertEqual(to_baby_words("カツカレーを食べました。"), "まんまお食べたのー。")
 
     def test_converts_engineer_words(self) -> None:
         result = to_baby_words("エラーが発生した。")
@@ -218,6 +259,22 @@ class ToBabyWordsTest(unittest.TestCase):
 
         self.assertIn("おやくそくのかみ", result)
         self.assertNotIn("おてて", result)
+
+    def test_toddler_accent_is_applied_before_dictionary_lookup(self) -> None:
+        # 「うさぎさん」は訛り変換で「うしゃぎしゃん」になり、その「うしゃぎ」
+        # 部分が辞書のエイリアス経由で「ぴょんぴょん」に変換される。「さん」
+        # 部分は辞書に無いので訛った形「しゃん」のまま残る。
+        result = to_baby_words("うさぎさんを見た。")
+
+        self.assertIn("ぴょんぴょんしゃん", result)
+
+    def test_toddler_accent_does_not_break_the_gokigen_ending_rule(self) -> None:
+        # 「してください」に訛り変換を先にかけると正規表現の語尾ルールと
+        # 一致しなくなるため、baby_fallback.py は語尾変換を先に確定させてから
+        # 訛り変換をかける（回帰テスト）。
+        result = to_baby_words("確認してください。")
+
+        self.assertIn("ほしいのー", result)
 
 
 class ToMotherWordsTest(unittest.TestCase):
