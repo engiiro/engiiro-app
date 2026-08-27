@@ -56,16 +56,24 @@ POST /transform { body, style }
 
 ### 2.3 フォールバック変換の中身（辞書と正規表現）
 
-`ai/dictionaries/`に辞書、`ai/src/fallback/`に変換ロジックがあります。
+`ai/dictionaries/`にJSON辞書、`ai/src/fallback/`に変換ロジックがあります。
 
-- `baby_category_words.py`：複数の単語を1つの赤ちゃん語へまとめる辞書
-  （例：「オムライス」も「カツカレー」も「まんま」）
-- `baby_engineer_words.py`：エンジニアが日常的に使う語の辞書
-  （例：「お約束」→「おやくそくのかみ」）。「えんじいろ」の利用者はエンジニアが
-  中心という前提で、ここを重点的に育てています
-- `harsh_word_softeners.py`：NGワードの端処理用の辞書
-  （例：「無能」→「まだ慣れていない」）。投稿を`block`するほどではないが
-  マサカリ寄りの語を、変換前に穏当化します
+- `baby_category_words.json`：複数の単語を1つの赤ちゃん語へまとめる辞書
+  （例：「オムライス」も「カツカレー」も「まんま」。「セダン」等の一般的な車は
+  「ぶーぶー」、「救急車」「パトカー」「消防車」のような緊急車両は
+  「ぴーぽーぴーぽー」と、車カテゴリを2つに分けています）
+- `baby_engineer_words.json`：エンジニアが日常的に使う語の辞書。同じ意味
+  グループの類義語をまとめて1つの赤ちゃん語へ寄せるサブカテゴリ化にしています
+  （例：「お約束」「仕様書」「規約」→「おやくそくのかみ」、「バグ」「エラー」
+  「障害」→「ばぐばぐ」）。「えんじいろ」の利用者はエンジニアが中心という
+  前提で、ここを重点的に育てています
+- `harsh_word_softeners.json`：NGワードの端処理用の辞書（1対1、カテゴリ化
+  しない。例：「無能」→「まだ慣れていない」）。投稿を`block`するほどでは
+  ないマサカリ寄りの語を、変換前に穏当化します
+- `dictionary_loader.py`：上記のJSON辞書を読み込む共通ロジック。カテゴリ辞書
+  （`{カテゴリ語: [対応語, ...]}`）を`{対応語: カテゴリ語}`のフラットな
+  置換辞書へ変換する`load_category_dictionary()`と、1対1の辞書をそのまま
+  読み込む`load_flat_dictionary()`がある
 - `dictionary_match.py`：上記の辞書を「最長一致」で置換する共通ロジック。
   形態素解析（fugashi）だけだと「自動車」が「自動」+「車」に割れてしまう
   問題を、原文の文字列に対する辞書引きで回避しています（詳しくはこの
@@ -76,8 +84,7 @@ POST /transform { body, style }
   行う本体
 
 辞書は最初から全部の語を網羅していません。「よく使う語を重点的に育てる」
-前提です。新しい語を追加する場合は各辞書ファイルのdocstringにある判断基準を
-読んでください。
+前提です。新しい語を追加する場合は7章「辞書の育て方」を読んでください。
 
 ### 2.4 NGワードの端処理と、投稿可否のモデレーションの違い
 
@@ -105,14 +112,15 @@ ai/
 │   ├── evaluate.py                    文章の年齢評価（Issue #36の担当領域）
 │   ├── transform.py                   /transform の本体。Gemini→フォールバックの制御
 │   └── fallback/
+│       ├── dictionary_loader.py         JSON辞書の読み込み・フラット化
 │       ├── dictionary_match.py          辞書の最長一致置換
 │       ├── sentence_split.py            文単位への分割
 │       ├── baby_fallback.py             赤ちゃん語のルールベース変換
 │       └── mother_fallback.py           お母さん語のルールベース変換
 ├── dictionaries/
-│   ├── baby_category_words.py         カテゴリ辞書（食事・車・眠り等）
-│   ├── baby_engineer_words.py         エンジニア用語辞書
-│   └── harsh_word_softeners.py        NGワードの端処理用の辞書
+│   ├── baby_category_words.json       カテゴリ辞書（食事・車・緊急車両・眠り等）
+│   ├── baby_engineer_words.json       エンジニア用語辞書（サブカテゴリ化）
+│   └── harsh_word_softeners.json      NGワードの端処理用の辞書
 └── tests/
     ├── test_environment.py            開発環境の依存関係スモークテスト
     ├── test_moderation_rules.py       投稿可否のモデレーションのテスト
@@ -209,17 +217,36 @@ python -m pytest tests/ -v
 
 ## 7. 辞書の育て方
 
-`ai/dictionaries/`の各ファイルはPythonの辞書リテラルです。新しい語を追加する
-場合：
+`ai/dictionaries/`の各ファイルはJSONです。`_comment`キーに辞書全体の説明を
+書いています（JSON自体にコメント構文が無いため）。
 
-1. 対象の辞書ファイル（`baby_category_words.py` / `baby_engineer_words.py` /
-   `harsh_word_softeners.py`）を開き、ファイル冒頭のdocstringにある判断基準を読む
-2. 意味が変わらないか、技術用語・製品名・数値をひらがな化していないかを確認する
-3. `ai/tests/test_fallback_transform.py`に、追加した語が期待どおり変換される
-   ことを確認するテストを足す
+### 7.1 カテゴリ辞書（`baby_category_words.json` / `baby_engineer_words.json`）への追加
 
-どんな赤ちゃん語・お母さん語があるか分からない場合は、Web検索で実際の育児語彙を
-調べてから追加してください。
+これらは`{カテゴリ語（赤ちゃん語）: [対応語, ...]}`という多対1の形です。
+新しい語を追加する場合：
+
+1. 対象のカテゴリ（例：「まんま」「ばぐばぐ」）を決める。当てはまる
+   カテゴリが無ければ、新しいカテゴリ語を1つ考えて追加する
+2. そのカテゴリの配列に、対応語を追加する。**意味が変わらないか**
+   （例：「セダン」は車だが「サーバー」は車ではない）、**技術用語・製品名・
+   数値をひらがな化していないか**（「React.js」「index.ts」等はどの辞書にも
+   入れない）を確認する
+3. 同じ単語を複数のカテゴリへ重複登録しない（`dictionary_loader.py`は後勝ちで
+   上書きするため、意図しないカテゴリに寄ってしまう）
+4. 数が多い場合は`ai/tests/test_fallback_transform.py`へ代表的な数件だけ
+   回帰テストを足せば十分（全語をテストする必要はない）
+
+どんな語が実際に使われているか分からない場合は、Web検索で実在するメニュー名・
+車種名・IT用語などを調べてから追加してください。**思いつきで作った語より、
+実在する語彙のほうが変換の網羅率が上がります。**
+
+### 7.2 NGワード置換辞書（`harsh_word_softeners.json`）への追加
+
+こちらは1対1（`{語: 置換後の語}`）です。`block`にする語（`ai/moderation_rules.py`
+の`NG_WORDS_BLOCK`・`SELF_HARM_WORDS`）とは別物なので、追加する前に
+「文脈次第では技術的な指摘としても使われる語か」「自傷・他害・差別・個人情報の
+ように文脈によらず投稿させるべきでない語か」を見極めてください（後者は
+`harsh_word_softeners.json`ではなく`ai/moderation_rules.py`側に追加する）。
 
 ## 8. 責務の境界
 

@@ -70,7 +70,7 @@ class ToBabyWordsTest(unittest.TestCase):
     def test_converts_engineer_words(self) -> None:
         result = to_baby_words("エラーが発生した。")
 
-        self.assertIn("えらーさん", result)
+        self.assertIn("ばぐばぐ", result)
 
     def test_every_sentence_in_a_multi_sentence_input_gets_an_ending(self) -> None:
         # 語尾変換は文字列の末尾にしかかからないため、最初の文が変換されずに

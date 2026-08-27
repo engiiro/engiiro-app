@@ -26,11 +26,13 @@ from typing import Literal, TypedDict
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import transform_api  # noqa: E402  (sys.path調整の後に置く必要がある)
-from dictionaries.harsh_word_softeners import HARSH_WORD_SOFTENERS  # noqa: E402
 from moderation_rules import check_rules  # noqa: E402
 from src.fallback.baby_fallback import to_baby_words  # noqa: E402
+from src.fallback.dictionary_loader import load_flat_dictionary  # noqa: E402
 from src.fallback.dictionary_match import replace_longest_match  # noqa: E402
 from src.fallback.mother_fallback import to_mother_words  # noqa: E402
+
+_HARSH_WORD_SOFTENERS = load_flat_dictionary("harsh_word_softeners.json")
 
 Style = Literal["baby", "mother"]
 
@@ -73,7 +75,7 @@ def transform(body: str, style: str) -> TransformResult:
       3. Geminiで変換を試みる。失敗・タイムアウトならフォールバックへ切り替える
       4. 事後モデレーション
     """
-    softened = replace_longest_match(body, HARSH_WORD_SOFTENERS)
+    softened = replace_longest_match(body, _HARSH_WORD_SOFTENERS)
 
     before_verdict = check_rules(softened)
     if before_verdict["action"] == "block":
