@@ -300,6 +300,24 @@ class ToBabyWordsTest(unittest.TestCase):
         # 「ぴーぽーぴーぽー」に変換される。
         self.assertIn("ぴーぽーぴーぽー", to_baby_words("白バイに止められた。"))
 
+    def test_family_synonyms_map_to_the_same_baby_word(self) -> None:
+        # 「ママ」の類義語（お母さん・母等）は、すべて既存の「ママ」と
+        # 同じ赤ちゃん語に変換される。
+        for word in ("お母さん", "母", "おかあちゃん"):
+            with self.subTest(word=word):
+                result = to_baby_words(f"{word}が来た。")
+                self.assertTrue(
+                    any(v in result for v in ("まんま", "ま", "まー", "まま")),
+                    f"{word} -> {result}",
+                )
+
+    def test_engineer_trouble_synonyms_map_to_babubabu(self) -> None:
+        # トラブル関連の類義語（セグフォ・コンフリクト等）は、すべて
+        # 既存の「バグ」と同じ赤ちゃん語に変換される。
+        for word in ("セグフォ", "コンフリクト", "レースコンディション"):
+            with self.subTest(word=word):
+                self.assertIn("ばぐばぐ", to_baby_words(f"{word}が起きた。"))
+
 
 class ToMotherWordsTest(unittest.TestCase):
     def test_softens_a_command_into_a_request(self) -> None:
