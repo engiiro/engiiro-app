@@ -26,6 +26,14 @@ type SegmentedTabsProps<T extends string> = {
   /** tabpanel 側の id。読み上げでの対応づけに使う */
   readonly panelId: string;
   readonly label: string;
+  /*
+   * 並べ方。
+   *   fill   … 等分に敷き詰める（既定。S8 のような 2〜3 個のタブ）
+   *   scroll … 中身の幅のまま横に流す（4 個以上、または細い列に置くとき）
+   * 見た目の作りは同じで、変わるのは幅の配り方だけ。似て非なるタブを増やさないため、
+   * 新しい部品ではなく変種にしている。
+   */
+  readonly variant?: "fill" | "scroll";
 };
 
 export function SegmentedTabs<T extends string>({
@@ -34,9 +42,14 @@ export function SegmentedTabs<T extends string>({
   onChange,
   panelId,
   label,
+  variant = "fill",
 }: SegmentedTabsProps<T>) {
   return (
-    <div className="eg-segmented" role="tablist" aria-label={label}>
+    <div
+      className={cx("eg-segmented", variant === "scroll" && "eg-segmented--scroll")}
+      role="tablist"
+      aria-label={label}
+    >
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const selected = tab.value === current;

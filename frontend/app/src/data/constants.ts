@@ -37,6 +37,21 @@ export function countChars(text: string): number {
 }
 
 /**
+ * 本文にカタログのスタンプが1つでも入っているか。
+ *
+ * 入力欄（textarea）の中に画像は出せないので、入っているときだけ
+ * 「こう出ます」の見え方を別に出す（screens/ComposePanel.tsx）。
+ */
+export function containsStamp(text: string): boolean {
+  for (const match of text.matchAll(STAMP_MARKER)) {
+    if (STAMP_CATALOG.some((stamp) => stamp.id === match[1])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * 保存できない長さかどうか。
  * 入力は止めず、保存ボタンだけを無効にするための判定（FR-POST-002 / NFR-005）。
  */

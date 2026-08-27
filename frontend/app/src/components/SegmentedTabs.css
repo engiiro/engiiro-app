@@ -7,6 +7,25 @@
   gap: var(--space-xs);
 }
 
+/*
+ * 横に流す変種。中身の幅のままにして、はみ出したぶんは横スクロールで見せる
+ * （スタンプ一覧の気持ちの棚のように、4つ以上並ぶとき）。
+ */
+.eg-segmented--scroll {
+  display: flex;
+  overflow-x: auto;
+  /* 端が切れていることが分かるように、右端に少しだけ余白を残す */
+  padding-right: var(--space-xxs);
+  scrollbar-width: thin;
+}
+
+.eg-segmented--scroll .eg-segmented__item {
+  flex: 0 0 auto;
+  /* 等分ではないので、文字の長さぶんだけ横に取る */
+  padding-inline: var(--space-sm);
+  border-radius: var(--rounded-pill);
+}
+
 .eg-segmented__item {
   display: flex;
   align-items: center;
