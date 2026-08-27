@@ -3,13 +3,24 @@ docs/design_doc.md 7章のAI推論API（評価・変換）のエントリーポ�
 Hugging Face Spaces（Docker SDK）にそのままデプロイする想定。
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 from src.evaluate import evaluate
+from src.style_classifier import get_classifier, passes_threshold
 from src.transform import transform
 
-app = FastAPI(title="engiiro-app AI service")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # 初回リクエストで学習コストを払わないよう、起動時に一度だけ学習させておく。
+    get_classifier()
+    yield
+
+
+app = FastAPI(title="engiiro-app AI service", lifespan=lifespan)
 
 
 class EvaluateRequest(BaseModel):
@@ -19,6 +30,7 @@ class EvaluateRequest(BaseModel):
 
 class EvaluateResponse(BaseModel):
     estimatedAge: float
+    passesThreshold: bool
 
 
 class TransformRequest(BaseModel):
@@ -38,7 +50,8 @@ def health():
 @app.post("/evaluate", response_model=EvaluateResponse)
 def post_evaluate(req: EvaluateRequest):
     estimated_age = evaluate(req.body, req.personaType)
-    return EvaluateResponse(estimatedAge=estimated_age)
+    passes = passes_threshold(req.body, req.personaType)
+    return EvaluateResponse(estimatedAge=estimated_age, passesThreshold=passes)
 
 
 @app.post("/transform", response_model=TransformResponse)

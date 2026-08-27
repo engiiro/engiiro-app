@@ -3,9 +3,11 @@
 // 必ずbackend経由にする（FR-AI-002）。呼び出しにアカウントID等の識別情報は含めない
 // （FR-AI-003、FR-PRIV-003）。
 //
-// ai/側は現時点でプレースホルダー実装（キーワードカウント/文字列置換）のまま
-// （ai/src/evaluate.py, ai/src/transform.py）。将来より高度な実装に差し替わっても、
-// ここで叩いているI/F（POST /evaluate, POST /transform）さえ保たれれば影響しない。
+// ai/側のI/F（POST /evaluate, POST /transform）さえ保たれれば、内部実装
+// （ai/src/evaluate.py, ai/src/style_classifier.py, ai/src/transform.py）が
+// 差し替わってもここは影響しない。
+// evaluateのpassesThresholdはFR-AI-EVAL-007の合否そのもの
+// （ai/src/style_classifier.pyのナイーブベイズ3クラス分類、閾値50）。
 
 function aiServiceUrl(): string {
   return Deno.env.get("AI_SERVICE_URL") ?? "http://localhost:8001";
@@ -13,6 +15,7 @@ function aiServiceUrl(): string {
 
 export interface AiEvaluateResult {
   estimatedAge: number;
+  passesThreshold: boolean;
 }
 
 export interface AiTransformResult {
@@ -33,8 +36,16 @@ export async function callAiEvaluate(
     });
     if (!res.ok) return null;
     const data = await res.json();
-    if (typeof data.estimatedAge !== "number") return null;
-    return { estimatedAge: data.estimatedAge };
+    if (
+      typeof data.estimatedAge !== "number" ||
+      typeof data.passesThreshold !== "boolean"
+    ) {
+      return null;
+    }
+    return {
+      estimatedAge: data.estimatedAge,
+      passesThreshold: data.passesThreshold,
+    };
   } catch (err) {
     console.error("[ai] evaluate call failed:", err);
     return null;

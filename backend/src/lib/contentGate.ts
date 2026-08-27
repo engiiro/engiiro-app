@@ -22,15 +22,6 @@ export interface GateResult {
   estimatedAge?: number;
 }
 
-/**
- * 閾値の具体的な初期値は未確定（design_doc.md 10章）。
- * ローカルE2E検証では「AI評価が正常に応答したこと」自体をゲートとし、
- * 応答した場合は常に通す仮実装とする。
- */
-function passesThreshold(_estimatedAge: number): boolean {
-  return true;
-}
-
 export async function checkPostable(
   body: string,
   personaType: "baby" | "mother",
@@ -54,7 +45,7 @@ export async function checkPostable(
     };
   }
 
-  if (!passesThreshold(evaluation.estimatedAge)) {
+  if (!evaluation.passesThreshold) {
     return {
       ok: false,
       reason: "evaluation",
