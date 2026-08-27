@@ -276,6 +276,30 @@ class ToBabyWordsTest(unittest.TestCase):
 
         self.assertIn("ほしいのー", result)
 
+    def test_concrete_horse_synonyms_map_to_the_same_abstract_baby_word(self) -> None:
+        # 具体と抽象：「馬」の類義語（人間監督の指示で例示された語を含む）は、
+        # すべて既存の「馬」と同じ赤ちゃん語に変換される。新しい赤ちゃん語は
+        # 作らない。
+        for word in ("牡馬", "牝馬", "駿馬", "汗血馬", "農耕馬", "乗用馬"):
+            with self.subTest(word=word):
+                result = to_baby_words(f"{word}を見た。")
+                self.assertTrue(
+                    any(v in result for v in ("んま", "おんま", "ぱかぱか")),
+                    f"{word} -> {result}",
+                )
+
+    def test_concrete_car_body_types_map_to_the_same_abstract_baby_word(self) -> None:
+        # 具体と抽象：車のボディタイプ（車種）は、すべて既存の「車」と同じ
+        # 赤ちゃん語「ぶーぶー」に変換される。
+        for word in ("ミニバン", "SUV", "クーペ", "軽トラック"):
+            with self.subTest(word=word):
+                self.assertIn("ぶーぶー", to_baby_words(f"{word}に乗った。"))
+
+    def test_emergency_vehicle_synonyms_are_distinguished_from_ordinary_cars(self) -> None:
+        # 緊急車両の類義語（白バイ等）は「ぶーぶー」ではなく
+        # 「ぴーぽーぴーぽー」に変換される。
+        self.assertIn("ぴーぽーぴーぽー", to_baby_words("白バイに止められた。"))
+
 
 class ToMotherWordsTest(unittest.TestCase):
     def test_softens_a_command_into_a_request(self) -> None:
