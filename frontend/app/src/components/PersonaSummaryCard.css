@@ -1,0 +1,60 @@
+/* プロフィールの見出しカード（S8 ほか） */
+
+.eg-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+}
+
+/* 役割は 縁の色でも示す。アバターの色だけに頼らない */
+.eg-summary.is-baby {
+  border-color: color-mix(in srgb, var(--baby) 28%, var(--hairline));
+}
+
+.eg-summary.is-mother {
+  border-color: color-mix(in srgb, var(--mother) 28%, var(--hairline));
+}
+
+.eg-summary__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+/* 見出しの右端（大好きボタン）。名前が長くても押せる幅を残す */
+.eg-summary__action {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.eg-summary__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.eg-summary__name {
+  overflow-wrap: anywhere;
+}
+
+.eg-summary__name.is-baby {
+  color: var(--baby);
+}
+
+.eg-summary__name.is-mother {
+  color: var(--mother);
+}
+
+.eg-summary__caption {
+  color: var(--body);
+}
+
+.eg-summary__note {
+  color: var(--muted);
+}

@@ -1,0 +1,10 @@
+[
+  { "id": "nemui", "name": "ねむい" },
+  { "id": "ogya", "name": "おぎゃー" },
+  { "id": "bottle", "name": "ほにゅうびん" },
+  { "id": "pacifier", "name": "おしゃぶり" },
+  { "id": "heart", "name": "すき" },
+  { "id": "star", "name": "きらきら" },
+  { "id": "cloud", "name": "もやもや" },
+  { "id": "drop", "name": "ぽろり" }
+]

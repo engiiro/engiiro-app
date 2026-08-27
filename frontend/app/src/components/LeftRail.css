@@ -1,18 +1,35 @@
 /* 左サイド。中央の列を差し替えるだけで、右サイドには触らない */
 
+/*
+ * ★ 縦の仕切り線をやめ、島（浮いた面）にした（UI刷新 2026-08-26）。
+ *   左に線、中央に列、右に線 という形が、いちばん強く既視感を出していた。
+ *   面として浮かせると、中央のフィードが「その中を流れているもの」に見える。
+ */
 .eg-rail {
   position: sticky;
-  top: 0;
+  top: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
-  height: 100vh;
+  gap: var(--space-lg);
+  /* viewport ではなく、列の高さから取る。上に何が積まれていても はみ出さない */
+  height: calc(100% - var(--space-md) * 2);
+  margin: var(--space-md) 0;
   padding: var(--space-lg) var(--space-sm);
-  border-right: var(--border-width) solid var(--hairline);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+  box-shadow: var(--elevation-offset);
 }
 
 .eg-rail__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
   padding: 0 var(--space-sm);
+}
+
+.eg-rail__mark {
+  --brandmark-size: 26px;
 }
 
 .eg-rail__logo {
@@ -80,13 +97,19 @@
   font-weight: 400;
 }
 
-/* 狭い幅ではアイコンだけの細い列にする */
+/* 狭い幅ではアイコンだけの細い列にする。名乗りは印だけ残す */
 @media (max-width: 1199px) {
   .eg-rail {
+    gap: var(--space-md);
     padding: var(--space-lg) var(--space-xs);
   }
 
-  .eg-rail__brand,
+  .eg-rail__brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .eg-rail__logo,
   .eg-rail__label,
   .eg-rail__soon {
     display: none;
@@ -109,10 +132,18 @@
     z-index: 30;
     flex-direction: row;
     height: auto;
+    margin: 0;
     padding: 0 0 env(safe-area-inset-bottom);
-    border-right: none;
+    border: none;
     border-top: var(--border-width) solid var(--hairline);
+    border-radius: 0;
     background: var(--surface);
+    box-shadow: none;
+  }
+
+  /* 下端のバーには名乗りを置かない。押せるものだけを並べる */
+  .eg-rail__brand {
+    display: none;
   }
 
   .eg-rail__list {
@@ -124,8 +155,9 @@
     flex: 1;
   }
 
+  /* 高さは base.css のトークン。中央の列の下余白が同じ値を見ている */
   .eg-rail__item {
-    height: calc(var(--touch-target-min) + var(--space-sm));
+    height: var(--bottom-nav-bar-height);
     border-radius: 0;
   }
 

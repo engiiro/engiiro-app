@@ -9,12 +9,31 @@ import "./MockControls.css";
  * 3テーマを並べて見比べるための切替と、画面だけでは作り出せない状態
  * （AI 停止中・フィードの読み込み中・フィードが空）を出すためのスイッチ。
  *
+ * 「入り口」は S1 の前後を行き来するためのもの。本物では登録を終えた人が
+ * 説明へ戻ることはない。
+ *
  * AI は「評価」と「生成」で止まったときの振る舞いが違うので、別々に落とせる
  * （PO 回答 2026-08-25、Issue #19）。評価が落ちると投稿できない。生成は投稿に影響しない。
  * 実 API に差し替えるときに、この帯ごと外す。
  */
 
 export type FeedMode = "normal" | "loading" | "empty";
+
+/**
+ * 画面の入り口。
+ *   intro  … 登録の前に読む説明
+ *   signup … S1 アカウント登録
+ *   login  … ログイン
+ *   app    … 本編（ゲストでもここに入れる）
+ */
+export type EntryStage = "intro" | "signup" | "login" | "app";
+
+const ENTRY_STAGES: readonly { readonly value: EntryStage; readonly label: string }[] = [
+  { value: "intro", label: "説明" },
+  { value: "signup", label: "登録" },
+  { value: "login", label: "ログイン" },
+  { value: "app", label: "本編" },
+];
 
 const FEED_MODES: readonly { readonly value: FeedMode; readonly label: string }[] = [
   { value: "normal", label: "ふつう" },
@@ -31,6 +50,8 @@ type MockControlsProps = {
   readonly onAiTransformChange: (available: boolean) => void;
   readonly feedMode: FeedMode;
   readonly onFeedModeChange: (mode: FeedMode) => void;
+  readonly entry: EntryStage;
+  readonly onEntryChange: (entry: EntryStage) => void;
 };
 
 export function MockControls({
@@ -42,6 +63,8 @@ export function MockControls({
   onAiTransformChange,
   feedMode,
   onFeedModeChange,
+  entry,
+  onEntryChange,
 }: MockControlsProps) {
   return (
     <div className="eg-mock">
@@ -78,6 +101,23 @@ export function MockControls({
           available={aiTransformAvailable}
           onChange={onAiTransformChange}
         />
+
+        <div className="eg-mock__group">
+          <span className={cx("eg-mock__label", "t-label")}>入り口</span>
+          <div className="eg-mock__seg">
+            {ENTRY_STAGES.map((stage) => (
+              <button
+                key={stage.value}
+                type="button"
+                aria-pressed={entry === stage.value}
+                className={cx("eg-mock__button", "t-label")}
+                onClick={() => onEntryChange(stage.value)}
+              >
+                {stage.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="eg-mock__group">
           <span className={cx("eg-mock__label", "t-label")}>フィード</span>

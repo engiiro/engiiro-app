@@ -40,6 +40,28 @@
   --compose-width: 440px;
   --column-gap: 24px;
 
+  /*
+   * 下端に貼りつくものの寸法。
+   *
+   * ★ スクロールする列（.eg-center）に padding-bottom を置かない。
+   *   position: sticky の要素は親の content box より下へは行けないので、
+   *   親に padding-bottom があると、いちばん下まで送りきった瞬間に
+   *   そのぶんだけボタンが跳ね上がる（人間の指摘、2026-08-26）。
+   *   下の余白は「実体のある最後の要素」の高さで確保する。
+   *
+   * --fab-height      … 「バブる」だけ、ふつうのボタン（48px）より一段大きい。
+   *                     このサービスでいちばん押してほしいボタンなので、
+   *                     色と位置だけでなく **大きさでも** 主役だと分かるようにする
+   *                     （人間の指示、2026-08-27）。
+   * --fab-slot-height … 「バブる」を置くスロット。ボタンの上下に 24px ずつ。
+   * --bottom-nav-*    … 767px 未満で下端に出るナビ（LeftRail）。両者が同じ値を見るため
+   *                     ここに置く。片方だけ直すと、ボタンがバーに潜る。
+   */
+  --fab-height: calc(var(--control-min-height) + var(--space-xs));
+  --fab-slot-height: calc(var(--fab-height) + var(--space-lg) * 2);
+  --bottom-nav-bar-height: calc(var(--touch-target-min) + var(--space-sm));
+  --bottom-nav-height: calc(var(--bottom-nav-bar-height) + env(safe-area-inset-bottom));
+
   /* §4 の各コンポーネント仕様に書かれている寸法 */
   --control-min-height: 48px;
   --control-padding-y: 13px;
@@ -60,6 +82,8 @@
   --input-padding: 12px;
   --avatar-size: 34px;
   --avatar-size-sm: 26px;
+  /* プロフィールの見出しに置く大きいアバター（S8 / S6） */
+  --avatar-size-lg: 64px;
   --meter-height: 9px;
 }
 
@@ -96,7 +120,8 @@ figure {
   margin: 0;
 }
 
-ul {
+ul,
+ol {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -156,6 +181,23 @@ textarea {
   max-width: var(--feed-max-width);
   margin: 0 auto;
   padding-inline: var(--gutter);
+}
+
+/*
+ * カーソルがそこにあることを示す量（人間の決定 2026-08-26、
+ * docs/color_and_ui_findings.md §0-4 / §4）。
+ *
+ * ★ 新しい色を作らず、--ink を重ねて1段持ち上げるだけにする。
+ *   ink を混ぜる形なら、ダークでは明るく、ライトでは暗くなるので、
+ *   どのテーマでも同じ規則で「乗っている」と読める。テーマごとの分岐が要らない。
+ *
+ * ★ 混ぜる先は要素ごとに選ぶ。
+ *   自分の面を持つもの（ボタン・リアクション）は自分の面色に混ぜる。
+ *   面を持たないもの（あやすの本文・行）は透かしを重ねる。
+ *   逆にすると、面が消えて地が透ける／役割色の地が消える。
+ */
+:root {
+  --hover-veil: 8%;
 }
 
 /* タッチターゲットは見た目が小さくても 44px を確保する（DESIGN.md §8.2） */

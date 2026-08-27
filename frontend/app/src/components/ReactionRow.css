@@ -19,7 +19,11 @@
   /* 高さは縦 padding と .eg-touch の min-height で 44px を確保する（DESIGN.md §8.2） */
   padding: var(--space-xs) var(--space-sm);
   border: var(--border-width) solid var(--hairline);
-  border-radius: var(--radius-control);
+  /*
+   * 丸くする（UI刷新 2026-08-26）。これは「送信」のような確定操作ではなく、
+   * そっと触れる反応なので、角のある操作ボタンと形で分ける。
+   */
+  border-radius: var(--rounded-pill);
   background: var(--surface);
   color: var(--muted);
   transition:
@@ -31,6 +35,17 @@
 
 .eg-reactions--compact .eg-reaction {
   padding: var(--space-xxs) var(--space-xs);
+}
+
+/*
+ * ★ ここに :hover が無いのが「カーソルの位置が分からない」の主因だった
+ *   （findings §4）。transition は前から書かれていたのに、変わる先が無かった。
+ *   自分の面を持つ要素なので、透かしではなく自分の面色に ink を混ぜる。
+ */
+.eg-reaction:not(:disabled):hover {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
+  color: var(--body);
 }
 
 .eg-reaction:not(:disabled):active {
@@ -46,6 +61,12 @@
 
 .eg-reaction.is-mine .eg-reaction__label {
   font-weight: 700;
+}
+
+/* 押下済みは地が accent-soft なので、混ぜる先もそちらに合わせる */
+.eg-reaction.is-mine:not(:disabled):hover {
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--accent-soft));
+  color: var(--accent-line);
 }
 
 /* 5回ぜんぶ押した状態。これ以上は押せない */

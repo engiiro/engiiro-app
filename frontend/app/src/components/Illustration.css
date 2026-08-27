@@ -1,0 +1,34 @@
+/*
+ * イラストの置き方。
+ *
+ * 大きさは置き場所（親）が決める。ここでは「縦横比を保つ」「文字の邪魔をしない」
+ * という共通の作法だけを持つ。
+ */
+
+.eg-illust {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* 本文やボタンの当たり判定を奪わない。装飾はあくまで背後の層 */
+  pointer-events: none;
+  user-select: none;
+}
+
+/*
+ * 置かれたときに一度だけ浮かび上がる。常時は動かさない（DESIGN.md §7）。
+ * 動きが無くても絵は出ているので、reduced-motion では opacity だけが残る。
+ */
+.eg-illust {
+  animation: eg-illust-float-in var(--duration-very-slow) var(--ease-smooth-out) both;
+}
+
+@keyframes eg-illust-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-medium)) scale(var(--scale-modal));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

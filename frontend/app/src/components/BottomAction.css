@@ -1,0 +1,36 @@
+/*
+ * 下端に貼りつく主操作の帯。
+ *
+ * 位置が動かないことがこの部品の仕事なので、寸法まわりのコメントは丁寧に残す。
+ */
+
+.eg-bottom-action {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  /* 面は中央の列いっぱいに。親（.eg-center）の左右 padding を打ち消す */
+  margin-inline: calc(var(--space-sm) * -1);
+  margin-top: var(--space-lg);
+  /* 下の余白はここで持つ。親に padding-bottom を戻さない（App.css の注記） */
+  padding: var(--space-sm) var(--space-sm) var(--space-lg);
+  border-top: var(--border-width) solid var(--hairline);
+  background: var(--canvas);
+}
+
+.eg-bottom-action__note {
+  margin-bottom: var(--space-xs);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .eg-bottom-action {
+    /*
+     * 下端のバー（LeftRail）の上に置く。
+     * バーぶんの逃げ場も自分の margin で持つ。ここを親の padding にすると、
+     * いちばん下まで送ったときに跳ねる。
+     */
+    bottom: var(--bottom-nav-height);
+    margin-bottom: var(--bottom-nav-height);
+  }
+}

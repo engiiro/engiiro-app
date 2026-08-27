@@ -4,23 +4,76 @@
   padding-top: var(--space-md);
 }
 
-/* カード間 12px（DESIGN.md §5.1） */
+/*
+ * 口上。
+ *
+ * 画面の主役をここで1つに決める（DESIGN.md の刷新方針）。
+ * 大きさ・行間・余白だけで作り、イラストは置かない
+ * ── この画面の絵は「吹き出しが並んでいること」そのもの。
+ */
+.eg-timeline__lede {
+  padding: var(--space-lg) 0 var(--space-xl);
+}
+
+.eg-timeline__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs) var(--space-sm);
+  border: var(--border-width) solid var(--accent-line);
+  border-radius: var(--rounded-pill);
+  color: var(--accent-line);
+}
+
+.eg-timeline__headline {
+  margin-top: var(--space-md);
+  /* 口上だけは display スケールより一段大きく。ここが画面の主役 */
+  font-size: clamp(26px, 6.4vw, 38px);
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.eg-timeline__sub {
+  margin-top: var(--space-sm);
+  color: var(--muted);
+}
+
+/* 口上は上から順に立ち上げる。合計 300ms 未満（DESIGN.md §7.2） */
+.eg-timeline__kicker,
+.eg-timeline__headline,
+.eg-timeline__sub {
+  animation: eg-texts-reveal var(--duration-slow) var(--ease-smooth-out) both;
+}
+
+.eg-timeline__headline {
+  animation-delay: var(--duration-stagger);
+}
+
+.eg-timeline__sub {
+  animation-delay: calc(var(--duration-stagger) * 2);
+}
+
+/*
+ * カード間（DESIGN.md §5.1 は 12px）。
+ * 吹き出しはしっぽ・書いた人・リアクションまでを1つの塊として持つので、
+ * 塊どうしは 1段広い 24px にしないと、隣のバブルの足元と混ざる。
+ */
 .eg-feed-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-lg);
 }
 
 .eg-timeline__section + .eg-timeline__section {
-  margin-top: var(--space-lg);
+  margin-top: var(--space-xl);
 }
 
 .eg-timeline__band {
-  margin-bottom: var(--space-sm);
-  padding: var(--space-sm) var(--space-sm) var(--space-sm);
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   /* 線の太さはテーマに従う。一点物の装飾でも生の px を置かない */
   border-left: calc(var(--border-width) * 2) solid var(--accent-line);
-  border-radius: var(--rounded-xs);
+  border-radius: var(--rounded-xs) var(--radius-blob) var(--radius-blob) var(--rounded-xs);
   background: var(--accent-soft);
 }
 
@@ -34,7 +87,7 @@
 }
 
 .eg-timeline__rest-title {
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-md);
   color: var(--ink);
 }
 
@@ -45,4 +98,59 @@
 /* 準備中の画面 */
 .eg-placeholder {
   padding: var(--space-lg) 0;
+}
+
+/* 見出しの右の「あたらしくする」 */
+.eg-timeline__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs) var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-pill);
+  background: var(--surface);
+  color: var(--muted);
+  white-space: nowrap;
+  transition: background-color var(--duration-quick) var(--ease-in-out);
+}
+
+.eg-timeline__refresh:hover:not(:disabled) {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.eg-timeline__refresh:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+}
+
+.eg-timeline__refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 読み込み中だけ回す。処理中であることを示す（NFR-006・DESIGN.md §7.4） */
+.eg-timeline__refresh-icon.is-spinning {
+  animation: eg-spin var(--duration-very-slow) var(--ease-linear) infinite;
+}
+
+@keyframes eg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-timeline__refresh {
+    transition: none;
+  }
+
+  .eg-timeline__refresh-icon.is-spinning {
+    animation: none;
+  }
+
+  .eg-timeline__kicker,
+  .eg-timeline__headline,
+  .eg-timeline__sub {
+    animation: none;
+  }
 }

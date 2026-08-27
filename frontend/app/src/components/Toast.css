@@ -1,5 +1,9 @@
 /* DESIGN.md §7.3 toast。影を使う数少ない場所のひとつ（§6） */
 
+/*
+ * 完了のしらせも吹き出しの形にする（UI刷新 2026-08-26）。
+ * 「ぽいっと できました」が、いま投げたバブルから返ってきた声に見える。
+ */
 .eg-toast {
   position: fixed;
   left: 50%;
@@ -8,7 +12,7 @@
   transform: translateX(-50%);
   max-width: calc(var(--feed-max-width) - var(--space-xxl));
   padding: var(--space-sm) var(--space-lg);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-balloon);
   border: var(--border-width) solid var(--accent-fill-large);
   /* 面積の大きい塗りなので accent-fill-large（DESIGN.md §5.3-2） */
   background: var(--accent-fill-large);
@@ -17,7 +21,53 @@
   animation: eg-toast-in var(--duration-slow) var(--ease-smooth-out) both;
 }
 
+/*
+ * 通った瞬間の波紋（人間の決定 2026-08-26 §0-3、
+ * docs/color_and_ui_findings.md §5）。
+ *
+ * ★ 型は既存の eg-ring-out（リアクション5回目の波紋）を使い回す。
+ *   新しい型を増やさない（DESIGN.md §7.3「MVP で入れる動きは5つだけ」）。
+ * ★ 一度だけ。出たあとは何も動かない。
+ * ★ reduced motion では --scale-modal などと違い keyframe 側に固定値があるので、
+ *   メディアクエリで明示的に止める（下）。
+ */
+.eg-toast::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: var(--border-width) solid var(--accent-fill-large);
+  animation: eg-ring-out var(--duration-very-slow) var(--ease-smooth-out) both;
+  pointer-events: none;
+}
+
+/* しっぽ。作りは BubbleCard.css と同じ */
+.eg-toast::after {
+  content: "";
+  position: absolute;
+  left: var(--space-lg);
+  bottom: calc(var(--balloon-tail-size) / -2);
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: var(--accent-fill-large);
+  border-right: var(--border-width) solid var(--accent-fill-large);
+  border-bottom: var(--border-width) solid var(--accent-fill-large);
+  border-bottom-right-radius: var(--rounded-xs);
+  transform: rotate(45deg);
+}
+
 /* 閉じるほうが速い。閉じる動作に delay を入れない（DESIGN.md §7.2） */
 .eg-toast.is-leaving {
   animation: eg-toast-out var(--duration-medium) var(--ease-smooth-out) both;
+}
+
+/*
+ * 波紋は「動きの等価物が無い」ので、reduced motion では出さない
+ * （motion.css が .eg-burst を消しているのと同じ扱い）。
+ * 完了は文字で伝わるので、情報は落ちない。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .eg-toast::before {
+    display: none;
+  }
 }

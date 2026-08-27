@@ -2,17 +2,18 @@
 
 .eg-right-rail {
   position: sticky;
-  top: 0;
+  top: var(--space-md);
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  padding: var(--space-lg) 0;
+  padding: var(--space-md) 0;
 }
 
+/* 左サイドと同じ「島」の作りにして、中央だけが流れている場に見せる */
 .eg-right-rail__card {
-  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  padding: var(--space-md);
   border: var(--border-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
+  border-radius: var(--radius-blob);
   background: var(--surface);
   box-shadow: var(--elevation-offset);
 }
@@ -45,4 +46,43 @@
 
 .eg-right-rail__skeleton--short {
   width: 64%;
+}
+
+/*
+ * よみものの上のログイン欄。
+ * ゲストにとってはここが唯一の「参加する」入口なので、地を accent-soft にして
+ * 下のよみもの（ただの読み物）と役割を面で分ける。
+ */
+.eg-right-rail__session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  /*
+   * 地は surface のまま、枠だけを臙脂にする。
+   * 地を accent-soft にすると、中の ghost ボタンのホバー（地が accent-soft）が
+   * 見えなくなり、押せることが分からなくなる。
+   */
+  border-color: var(--accent-line);
+}
+
+.eg-right-rail__session-title {
+  color: var(--ink);
+}
+
+/* 出すのは赤ちゃんの顔だけ。両方を並べない（DESIGN.md §0.1-1） */
+.eg-right-rail__who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.eg-right-rail__nickname {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* この欄の中では、注記の上余白を詰める */
+.eg-right-rail__session .eg-right-rail__note {
+  margin-top: 0;
 }

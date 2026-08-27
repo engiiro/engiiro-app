@@ -1,72 +1,139 @@
-/* DESIGN.md §4 Cards / Tags */
+/*
+ * バブルカード（UI刷新 2026-08-26）。
+ *
+ * 構造は3段：
+ *   1. 吹き出し（本文＋あやすの件数）— 押すと詳細が開く
+ *   2. しっぽの先の書いた人
+ *   3. リアクション行
+ *
+ * 1段目だけが押せる面で、2・3段目はそれぞれ独立した操作。
+ * 入れ子のボタンを作らずに済むので、キーボードの移動順もそのまま上から下になる。
+ */
 
-.eg-card {
-  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
-  border: var(--border-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
-  background: var(--surface);
-  /* 影なし。ノーマルとダークでは 0。園児UI だけずらし影（DESIGN.md §6） */
-  box-shadow: var(--elevation-offset);
-}
-
-.eg-card__head {
+.eg-bubble {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-xs);
+  flex-direction: column;
+  /* 出てくるときだけ、下から浮かぶ。並んだあとは動かさない */
+  animation: eg-bubble-rise var(--duration-slow) var(--ease-smooth-out) both;
 }
 
-.eg-card__state {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  flex: none;
-  color: var(--accent-line);
+@keyframes eg-bubble-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-medium));
+  }
 }
 
-.eg-card__dot {
-  width: var(--space-xs);
-  height: var(--space-xs);
-  border-radius: var(--rounded-pill);
-  background: var(--accent-line);
-}
+/* ── 1. 吹き出し ─────────────────────────────────────────────────────── */
 
-.eg-card__read {
-  color: var(--muted);
-}
-
-.eg-card__open {
+.eg-bubble__balloon {
+  position: relative;
   display: block;
   width: 100%;
-  margin-top: var(--space-xs);
+  padding: var(--card-padding-top) var(--space-md) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  /* しっぽが付く左下だけ角を落とす（theme.css の --radius-balloon） */
+  border-radius: var(--radius-balloon);
+  background: var(--surface);
+  box-shadow: var(--elevation-offset);
   text-align: start;
   /* ホバーで浮かせない。押した反応は面色で返す（DESIGN.md §4 Cards / §7.4） */
-  border-radius: var(--rounded-md);
-  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out);
 }
 
-.eg-card__open:active {
+/*
+ * しっぽ。
+ *
+ * 45度に回した正方形の右辺と下辺だけに線を引くと「∨」になる。
+ * 中心を吹き出しの下辺にぴったり合わせると、∨ の両端が下辺の線の上に来て、
+ * 輪郭が1本につながる。塗りは吹き出しと同じ面色なので、下辺の線は
+ * しっぽの幅ぶんだけ隠れる ＝ 吹き出しからことばが出ている形になる。
+ */
+.eg-bubble__balloon::after {
+  content: "";
+  position: absolute;
+  left: var(--balloon-tail-inset);
+  bottom: calc(var(--balloon-tail-size) / -2);
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: var(--surface);
+  border-right: var(--border-width) solid var(--hairline);
+  border-bottom: var(--border-width) solid var(--hairline);
+  border-bottom-right-radius: var(--rounded-xs);
+  transform: rotate(45deg);
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* 自分の面を持つ要素なので、自分の面色に ink を混ぜる（findings §4） */
+.eg-bubble__balloon:hover,
+.eg-bubble__balloon:hover::after {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
+}
+
+.eg-bubble__balloon:active,
+.eg-bubble__balloon:active::after {
   background: var(--card);
 }
 
-.eg-card__body {
+/*
+ * 狙っているとき。
+ * outline は吹き出しの箱にしか回らず、しっぽだけが枠の外に取り残される。
+ * しっぽの線も臙脂にして、全体で1つの形として狙われて見えるようにする。
+ */
+.eg-bubble__balloon:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+  border-radius: var(--radius-balloon);
+}
+
+.eg-bubble__balloon:focus-visible::after {
+  border-color: var(--accent-line);
+}
+
+.eg-bubble__body {
   display: block;
   color: var(--body);
 }
 
-.eg-card__meta {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-xs);
+.eg-bubble__more {
+  display: block;
   margin-top: var(--space-xs);
-}
-
-.eg-card__more {
-  flex: none;
+  text-align: end;
   color: var(--muted);
 }
 
-.eg-card__foot {
-  margin-top: var(--space-sm);
+/* ── 2. しっぽの先。書いた人 ─────────────────────────────────────────── */
+
+/*
+ * ★ 「よんだ／まだ」の印を置いていた行（人間の指示、2026-08-27 で廃止）。
+ *   右端が空いたぶん、この行とリアクション行の間を詰めてある。
+ *   既読が無くなっても失われる情報は無い：誰が・いつ・どれだけあやされたかは
+ *   吹き出しの中と この行に そのまま残っている。
+ */
+.eg-bubble__who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  /* しっぽのぶんだけ下げ、しっぽの根元より右から始める */
+  margin-top: calc(var(--balloon-tail-size) / 2 + var(--space-xxs));
+  padding-left: var(--space-xs);
+}
+
+/* ── 3. リアクション行 ───────────────────────────────────────────────── */
+
+.eg-bubble__foot {
+  /* 印が消えて2段目が細くなったぶん、3段目を近づける（1枚ぶんの塊に見せる） */
+  margin-top: var(--space-xxs);
+  padding-left: var(--space-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-bubble {
+    animation: none;
+  }
 }

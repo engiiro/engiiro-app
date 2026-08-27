@@ -1,14 +1,8 @@
 import type { ReactElement } from "react";
 
 import { cx } from "../lib/cx";
-import {
-  IconBell,
-  IconGear,
-  IconHome,
-  IconPerson,
-  IconSearch,
-  IconStar,
-} from "./icons";
+import { BrandMark } from "./BrandMark";
+import { IconBell, IconGear, IconHeart, IconHome, IconPerson, IconSearch } from "./icons";
 import "./LeftRail.css";
 
 /*
@@ -16,9 +10,16 @@ import "./LeftRail.css";
  *
  * どれを押しても中央の列が差し替わる。右サイドは動かない。
  *
- * ホーム以外は docs/design_doc.md §4.1 の画面一覧（S1〜S8）に無い画面で、
+ * ホーム・おきにいり・プロフィール以外は docs/design_doc.md §4.1 の画面一覧（S1〜S8）に
+ * 無い画面で、
  * 今は「準備中」を出すだけのプレースホルダ。設計書の画面一覧の更新は
  * backend / 設計担当の領域なので、こちらでは触っていない。
+ *
+ * プロフィールは S8（本人専用プロフィール）。両ペルソナを同時に出してよい唯一の画面
+ * （FR-PERSONA-005）なので、他の画面から同じ中身を出さない。
+ *
+ * おきにいりは S7（大好きな人の一覧＝フォロー中一覧、FR-FOLLOW-003）。
+ * 本人だけが見られる。「大好きされた側」の一覧はここにも作らない（OUT-004）。
  *
  * 置いていないもの：DM の入口（OUT-001）、フォロワー関係（OUT-004）。
  */
@@ -43,8 +44,8 @@ const RAIL_ITEMS: readonly RailItem[] = [
   { view: "timeline", label: "ホーム", icon: IconHome, ready: true },
   { view: "search", label: "さがす", icon: IconSearch, ready: false },
   { view: "notifications", label: "おしらせ", icon: IconBell, ready: false },
-  { view: "favorites", label: "おきにいり", icon: IconStar, ready: false },
-  { view: "profile", label: "プロフィール", icon: IconPerson, ready: false },
+  { view: "favorites", label: "おきにいり", icon: IconHeart, ready: true },
+  { view: "profile", label: "プロフィール", icon: IconPerson, ready: true },
   { view: "settings", label: "せってい", icon: IconGear, ready: false },
 ];
 
@@ -57,7 +58,12 @@ export function LeftRail({
 }) {
   return (
     <nav className="eg-rail" aria-label="メインナビゲーション">
+      {/*
+        名乗り。細い列（1199px 以下）では印だけが残り、文字は消える。
+        印そのものは全利用者で同じ絵柄なので、誰かを識別する手がかりにはならない。
+      */}
       <div className="eg-rail__brand">
+        <BrandMark className="eg-rail__mark" />
         <span className={cx("eg-rail__logo", "t-display")}>えんじいろ</span>
       </div>
       <ul className="eg-rail__list">
@@ -68,6 +74,14 @@ export function LeftRail({
               <button
                 type="button"
                 aria-current={current === item.view ? "page" : undefined}
+                /*
+                 * 1199px 未満（さらに 767px 未満のボトムバーでも）は .eg-rail__label /
+                 * .eg-rail__soon を display:none にして文字を消している（LeftRail.css）。
+                 * display:none は読み上げからも消えるので、そのままだとボタンに
+                 * アクセシブルネームが1つも残らない。aria-label は見た目の表示状態に
+                 * 依存しないので、ここで明示しておく（人間の指摘）。
+                 */
+                aria-label={item.ready ? item.label : item.label + "（準備中）"}
                 className={cx("eg-rail__item", "eg-touch", current === item.view && "is-current")}
                 onClick={() => onNavigate(item.view)}
               >
