@@ -26,6 +26,18 @@ export function error(message: string, status: number): Response {
 }
 
 /**
+ * reason付きのエラーレスポンス。design_doc.mdの正本形式（{error}）に
+ * reasonを足しただけなので、reasonを見ないクライアントには影響しない。
+ */
+export function errorWithReason(
+  message: string,
+  status: number,
+  reason: string,
+): Response {
+  return json({ error: message, reason }, status);
+}
+
+/**
  * リクエストボディをJSONとして読む。
  * 壊れたJSONが来たときに500ではなく400を返せるよう、ここで失敗を吸収する。
  */
