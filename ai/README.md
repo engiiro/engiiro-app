@@ -66,21 +66,33 @@ POST /transform { body, style }
   「ぴーぽーぴーぽー」と、車カテゴリを2つに分けています
 - `baby_engineer_words.json`：エンジニアが日常的に使う語の辞書。同じ意味
   グループの類義語をまとめて1つの赤ちゃん語へ寄せるサブカテゴリ化にしています
-  （例：「お約束」「仕様書」「規約」→「おやくそくのかみ」、「バグ」「エラー」
+  （例：「お約束」「規約」→「おやくそくのかみ」、「バグ」「エラー」
   「障害」→「ばぐばぐ」）。「えんじいろ」の利用者はエンジニアが中心という
   前提で、ここを重点的に育てています
+- `baby_engineer_word_parts.json`：複合語を構成する「部品」の辞書（例：
+  「仕様」→「おやくそく」、「書」→「のかみ」）。上の`baby_engineer_words.json`
+  が「仕様書」のような複合語を丸ごと1つのキーとして登録するのに対し、
+  こちらは部品ごとに登録することで、辞書に無い似た構造の複合語（例：
+  「仕様概要図」）にも自動的に対応する（人間監督の指摘）。詳しくは
+  `docs/ai_transform_design.md` 6.4.1章
 - `harsh_word_softeners.json`：NGワードの端処理用の辞書（1対1、バリエーション
   無し。例：「無能」→「まだ慣れていない」）。投稿を`block`するほどでは
   ないマサカリ寄りの語を、変換前に穏当化します
 - `dictionary_loader.py`：上記のJSON辞書を読み込む共通ロジック。バリエーション
-  辞書（`{サブカテゴリ: {語: [候補, ...]}}`という2階層）を`{語: 選ばれた候補}`
-  のフラットな置換辞書へ変換する`load_variant_dictionary()`と、1対1の辞書を
-  そのまま読み込む`load_flat_dictionary()`がある。候補が複数あるときは、
-  単語自体の文字数から機械的に1つを選ぶ（同じ単語には常に同じ変換結果を返す）
-- `dictionary_match.py`：上記の辞書を「最長一致」で置換する共通ロジック。
-  形態素解析（fugashi）だけだと「自動車」が「自動」+「車」に割れてしまう
-  問題を、原文の文字列に対する辞書引きで回避しています（詳しくはこの
-  ファイルのdocstring、および`docs/ai_transform_design.md` 6.3章）
+  辞書（`{サブカテゴリ: {語: [候補, ...]}}`という2階層、または`{語: [候補, ...]}`
+  という1階層）を`{語: 選ばれた候補}`のフラットな置換辞書へ変換する
+  `load_variant_dictionary()`と、1対1の辞書をそのまま読み込む
+  `load_flat_dictionary()`がある。候補が複数あるときは、単語自体の文字数から
+  機械的に1つを選ぶ（同じ単語には常に同じ変換結果を返す）
+- `dictionary_match.py`：`baby_daily_words.json`・`baby_engineer_words.json`
+  （統合してから使う）を「最長一致」で置換する共通ロジック。形態素解析
+  （fugashi）だけだと「自動車」が「自動」+「車」に割れてしまう問題を、
+  原文の文字列に対する辞書引きで回避しています（詳しくはこのファイルの
+  docstring、および`docs/ai_transform_design.md` 6.3章）
+- `token_match.py`：`baby_engineer_word_parts.json`を、形態素解析で名詞・
+  接尾辞のトークンだけを対象に置換する共通ロジック。「書」のような短い
+  部品を動詞「書く」の活用形と混同しないための工夫（詳しくはこのファイルの
+  docstring、および`docs/ai_transform_design.md` 6.4.1章）
 - `sentence_split.py`：複数の文からなる入力を句点・感嘆符・疑問符で分割する
   共通ロジック
 - `baby_fallback.py` / `mother_fallback.py`：上記を組み合わせて、実際の変換を
@@ -121,12 +133,14 @@ ai/
 │   └── fallback/
 │       ├── dictionary_loader.py         JSON辞書の読み込み・フラット化
 │       ├── dictionary_match.py          辞書の最長一致置換
+│       ├── token_match.py               品詞を考慮した部品辞書の置換
 │       ├── sentence_split.py            文単位への分割
 │       ├── baby_fallback.py             赤ちゃん語のルールベース変換
 │       └── mother_fallback.py           お母さん語のルールベース変換
 ├── dictionaries/
 │   ├── baby_daily_words.json          日常語彙辞書（家族・動物・食べ物・車・体・動作等）
 │   ├── baby_engineer_words.json       エンジニア用語辞書（サブカテゴリ化）
+│   ├── baby_engineer_word_parts.json  複合語の部品辞書（「仕様」＋「書」等）
 │   └── harsh_word_softeners.json      NGワードの端処理用の辞書
 └── tests/
     ├── test_environment.py            開発環境の依存関係スモークテスト
@@ -241,7 +255,10 @@ python -m pytest tests/ -v
    入れない）を確認する
 3. 候補が1つしか無くても配列で書く（`["まんま"]`）。将来バリエーションが
    増えたときに配列のまま追記できるようにするため
-4. 同じ大人の言葉を複数のサブカテゴリへ重複登録しない
+4. 同じ大人の言葉を複数のサブカテゴリへ重複登録しない。`baby_daily_words.json`
+   と`baby_engineer_words.json`の間でもキーを重複させない（`baby_fallback.py`は
+   この2つを統合してから最長一致させるため。`DictionaryConsistencyTest`で
+   重複が無いことをテストしている）
 5. 動詞を追加する場合、活用形（食べた／食べます等）は変換されない
    （2.3章の既知の制限）。基本形1つだけを登録すれば十分
 6. 数が多い場合は`ai/tests/test_fallback_transform.py`へ代表的な数件だけ
@@ -251,7 +268,27 @@ python -m pytest tests/ -v
 車種名・IT用語などを調べてから追加してください。**思いつきで作った語より、
 実在する語彙のほうが変換の網羅率が上がります。**
 
-### 7.2 NGワード置換辞書（`harsh_word_softeners.json`）への追加
+### 7.2 部品辞書（`baby_engineer_word_parts.json`）への追加
+
+`{語: [候補, ...]}`という1階層の形です。「仕様書」を丸ごと1語で登録する
+代わりに、「仕様」＋「書」のように部品ごとに登録することで、辞書に無い
+似た構造の複合語（例：「規約書」「手順書」）にも自動的に対応させたい場合に
+使います。追加する前に、必ず次の2点を確認してください（`docs/ai_transform_design.md`
+6.4.1章に詳しい理由がある）。
+
+1. **単語自体の変換結果が、`baby_daily_words.json`・`baby_engineer_words.json`
+   に登録済みの同じ語の変換結果と重複・矛盾しないか。** 重複すると「規約書」が
+   「おやくそくのかみのかみ」のように二重変換される
+2. **`baby_daily_words.json`・`baby_engineer_words.json`のどのキーの一部としても
+   出現しないか。** 出現すると、その複合語が`token_match.py`の処理で先に
+   壊されてから複合語辞書に届き、変換に失敗する（例：「手」（体の部位）と
+   衝突する「手順」は部品化せず、「手順書」のまま`baby_engineer_words.json`に
+   残している）
+
+条件を満たさない場合は、部品化せず複合語のまま`baby_engineer_words.json`へ
+追加してください。
+
+### 7.3 NGワード置換辞書（`harsh_word_softeners.json`）への追加
 
 こちらは1対1（`{語: 置換後の語}`）です。`block`にする語（`ai/moderation_rules.py`
 の`NG_WORDS_BLOCK`・`SELF_HARM_WORDS`）とは別物なので、追加する前に

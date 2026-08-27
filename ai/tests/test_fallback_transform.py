@@ -23,6 +23,7 @@ from src.fallback.dictionary_loader import load_flat_dictionary, load_variant_di
 from src.fallback.dictionary_match import replace_longest_match
 from src.fallback.mother_fallback import to_mother_words
 from src.fallback.sentence_split import split_sentences
+from src.fallback.token_match import replace_by_token
 from src.transform import transform
 
 
@@ -51,6 +52,46 @@ class LoadFlatDictionaryTest(unittest.TestCase):
 
         self.assertEqual(dictionary["無能"], "まだ慣れていない")
         self.assertNotIn("_comment", dictionary)
+
+
+class DictionaryConsistencyTest(unittest.TestCase):
+    def test_daily_and_engineer_dictionaries_have_no_overlapping_keys(self) -> None:
+        # baby_fallback.py はこの2つを1つの辞書へ統合してから最長一致させる
+        # （短いキーが複合語の一部を先に食べてしまう問題を避けるため）。
+        # 統合する前提が崩れないよう、キーの重複が無いことを固定しておく。
+        daily = load_variant_dictionary("baby_daily_words.json")
+        engineer = load_variant_dictionary("baby_engineer_words.json")
+
+        self.assertEqual(set(daily) & set(engineer), set())
+
+
+class ReplaceByTokenTest(unittest.TestCase):
+    def test_replaces_a_noun_token_that_matches_the_dictionary(self) -> None:
+        dictionary = {"書": "のかみ"}
+
+        result = replace_by_token("仕様書を確認する。", dictionary)
+
+        self.assertEqual(result, "仕様のかみを確認する。")
+
+    def test_does_not_replace_a_verb_stem_with_the_same_surface_form(self) -> None:
+        # 「書」を接尾辞として辞書に持っていても、動詞「書く」の活用形
+        # （「書いた」の「書い」等）は「書」という1文字トークンにならないため
+        # 誤って変換されない（token_match.py の docstring 参照）。
+        dictionary = {"書": "のかみ"}
+
+        result = replace_by_token("明日までに書いてください。", dictionary)
+
+        self.assertEqual(result, "明日までに書いてください。")
+
+    def test_does_not_replace_a_word_that_already_contains_the_key_as_one_token(
+        self,
+    ) -> None:
+        # 「辞書」は1つの名詞トークンなので、「書」というキーとは一致しない。
+        dictionary = {"書": "のかみ"}
+
+        result = replace_by_token("辞書を引いた。", dictionary)
+
+        self.assertEqual(result, "辞書を引いた。")
 
 
 class ReplaceLongestMatchTest(unittest.TestCase):
@@ -150,6 +191,33 @@ class ToBabyWordsTest(unittest.TestCase):
         result = to_baby_words("React.js のバージョンで詰まっている。")
 
         self.assertIn("React.js", result)
+
+    def test_a_compound_word_not_in_the_dictionary_is_assembled_from_parts(self) -> None:
+        # 人間監督の指摘：「仕様書」を丸ごと1語で覚えるのではなく、「仕様」
+        # 「書」のように部品を列挙すれば、辞書に無い似た構造の複合語にも
+        # 対応できる。「仕様概要図」は辞書に登録していない新語だが、
+        # 「仕様」（→おやくそく）と「図」（→のかみ）が部品辞書にあるので
+        # 変換される。
+        result = to_baby_words("仕様概要図を確認する。")
+
+        self.assertIn("おやくそく", result)
+        self.assertIn("のかみ", result)
+
+    def test_compound_dictionary_entries_that_would_conflict_are_kept_whole(self) -> None:
+        # 「基本設計書」は語根「設計」が『開発フロー』カテゴリの複合語
+        # （「外部設計」「内部設計」等）と衝突するため、部品分解せず複合語
+        # のまま辞書に残している。分解されて壊れていないことを確認する。
+        result = to_baby_words("基本設計書をレビューした。")
+
+        self.assertIn("おやくそくのかみ", result)
+
+    def test_a_word_that_would_collide_with_a_daily_word_part_is_kept_whole(self) -> None:
+        # 「手順書」は語根「手順」の先頭が日常語彙辞書の「手」（体の部位）と
+        # 衝突するため、部品分解せず複合語のまま辞書に残している。
+        result = to_baby_words("手順書を作った。")
+
+        self.assertIn("おやくそくのかみ", result)
+        self.assertNotIn("おてて", result)
 
 
 class ToMotherWordsTest(unittest.TestCase):

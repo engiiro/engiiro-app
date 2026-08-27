@@ -5,9 +5,22 @@ docs/ai_transform_design.md 6.3〜6.6章の実装。
 処理の流れ：
   1. 辞書（カテゴリ辞書・エンジニア用語辞書）を最長一致で置換する（辞書マッチには
      形態素解析を使わない。理由は dictionary_match.py の docstring を参照）
-  2. 文末表現を赤ちゃん語の語尾へ書き換える
-  3. 一人称を書き換える
-  4. 気持ちワード（「疲れた」等）を含む文には、文頭へ感嘆詞を1つ添える
+  2. 部品辞書（例：「仕様」＋「書」）を、名詞・接尾辞のトークン単位で置換する
+     （token_match.py の docstring を参照。辞書に無い新しい複合語にも対応するため）
+  3. 文末表現を赤ちゃん語の語尾へ書き換える
+  4. 一人称を書き換える
+  5. 気持ちワード（「疲れた」等）を含む文には、文頭へ感嘆詞を1つ添える
+
+  1を2より先に行う理由：「基本設計書」のように複合語辞書へそのまま残した
+  長い複合語（8文字）を、部品辞書の短いキー「書」（1文字）より先に確実に
+  マッチさせるため。1で使い切った文字列には、もう部品辞書のキーとなる
+  文字は残らないため、2で二重に変換される心配もない。
+
+  逆に部品辞書へ入れる語（「仕様」「フロー」「書」「図」等）は、日常語彙
+  辞書・エンジニア複合語辞書のどのキーとも文字列として重ならないものだけを
+  選んでいる（例：「手」（体の部位、1文字）と衝突する「手順」は部品化せず、
+  「手順書」のまま複合語辞書に残している。判断基準は
+  baby_engineer_word_parts.json のコメントを参照）。
 
 気持ちワードの検出だけは形態素解析（fugashi）を使う。「疲れた」「疲れました」
 「疲れちゃった」のように活用形が変わっても、原形（lemma）で見れば同じ語として
@@ -23,14 +36,26 @@ import fugashi
 from src.fallback.dictionary_loader import load_variant_dictionary
 from src.fallback.dictionary_match import replace_longest_match
 from src.fallback.sentence_split import split_sentences
+from src.fallback.token_match import replace_by_token
 
 # Taggerの初期化はコストがあるため、モジュール読み込み時に1回だけ行う。
 _tagger = fugashi.Tagger()
 
 # 辞書もモジュール読み込み時に1回だけ読み込む（リクエストのたびにJSONを
 # 読み直さないため）。ai/dictionaries/*.json を参照。
+#
+# 日常語彙とエンジニア用語は1つの辞書へ統合してから replace_longest_match()
+# へ渡す。理由：別々に replace_longest_match() を呼ぶと、片方の辞書の短い
+# キーがもう片方の辞書の複合語の一部を先に食べてしまうことがある
+# （例：「手順書」を処理する前に「手」（日常語彙・体の部位）が先にマッチし、
+# 「手順」というキーを認識できなくなる）。1つの辞書に統合して一度に最長一致
+# させれば、キーの長さだけで正しく優先順位が決まる（「手順書」3文字 >
+# 「手」1文字）。両辞書にキーの重複が無いことは
+# tests/test_fallback_transform.py で確認している。
 _DAILY_WORDS = load_variant_dictionary("baby_daily_words.json")
 _ENGINEER_WORDS = load_variant_dictionary("baby_engineer_words.json")
+_COMPLEX_WORDS = {**_DAILY_WORDS, **_ENGINEER_WORDS}
+_ENGINEER_WORD_PARTS = load_variant_dictionary("baby_engineer_word_parts.json")
 
 # 気持ちワードの原形一覧。活用形（疲れた／疲れます／疲れちゃった）を問わず、
 # 原形がここに含まれていれば「弱音」を含む文と判定する。
@@ -88,8 +113,8 @@ def to_baby_words(text: str) -> str:
     """文章を赤ちゃん語へ変換する。Gemini APIを使わない、規則だけの変換。"""
     has_feeling = _has_feeling_word(text)
 
-    result = replace_longest_match(text, _DAILY_WORDS)
-    result = replace_longest_match(result, _ENGINEER_WORDS)
+    result = replace_longest_match(text, _COMPLEX_WORDS)
+    result = replace_by_token(result, _ENGINEER_WORD_PARTS)
 
     # 語尾変換は文字列の末尾（正規表現の `$`）にしかかからないため、複数文
     # からなる入力では文ごとに分けてから適用する（最初の文だけ変換されず
