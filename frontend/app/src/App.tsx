@@ -192,6 +192,10 @@ export function App() {
         if (!cancelled) {
           setMe(result);
           setBootError(false);
+          // トークンが残っていて本人の情報が取れたなら、再訪でもログイン状態から始める。
+          // fetchMe自身がトークン切れを検知したときはゲスト用の空ペルソナに落としているので、
+          // ニックネームの有無で判定できる。
+          setIsGuest(result.baby.nickname === "" && result.mother.nickname === "");
         }
       })
       .catch(() => {
@@ -757,7 +761,8 @@ export function App() {
               applySession(true);
               setEntry("app");
             }}
-            onDone={() => {
+            onDone={(loggedInMe) => {
+              setMe(loggedInMe);
               applySession(false);
               setEntry("app");
               navigate("timeline");
@@ -774,11 +779,12 @@ export function App() {
               applySession(true);
               setEntry("app");
             }}
-            onDone={(babyNickname) => {
+            onDone={(newMe) => {
+              setMe(newMe);
               applySession(false);
               setEntry("app");
               navigate("timeline");
-              setToast(babyNickname + " として はじめました");
+              setToast(newMe.baby.nickname + " として はじめました");
             }}
           />
         ) : null}

@@ -18,6 +18,8 @@ import {
 } from "./src/routes/personas.ts";
 import {
   handleCreateComment,
+  handleGetComment,
+  handleListCommentReplies,
   handleListComments,
 } from "./src/routes/comments.ts";
 import {
@@ -123,6 +125,16 @@ const routes: Route[] = [
     method: "DELETE",
     pattern: new URLPattern({ pathname: "/api/posts/:id/reactions/:type" }),
     handler: handleDeletePostReaction,
+  },
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/comments/:id" }),
+    handler: handleGetComment,
+  },
+  {
+    method: "GET",
+    pattern: new URLPattern({ pathname: "/api/comments/:id/comments" }),
+    handler: handleListCommentReplies,
   },
   {
     method: "POST",
