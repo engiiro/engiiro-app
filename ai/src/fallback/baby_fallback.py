@@ -20,7 +20,7 @@ import re
 
 import fugashi
 
-from src.fallback.dictionary_loader import load_category_dictionary
+from src.fallback.dictionary_loader import load_variant_dictionary
 from src.fallback.dictionary_match import replace_longest_match
 from src.fallback.sentence_split import split_sentences
 
@@ -29,8 +29,8 @@ _tagger = fugashi.Tagger()
 
 # 辞書もモジュール読み込み時に1回だけ読み込む（リクエストのたびにJSONを
 # 読み直さないため）。ai/dictionaries/*.json を参照。
-_CATEGORY_WORDS = load_category_dictionary("baby_category_words.json")
-_ENGINEER_WORDS = load_category_dictionary("baby_engineer_words.json")
+_DAILY_WORDS = load_variant_dictionary("baby_daily_words.json")
+_ENGINEER_WORDS = load_variant_dictionary("baby_engineer_words.json")
 
 # 気持ちワードの原形一覧。活用形（疲れた／疲れます／疲れちゃった）を問わず、
 # 原形がここに含まれていれば「弱音」を含む文と判定する。
@@ -88,7 +88,7 @@ def to_baby_words(text: str) -> str:
     """文章を赤ちゃん語へ変換する。Gemini APIを使わない、規則だけの変換。"""
     has_feeling = _has_feeling_word(text)
 
-    result = replace_longest_match(text, _CATEGORY_WORDS)
+    result = replace_longest_match(text, _DAILY_WORDS)
     result = replace_longest_match(result, _ENGINEER_WORDS)
 
     # 語尾変換は文字列の末尾（正規表現の `$`）にしかかからないため、複数文

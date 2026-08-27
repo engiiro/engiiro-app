@@ -19,10 +19,38 @@ if str(AI_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(AI_DIRECTORY))
 
 from src.fallback.baby_fallback import to_baby_words
+from src.fallback.dictionary_loader import load_flat_dictionary, load_variant_dictionary
 from src.fallback.dictionary_match import replace_longest_match
 from src.fallback.mother_fallback import to_mother_words
 from src.fallback.sentence_split import split_sentences
 from src.transform import transform
+
+
+class LoadVariantDictionaryTest(unittest.TestCase):
+    def test_flattens_the_two_level_subcategory_structure(self) -> None:
+        dictionary = load_variant_dictionary("baby_daily_words.json")
+
+        self.assertIn("ママ", dictionary)
+        self.assertIn("犬", dictionary)
+
+    def test_picks_the_same_variant_for_the_same_word_every_time(self) -> None:
+        first = load_variant_dictionary("baby_daily_words.json")
+        second = load_variant_dictionary("baby_daily_words.json")
+
+        self.assertEqual(first["ママ"], second["ママ"])
+
+    def test_excludes_keys_starting_with_underscore(self) -> None:
+        dictionary = load_variant_dictionary("baby_daily_words.json")
+
+        self.assertNotIn("_comment", dictionary)
+
+
+class LoadFlatDictionaryTest(unittest.TestCase):
+    def test_loads_a_one_to_one_dictionary(self) -> None:
+        dictionary = load_flat_dictionary("harsh_word_softeners.json")
+
+        self.assertEqual(dictionary["無能"], "まだ慣れていない")
+        self.assertNotIn("_comment", dictionary)
 
 
 class ReplaceLongestMatchTest(unittest.TestCase):
@@ -93,6 +121,30 @@ class ToBabyWordsTest(unittest.TestCase):
 
     def test_replaces_first_person_pronouns(self) -> None:
         self.assertIn("わたち", to_baby_words("私は担当者です。"))
+
+    def test_converts_a_word_with_multiple_variants_to_one_of_them(self) -> None:
+        # 「ママ」には複数の赤ちゃん語バリエーション（まんま／ま／まー／まま）
+        # があるため、そのうちのどれかに変換されることだけを確認する。
+        result = to_baby_words("ママに会いたい。")
+
+        self.assertTrue(any(variant in result for variant in ("まんま", "ま", "まー", "まま")))
+
+    def test_converts_emergency_vehicles_differently_from_ordinary_cars(self) -> None:
+        # 人間監督の指摘：救急車・パトカーは「ぶーぶー」ではなく「ぴーぽーぴーぽー」。
+        result = to_baby_words("救急車とセダンが通った。")
+
+        self.assertIn("ぴーぽーぴーぽー", result)
+        self.assertIn("ぶーぶー", result)
+
+    def test_verb_in_base_form_is_converted(self) -> None:
+        self.assertIn("ねんね", to_baby_words("そろそろ寝る。"))
+
+    def test_verb_in_conjugated_form_is_left_untouched(self) -> None:
+        # 既知の制限：活用形（「寝た」）は辞書のキー（基本形「寝る」）と
+        # 完全一致しないため変換されない。
+        result = to_baby_words("昨日は早く寝た。")
+
+        self.assertNotIn("ねんね", result)
 
     def test_unknown_technical_terms_are_left_untouched(self) -> None:
         result = to_baby_words("React.js のバージョンで詰まっている。")

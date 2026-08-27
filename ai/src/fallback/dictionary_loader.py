@@ -3,10 +3,17 @@
 辞書ファイルには2つの形がある。
 
 1. **フラット辞書**：`{語: 置換後の語}`（1対1）。`harsh_word_softeners.json`など。
-2. **カテゴリ辞書**：`{赤ちゃん語: [対応する単語の一覧]}`（多対1）。
-   `baby_category_words.json`・`baby_engineer_words.json`など。
+2. **バリエーション辞書**：`{サブカテゴリ: {大人の言葉: [赤ちゃん語の候補, ...]}}`
+   （2階層、大人の言葉1つに対して赤ちゃん語の候補が複数ありうる）。
+   `baby_daily_words.json`・`baby_engineer_words.json`など。トップレベルの
+   サブカテゴリはファイルを人間が読みやすくするためのグルーピングであり、
+   変換ロジックからは見えない（読み込み時にフラット化する）。
 
-どちらも`_comment`キーで辞書の説明を書けるようにしている（JSON自体には
+候補が複数ある場合は、対象の単語自体の文字数から機械的に1つを選ぶ。同じ単語
+には常に同じ変換結果を返すため（外部の乱数には頼らない。理由は
+baby_fallback.pyの感嘆詞選択と同じ）。
+
+どちらの形でも`_comment`キーで辞書の説明を書けるようにしている（JSON自体には
 コメント構文が無いため）。読み込み時に`_`で始まるキーは辞書の対象から除く。
 
 大量の語彙を人間やAIが追記していく前提のため、Pythonの辞書リテラルではなく
@@ -27,32 +34,50 @@ def _load_json(filename: str) -> dict[str, object]:
         return json.load(f)
 
 
+def _pick_variant(word: str, candidates: list[str]) -> str:
+    return candidates[len(word) % len(candidates)]
+
+
 def load_flat_dictionary(filename: str) -> dict[str, str]:
     """フラット辞書（`{語: 置換後の語}`）を読み込む。`_comment`等は除く。"""
     data = _load_json(filename)
     return {key: value for key, value in data.items() if not key.startswith("_")}
 
 
-def load_category_dictionary(filename: str) -> dict[str, str]:
-    """カテゴリ辞書（`{赤ちゃん語: [対応語の一覧]}`）を読み込み、
-    `replace_longest_match()`にそのまま渡せる `{対応語: 赤ちゃん語}` の
-    フラットな置換辞書へ変換する。
+def load_variant_dictionary(filename: str) -> dict[str, str]:
+    """バリエーション辞書を読み込み、`replace_longest_match()`にそのまま渡せる
+    `{大人の言葉: 赤ちゃん語}`のフラットな置換辞書へ変換する。
+
+    トップレベルがサブカテゴリの2階層形式（`{サブカテゴリ: {語: [候補,...]}}`）
+    と、サブカテゴリの無いフラットな1階層形式（`{語: [候補,...]}`）の両方を
+    受け付ける。
     """
     data = _load_json(filename)
     flattened: dict[str, str] = {}
-    for category, words in data.items():
-        if category.startswith("_"):
+    for key, value in data.items():
+        if key.startswith("_"):
             continue
-        for word in words:
-            flattened[word] = category
+        if isinstance(value, dict):
+            # 2階層形式：value がサブカテゴリの中身（{語: [候補,...]}）
+            for word, candidates in value.items():
+                if word.startswith("_"):
+                    continue
+                flattened[word] = _pick_variant(word, candidates)
+        else:
+            # 1階層形式：value がそのまま候補のリスト
+            flattened[key] = _pick_variant(key, value)
     return flattened
 
 
 if __name__ == "__main__":
-    category_dictionary = load_category_dictionary("baby_category_words.json")
-    print(f"カテゴリ辞書の語数: {len(category_dictionary)}")
-    print(f"例: 'カツカレー' -> {category_dictionary.get('カツカレー')!r}")
-    print(f"例: '救急車' -> {category_dictionary.get('救急車')!r}")
+    daily_words = load_variant_dictionary("baby_daily_words.json")
+    print(f"日常語彙辞書の語数: {len(daily_words)}")
+    print(f"例: 'ママ' -> {daily_words.get('ママ')!r}")
+    print(f"例: '救急車' -> {daily_words.get('救急車')!r}")
+
+    engineer_words = load_variant_dictionary("baby_engineer_words.json")
+    print(f"エンジニア用語辞書の語数: {len(engineer_words)}")
+    print(f"例: 'エラー' -> {engineer_words.get('エラー')!r}")
 
     flat_dictionary = load_flat_dictionary("harsh_word_softeners.json")
     print(f"フラット辞書の語数: {len(flat_dictionary)}")
