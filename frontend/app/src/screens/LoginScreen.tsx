@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { ACCOUNT_ID_RULE_TEXT, PASSWORD_MIN_LENGTH, login } from "../data/api";
+import type { Me } from "../data/types";
 import { cx } from "../lib/cx";
 import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/Button";
@@ -27,7 +28,7 @@ export function LoginScreen({
   onSignUp,
   onGuest,
 }: {
-  readonly onDone: () => void;
+  readonly onDone: (me: Me) => void;
   readonly onSignUp: () => void;
   /** ログインせずに読むのに戻る */
   readonly onGuest: () => void;
@@ -49,7 +50,7 @@ export function LoginScreen({
     }
     /* 認証情報を画面に残さない（FR-ACCOUNT-003） */
     setPassword("");
-    onDone();
+    onDone(result.me);
   }
 
   return (
