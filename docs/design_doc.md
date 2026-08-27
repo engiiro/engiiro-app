@@ -849,15 +849,14 @@ create table persona_age_estimates (
 }
 // Response
 {
-  "action": "allow | rewrite_required | block",
+  "action": "allow | block",
   "transformedText": "string | null",
   "reasonCodes": ["string"]
 }
 ```
 
 - `allow`：利用できる変換候補を`transformedText`に返す。
-- `rewrite_required`：原文のままでは利用せず、優しい書き換え候補を`transformedText`に返して、利用者に確認を求める。
-- `block`：安全に提示できる変換候補がない状態。`transformedText`は`null`とする（FR-AI-TRANS-005）。
+- `block`：安全に提示できる変換候補がない状態。`transformedText`は`null`とする（FR-AI-TRANS-005）。個人情報・マサカリ表現を含め、`block`判定はすべてこの1値に統一し、`rewrite_required`のような中間状態は設けない（9.2章、FR-MOD-023）。
 - `reasonCodes`：判定理由を表す短い分類コードの配列。内部の判断過程やNG辞書の具体的内容は返さない（FR-AI-TRANS-009）。
 - モデレーションは変換前の入力と変換後の出力の両方に対して行う（FR-MOD-001〜002）。変換結果は自動で投稿・保存せず、利用者がプレビューを確認・編集してから保存操作を行う（FR-AI-TRANS-006〜007）。
 

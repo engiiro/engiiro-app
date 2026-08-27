@@ -1,6 +1,18 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
-pydantic==2.9.2
+# google-genai が pydantic>=2.12.5 を要求するため、2.9.2 から引き上げている。
+# 引き上げないと、まっさらな環境で pip install が ResolutionImpossible になる。
+pydantic==2.13.4
+
+# Gemini APIによる文章変換（ai/transform_api.py、docs/ai_transform_design.md 4章）
+google-genai==2.20.0
+
+# フォールバック変換の形態素解析（docs/ai_transform_design.md 6.3章）。
+# naive-bayes-sample と同じく、MeCab辞書を別途セットアップしなくて良い構成にしている。
+fugashi[unidic-lite]==1.5.2
+
+# テスト実行に使う（ai/tests/）
+pytest==9.1.1
 
 # 本格的なモデルを組み込む際に使う想定（docs/design_doc.md 5章参照）
 torch==2.4.1
