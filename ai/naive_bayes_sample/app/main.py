@@ -46,6 +46,7 @@ from pydantic import BaseModel, Field
 
 from .classifier import NaiveBayesClassifier
 from .data_loader import load_training_data
+from .moderation import is_abusive
 
 # 分類器はモジュールのトップレベルで1つだけ作る。
 # リクエストのたびに学習し直すと遅いので、サーバー起動時に一度だけ学習させ、
@@ -121,6 +122,9 @@ def predict(request: PredictRequest) -> PredictResponse:
     """
     probabilities = classifier.predict_proba(request.text)
     predicted_class = max(probabilities, key=probabilities.get)  # type: ignore[arg-type]
+    # 明示的な攻撃表現は、確率の大小にかかわらず「その他」に固定する。
+    if is_abusive(request.text):
+        predicted_class = "その他"
     return PredictResponse(
         text=request.text,
         probabilities=probabilities,
