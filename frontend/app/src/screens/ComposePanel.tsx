@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createBubble, createSoothe } from "../data/api";
 import { BUBBLE_MAX_LENGTH, containsStamp, countChars, isOverLimit } from "../data/constants";
-import { BLOCK_DEMO_INPUT, REWRITE_DEMO_INPUT } from "../data/moderationSamples";
 import { stampGroups } from "../data/stampCatalog";
 import type { Me, PersonaKind } from "../data/types";
 import { cx } from "../lib/cx";
@@ -393,18 +392,6 @@ export function ComposePanel({
           本名・会社や学校の名前・住所・電話番号・メール・外部サービスのID・URL・
           待ち合わせの約束は 書けません。
         </NoteBox>
-
-        <div className="eg-compose__mock">
-          <p className={cx("t-caption")}>モック操作：拒否の見え方を試すサンプル入力</p>
-          <div className="eg-compose__mock-buttons">
-            <Button variant="quiet" onClick={() => changeBody(BLOCK_DEMO_INPUT)}>
-              block になる例
-            </Button>
-            <Button variant="quiet" onClick={() => changeBody(REWRITE_DEMO_INPUT)}>
-              rewrite_required になる例
-            </Button>
-          </div>
-        </div>
       </div>
 
       {/* 押す前に止めるのは AI 評価が落ちているときだけ（NFR-003） */}

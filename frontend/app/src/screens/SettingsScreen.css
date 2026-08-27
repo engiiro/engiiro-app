@@ -148,9 +148,16 @@
 
 /* ── このアプリのこと：ひらいて読む行 ───────────────────────────── */
 
+/*
+ * ★ 角は --radius-blob（面の角）で、--radius-control（操作の角）を使わない。
+ *   園児UI の --radius-control は丸薬型（999px）。丸薬型は「高さの決まった操作」
+ *   のための形で、開くと高さが伸びるこの箱に当てると、角の曲線が本文の左端を
+ *   食う（600px 幅・170px 高で半径 84px まで育つ）。overflow: hidden と重なると
+ *   文字がそのまま切り取られ、園児UI だけ説明が読めなくなっていた（人間の指摘 2026-08-28）。
+ */
 .eg-disclose {
   border: var(--border-width) solid var(--hairline);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-blob);
   background: var(--surface);
   overflow: hidden;
 }
@@ -196,6 +203,17 @@
   border-top: var(--border-width) solid var(--hairline);
 }
 
+/*
+ * ★ hidden 属性を効かせる（人間の指摘 2026-08-28「説明が見えなくなっている」）。
+ *   ブラウザ既定の [hidden] { display: none } は作者側の display: flex に負けるので、
+ *   上の指定だけだと閉じているつもりの中身が出たままになっていた。
+ *   閉じている中身も DOM には残す（aria-controls の指す先を消さない）ので、
+ *   隠すのはこの1行の仕事になる。
+ */
+.eg-disclose__body[hidden] {
+  display: none;
+}
+
 .eg-disclose__line {
   color: var(--body);
 }
@@ -219,7 +237,8 @@
   gap: var(--space-sm);
   padding: var(--space-xs) var(--space-sm);
   border: var(--border-width) dashed var(--hairline);
-  border-radius: var(--radius-control);
+  /* .eg-disclose と同じ理由で面の角。狭い幅では説明が折り返して高さが伸びる */
+  border-radius: var(--radius-blob);
 }
 
 .eg-settings__soon-title {

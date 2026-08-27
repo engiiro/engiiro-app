@@ -249,20 +249,6 @@
 }
 
 /* モック専用の足場。製品の UI ではないので、いちばん静かな見た目にして最後に置く */
-.eg-compose__mock {
-  margin-top: auto;
-  padding-top: var(--space-sm);
-  border-top: var(--border-width) dashed var(--hairline);
-  color: var(--muted);
-}
-
-.eg-compose__mock-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  margin-top: var(--space-xs);
-}
-
 /* 3つの道具ボタン */
 
 .eg-compose__tools {
@@ -361,7 +347,8 @@
   margin-top: var(--space-xs);
   padding: var(--space-xs) var(--space-sm);
   border: var(--border-width) dashed var(--hairline);
-  border-radius: var(--radius-control);
+  /* 本文が伸びる箱なので面の角。丸薬型（園児UI の --radius-control）は当てない */
+  border-radius: var(--radius-blob);
   background: var(--surface);
 }
 
@@ -399,7 +386,11 @@
   gap: var(--space-xxs);
   padding: var(--space-xs) var(--space-xxs);
   border: var(--border-width) solid var(--hairline);
-  border-radius: var(--radius-control);
+  /*
+   * 面の角。ほぼ正方形の札なので、丸薬型（園児UI の --radius-control）を当てると
+   * 円になり、下に置いた名前が枠からはみ出す
+   */
+  border-radius: var(--radius-blob);
   background: var(--surface);
   color: var(--muted);
   transition:
