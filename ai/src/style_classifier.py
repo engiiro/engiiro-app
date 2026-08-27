@@ -3,9 +3,13 @@
 
 `engiiro/naive-bayes-sample`（教育用サンプルリポジトリ）で作られたロジック
 （`app/tokenizer.py` + `app/classifier.py` + `app/data_loader.py`、単語分割ベースの
-フルスクラッチ多項ナイーブベイズ）と、そこで蓄積された実データ11,525件
-（赤ちゃん3,855／お母さん3,869／その他3,801、比率1:1:1、300件のテストで合算精度90.0%）
-を同じロジックのままこちらへ移した。学習データは`ai/data/style_classifier/`配下。
+フルスクラッチ多項ナイーブベイズ）をそのまま使う。学習データは`ai/data/style_classifier/`
+配下で、**このディレクトリが学習データの正本（唯一の置き場）**。
+
+以前は同じ学習データが複数箇所に分散していた
+（`naive-bayes-sample`リポジトリのPRと、engiiro-appリポジトリの別PRの双方に
+別々のデータが追加され続けていた）。2026-08-27に両方の内容を突き合わせて
+統合し、以後はここへ追記する運用にした。詳細は同ディレクトリの`README.md`参照。
 
 `evaluate()`（`ai/src/evaluate.py`）から、`POST /api/ai/evaluate`のFR-AI-EVAL-007の
 `passesThreshold`判定に使う。閾値は50（度合いが50を超えたら通す。人間監督の決定）。
