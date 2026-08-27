@@ -1,0 +1,353 @@
+/*
+ * 投稿・返信のパネル（人間の決定、2026-08-25）。
+ * 右から出て右へ帰る。中央のタイムラインを塞がないので scrim は敷かない。
+ */
+
+.eg-compose {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: var(--space-lg) var(--space-md);
+  border-left: var(--border-width) solid var(--hairline);
+  background: var(--surface);
+  /* 起点は右。出た経路で帰す（DESIGN.md §7.4） */
+  transform-origin: right center;
+  animation: eg-panel-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+.eg-compose.is-leaving {
+  animation: eg-panel-out var(--duration-quick) var(--ease-smooth-out) both;
+}
+
+/* 上段：アイコン / 名前 / とじる / 送信 */
+
+.eg-compose__head {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.eg-compose__avatar {
+  display: grid;
+  place-items: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: var(--rounded-pill);
+  border: var(--border-width) solid currentColor;
+  font-family: var(--font-display);
+  font-size: var(--size-label);
+  font-weight: 700;
+  transform: rotate(var(--tilt));
+}
+
+.eg-compose__avatar--baby {
+  color: var(--baby);
+  background: var(--baby-soft);
+}
+
+.eg-compose__avatar--mother {
+  color: var(--mother);
+  background: var(--mother-soft);
+}
+
+.eg-compose__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.eg-compose__title {
+  color: var(--ink);
+}
+
+.eg-compose__nickname {
+  color: var(--muted);
+}
+
+.eg-compose__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  border-radius: var(--radius-control);
+  color: var(--muted);
+}
+
+.eg-compose__close:hover {
+  background: var(--card);
+  color: var(--body);
+}
+
+.eg-compose__send {
+  min-height: var(--touch-target-min);
+  padding: var(--space-xs) var(--space-md);
+}
+
+/* ペルソナ変更 */
+
+.eg-compose__persona {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  margin-top: var(--space-xs);
+}
+
+.eg-compose__swap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  color: var(--muted);
+}
+
+/* DESIGN.md §4 Disabled。非表示にしない */
+.eg-compose__swap:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.eg-compose__swap.is-enabled {
+  border-color: var(--accent-line);
+  color: var(--accent-line);
+}
+
+.eg-compose__swap.is-enabled:hover {
+  background: var(--accent-soft);
+}
+
+.eg-compose__reason {
+  color: var(--accent-line);
+}
+
+.eg-compose__target {
+  margin-top: var(--space-xxs);
+  color: var(--muted);
+}
+
+/* 本文まわり（DESIGN.md §4 Inputs。園児UI では枠が 2px 破線になる） */
+
+.eg-textarea {
+  width: 100%;
+  padding: var(--input-padding);
+  border: var(--border-width) var(--input-border-style) var(--hairline);
+  border-radius: var(--rounded-md);
+  background: var(--surface);
+  color: var(--body);
+  resize: vertical;
+  transition: border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-textarea::placeholder {
+  color: var(--muted);
+}
+
+/* 超過中も入力は止めない。枠で気づかせるだけ（FR-POST-002） */
+.eg-textarea.is-over {
+  border-color: var(--accent-line);
+}
+
+
+.eg-compose__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  overflow-y: auto;
+}
+
+.eg-compose__body .eg-textarea {
+  min-height: calc(var(--space-xxl) * 3);
+  resize: none;
+}
+
+.eg-compose__mock {
+  padding-top: var(--space-sm);
+  border-top: var(--border-width) dashed var(--hairline);
+  color: var(--muted);
+}
+
+.eg-compose__mock-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+/* 3つの道具ボタン */
+
+.eg-compose__tools {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: var(--border-width) solid var(--hairline);
+}
+
+.eg-tool {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xs);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--muted);
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-tool:hover {
+  color: var(--body);
+}
+
+.eg-tool.is-active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-line);
+  font-weight: 700;
+}
+
+/* 引き出し：パネルの下 2/5 */
+
+.eg-drawer {
+  flex: 0 0 40%;
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-md);
+  background: var(--card);
+  overflow: hidden;
+  animation: eg-drawer-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+.eg-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: var(--border-width) solid var(--hairline);
+}
+
+.eg-drawer__title {
+  color: var(--body);
+}
+
+.eg-drawer__close {
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--radius-control);
+  color: var(--accent-line);
+}
+
+.eg-drawer__close:hover {
+  background: var(--accent-soft);
+}
+
+.eg-drawer__body {
+  flex: 1;
+  padding: var(--space-sm);
+  overflow-y: auto;
+}
+
+.eg-drawer__note {
+  color: var(--muted);
+}
+
+.eg-stamp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: var(--space-xs);
+}
+
+.eg-stamp-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xs);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-md);
+  background: var(--surface);
+  color: var(--muted);
+  transition:
+    border-color var(--duration-quick) var(--ease-smooth-out),
+    background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-stamp-pick:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.eg-stamp-pick:active {
+  transform: scale(var(--press-scale-strong));
+}
+
+/* 赤ちゃん度・お母さん度（DESIGN.md §4 Meter） */
+
+.eg-evaluate__axis {
+  color: var(--muted);
+}
+
+.eg-evaluate__value {
+  margin-top: var(--space-xxs);
+  color: var(--ink);
+}
+
+.eg-meter {
+  height: var(--meter-height);
+  margin-top: var(--space-xs);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-pill);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.eg-meter__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--rounded-pill);
+  transition: width var(--duration-slow) var(--ease-smooth-out);
+}
+
+.eg-meter__fill.is-baby {
+  background: var(--baby);
+}
+
+/* 塗り専用の値を使う。文字には使わない（DESIGN.md §2.1） */
+.eg-meter__fill.is-mother {
+  background: var(--mother-fill);
+}
+
+.eg-compose__gate {
+  margin-top: var(--space-xs);
+  color: var(--accent-line);
+  text-align: end;
+}
+
+.eg-evaluate__note {
+  margin-top: var(--space-xs);
+  color: var(--muted);
+}
+
+/* 狭い幅では画面に重ねる */
+@media (max-width: 1199px) {
+  .eg-compose {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    width: min(var(--compose-width), 100vw);
+    box-shadow: var(--elevation-modal);
+  }
+}

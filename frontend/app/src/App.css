@@ -1,0 +1,175 @@
+/*
+ * 3カラムの骨組み（人間の決定、2026-08-25）。
+ *
+ * 中央は 600px のまま広げない（DESIGN.md §5.2 のフィード幅は守る）。
+ * ただし §5.2 の「カラムを増やさない」と §8.1 の「モバイルファースト」には
+ * 反している。改訂案は別途出す。
+ *
+ * バブるボタンを押すと右の列が投稿パネルに入れ替わり、中央が左へ詰まる。
+ * 中央のスクロールは生きたまま（画面を塞ぐモーダルにはしない）。
+ */
+
+.eg-app {
+  min-height: 100vh;
+  background: var(--canvas);
+}
+
+.eg-layout {
+  display: grid;
+  grid-template-columns:
+    var(--rail-left-width)
+    minmax(0, var(--feed-max-width))
+    var(--rail-right-width);
+  gap: var(--column-gap);
+  justify-content: center;
+  align-items: start;
+  max-width: calc(
+    var(--rail-left-width) + var(--feed-max-width) + var(--rail-right-width) +
+      var(--column-gap) * 2
+  );
+  margin: 0 auto;
+  /* 列の入れ替えを1つの運動として読ませる。パネルの開閉と同じ長さ・同じ緩急 */
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+
+.eg-layout__left {
+  position: sticky;
+  top: 0;
+}
+
+.eg-center {
+  position: relative;
+  /*
+   * 縦に flex で積む。中身が短くても「バブる」を下端に置くため
+   * （下のスロットが margin-top: auto で余りを吸う）。
+   */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-height: 100vh;
+  padding: 0 var(--space-sm);
+  /* 下端のボタンに本文が隠れないぶんだけ空ける */
+  padding-bottom: calc(var(--control-min-height) + var(--space-lg));
+  border-inline: var(--border-width) solid var(--hairline);
+  /* 左に詰まっても中央はスクロールできる */
+  overflow-y: auto;
+}
+
+/* flex の子が中身より縮まないようにする（画面はそれぞれ自分の高さで積む） */
+.eg-center > * {
+  flex: none;
+}
+
+.eg-center__loading {
+  padding-top: var(--space-md);
+}
+
+.eg-layout__right {
+  position: sticky;
+  top: 0;
+}
+
+/*
+ * 「バブる」の置き場所。
+ *
+ * 高さ 0 のスロットを中央の列の末尾に置き、margin-top: auto で下端へ送る。
+ * position: sticky なので、中身が長くてスクロールしても下端に貼りついたまま動かない。
+ * ボタン自体を sticky にすると、中身が短いときに本文の直後まで上がってきてしまう。
+ */
+.eg-fab-slot {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin-top: auto;
+  height: 0;
+  /* 高さ 0 の帯が本文のクリックを奪わないように */
+  pointer-events: none;
+}
+
+/* 中央の右下。深夜に片手でなくても、視線の帰る先に置く */
+.eg-bubble-fab {
+  position: absolute;
+  right: var(--space-md);
+  bottom: var(--space-lg);
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--control-min-height);
+  padding: var(--control-padding-y) var(--control-padding-x);
+  border: var(--border-width) solid var(--accent-fill-large);
+  border-radius: var(--radius-control);
+  background: var(--accent-fill-large);
+  color: var(--on-accent);
+  box-shadow: var(--elevation-modal);
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-micro) var(--ease-smooth-out);
+}
+
+.eg-bubble-fab:hover {
+  background: var(--accent-press);
+}
+
+.eg-bubble-fab:active {
+  transform: scale(var(--press-scale));
+}
+
+/*
+ * 投稿パネルが開いているあいだ。
+ * 右の列がパネルの幅になり、その結果として中央が左へ詰まる。
+ */
+.eg-app.is-composing .eg-layout {
+  grid-template-columns:
+    var(--rail-left-width)
+    minmax(0, var(--feed-max-width))
+    var(--compose-width);
+  max-width: calc(
+    var(--rail-left-width) + var(--feed-max-width) + var(--compose-width) +
+      var(--column-gap) * 2
+  );
+}
+
+/* 1200px 未満：右の列を畳む。パネルは画面に重ねる（ComposePanel.css 側） */
+@media (max-width: 1199px) {
+  .eg-layout,
+  .eg-app.is-composing .eg-layout {
+    grid-template-columns: var(--rail-left-narrow) minmax(0, var(--feed-max-width));
+    max-width: calc(var(--rail-left-narrow) + var(--feed-max-width) + var(--column-gap));
+  }
+
+  .eg-layout__right {
+    position: static;
+  }
+
+  .eg-right-rail {
+    display: none;
+  }
+}
+
+/* 768px 未満：左サイドが下部のバーになる（LeftRail.css 側） */
+@media (max-width: 767px) {
+  .eg-layout,
+  .eg-app.is-composing .eg-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    max-width: none;
+  }
+
+  .eg-layout__left {
+    position: static;
+  }
+
+  .eg-center {
+    max-height: none;
+    padding-bottom: calc(var(--touch-target-min) + var(--space-xxl));
+    border-inline: none;
+  }
+
+  /* 中央が画面いっぱいになるので、下端のバーの上に置く */
+  .eg-bubble-fab {
+    position: fixed;
+    right: var(--gutter);
+    bottom: calc(var(--touch-target-min) + var(--space-lg) + env(safe-area-inset-bottom));
+  }
+}

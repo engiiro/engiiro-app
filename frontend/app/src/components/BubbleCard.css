@@ -1,0 +1,109 @@
+/* DESIGN.md §4 Cards / Tags */
+
+.eg-card {
+  /* 本文ボタンの当たり判定をカード全面へ広げるための基準（下の __open::after） */
+  position: relative;
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  background: var(--surface);
+  /* 影なし。ノーマルとダークでは 0。園児UI だけずらし影（DESIGN.md §6） */
+  box-shadow: var(--elevation-offset);
+}
+
+/*
+ * 見出しとリアクション行は、広げた当たり判定より前に出す。
+ * ここを上げないと、ニックネームもリアクションも押せなくなる。
+ */
+.eg-card__head,
+.eg-card__foot {
+  position: relative;
+  z-index: 1;
+}
+
+.eg-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.eg-card__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  flex: none;
+  color: var(--accent-line);
+}
+
+.eg-card__dot {
+  width: var(--space-xs);
+  height: var(--space-xs);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-line);
+}
+
+.eg-card__read {
+  color: var(--muted);
+}
+
+/*
+ * バブルを開くボタン。
+ *
+ * 当たり判定はカード全面（人間の指示、2026-08-25）。
+ * ボタンでカード全体を包むと、中のニックネームとリアクションが
+ * button の入れ子になってしまうので、擬似要素をカードいっぱいに敷いて広げる。
+ * 手前に出したい操作（見出し・リアクション行）だけ z-index で上げる。
+ */
+.eg-card__open {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-xs);
+  text-align: start;
+  /* ホバーで浮かせない。押した反応は面色で返す（DESIGN.md §4 Cards / §7.4） */
+  border-radius: var(--rounded-md);
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-card__open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--rounded-lg);
+}
+
+.eg-card__open:active {
+  background: var(--card);
+}
+
+/* 枠線はカードの角に合わせる（擬似要素の側に出る） */
+.eg-card__open:focus-visible {
+  outline: none;
+}
+
+.eg-card__open:focus-visible::after {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+
+.eg-card__body {
+  display: block;
+  color: var(--body);
+}
+
+.eg-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.eg-card__more {
+  flex: none;
+  color: var(--muted);
+}
+
+.eg-card__foot {
+  margin-top: var(--space-sm);
+}

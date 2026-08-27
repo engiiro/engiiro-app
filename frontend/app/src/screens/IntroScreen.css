@@ -1,0 +1,186 @@
+/* 登録の前に読む説明（S1 の手前） */
+
+.eg-intro {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-lg) var(--gutter);
+  background: var(--canvas);
+}
+
+.eg-intro__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  width: 100%;
+  max-width: 520px;
+  padding: var(--space-lg);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+}
+
+.eg-intro__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.eg-intro__brand {
+  color: var(--accent-line);
+}
+
+.eg-intro__skip {
+  margin-inline-start: auto;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-pill);
+  color: var(--muted);
+}
+
+.eg-intro__skip:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.eg-intro__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  /* 短い画面でも高さが跳ねないよう、下限だけ決める */
+  min-height: 320px;
+}
+
+.eg-intro__figure {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-sm) 0;
+}
+
+.eg-intro__title {
+  color: var(--ink);
+}
+
+.eg-intro__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.eg-intro__line {
+  color: var(--body);
+  /* EmptyState と同じ texts-reveal。ずらしの合計は 300ms 未満（DESIGN.md §7.2） */
+  animation: eg-intro-reveal var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+@keyframes eg-intro-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-medium));
+    filter: blur(var(--blur-medium));
+  }
+}
+
+/* 1枚目：ふたつの顔 */
+.eg-intro__faces {
+  display: flex;
+  gap: var(--space-xl);
+}
+
+.eg-intro__face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.eg-intro__face-label.is-baby {
+  color: var(--baby);
+}
+
+.eg-intro__face-label.is-mother {
+  color: var(--mother);
+}
+
+.eg-intro__face-note {
+  color: var(--muted);
+}
+
+/* 2枚目：つながらない */
+.eg-intro__linkage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.eg-intro__cut {
+  padding: var(--space-xxs) var(--space-xs);
+  border: var(--border-width) dashed var(--hairline);
+  border-radius: var(--rounded-pill);
+  color: var(--muted);
+}
+
+/* 3枚目：リアクション */
+.eg-intro__reactions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.eg-intro__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs) var(--space-xs);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-pill);
+  background: var(--baby-soft);
+  color: var(--baby);
+}
+
+.eg-intro__chip.is-mother {
+  background: var(--mother-soft);
+  color: var(--mother);
+}
+
+/* 4枚目：やくそく */
+.eg-intro__shield-icon {
+  width: var(--avatar-size-lg);
+  height: var(--avatar-size-lg);
+  color: var(--accent-line);
+}
+
+.eg-intro__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.eg-intro__dots {
+  display: flex;
+  gap: var(--space-xxs);
+}
+
+.eg-intro__dot {
+  width: var(--space-xs);
+  height: var(--space-xs);
+  border-radius: var(--rounded-pill);
+  background: var(--card);
+}
+
+.eg-intro__dot.is-current {
+  background: var(--accent-line);
+}
+
+.eg-intro__actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-inline-start: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-intro__line {
+    animation: none;
+  }
+}

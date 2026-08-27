@@ -1,0 +1,65 @@
+[
+  {
+    "id": "bubble_01",
+    "authorPersonaId": "bp_sheep",
+    "body": "レビューのコメントが 30こ ついてた。ぜんぶ ただしいのが つらい。ぼく、まだ ちゃんと できてないのが ばれちゃう。",
+    "minutesAgo": 22,
+    "reactions": { "counts": { "ogya": 12, "yoshiyoshi": 31, "manma": 48 }, "mine": {} },
+    "read": false,
+    "affinity": 0.94
+  },
+  {
+    "id": "bubble_02",
+    "authorPersonaId": "bp_taputapu",
+    "body": "きょうも 会議で なにも 手が うごかなかった。ごはん たべるの わすれてて、きづいたら まっくらだった。",
+    "minutesAgo": 58,
+    "reactions": { "counts": { "ogya": 3, "yoshiyoshi": 9, "manma": 21 }, "mine": { "yoshiyoshi": 2 } },
+    "read": false,
+    "affinity": 0.88
+  },
+  {
+    "id": "bubble_03",
+    "authorPersonaId": "bp_babubabu",
+    "body": "ぼくの かいた コードが うごかない。うごかない りゆうも わからない。ねむい。",
+    "minutesAgo": 7,
+    "reactions": { "counts": { "ogya": 6, "yoshiyoshi": 4, "manma": 11 }, "mine": {} },
+    "read": false,
+    "affinity": 0.41
+  },
+  {
+    "id": "bubble_04",
+    "authorPersonaId": "bp_me",
+    "body": "だれにも いえないけど、もう ぜんぶ なげだして ねてしまいたい。あしたも あるのに。",
+    "minutesAgo": 96,
+    "reactions": { "counts": { "ogya": 2, "yoshiyoshi": 14, "manma": 7 }, "mine": {} },
+    "read": true,
+    "affinity": 1
+  },
+  {
+    "id": "bubble_05",
+    "authorPersonaId": "bp_mikan",
+    "body": "リリースの まえの日は いつも おなかが いたくなる。だいじょうぶって いわれるほど こわい。",
+    "minutesAgo": 143,
+    "reactions": { "counts": { "ogya": 8, "yoshiyoshi": 17, "manma": 26 }, "mine": {} },
+    "read": false,
+    "affinity": 0.79
+  },
+  {
+    "id": "bubble_06",
+    "authorPersonaId": "bp_yowane",
+    "body": "わからないって いうのが こわくて、わかったふりを した。ぜんぶ ぼくの せいだ。",
+    "minutesAgo": 310,
+    "reactions": { "counts": { "ogya": 15, "yoshiyoshi": 22, "manma": 39 }, "mine": { "manma": 5 } },
+    "read": true,
+    "affinity": 0.86
+  },
+  {
+    "id": "bubble_07",
+    "authorPersonaId": "bp_puni",
+    "body": "ひとりで かかえてるの、なれちゃった。なれたって いいことじゃ ないよね。",
+    "minutesAgo": 512,
+    "reactions": { "counts": { "ogya": 1, "yoshiyoshi": 5, "manma": 12 }, "mine": {} },
+    "read": true,
+    "affinity": 0.35
+  }
+]
