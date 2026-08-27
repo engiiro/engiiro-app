@@ -8,6 +8,7 @@ backend/.deno/
 ai/__pycache__/
 ai/**/__pycache__/
 ai/.venv/
+ai/**/.venv/
 ai/*.egg-info/
 ai/models/*.bin
 ai/models/*.pt
