@@ -15,6 +15,7 @@ import { AiTransformPanel } from "../components/AiTransformPanel";
 import type { AiPanelState } from "../components/AiTransformPanel";
 import { Button } from "../components/Button";
 import { CharCounter } from "../components/CharCounter";
+import { Illustration } from "../components/Illustration";
 import { StampGlyph } from "../components/BubbleBody";
 import {
   IconClose,
@@ -108,6 +109,31 @@ export function ComposePanel({
    * 文章生成が落ちているかどうかはここに関係しない（NFR-001）。
    */
   const canSend = body.trim().length > 0 && !over && !submitting && aiEvaluateAvailable;
+
+  /*
+   * 「もう出せる」の合図（人間の決定 2026-08-26 §0-3、
+   * docs/color_and_ui_findings.md §5「押す前の誘い」の案2）。
+   *
+   * ★ 常時は動かさない。送れる状態に変わった瞬間だけ、送信ボタンが一度 pop する。
+   *   案1（弱い呼吸）と案3（ホバーでしっぽが伸びる）は採らない。
+   *   誘いは1つに絞らないと、DESIGN.md §7.2「常時動く背景は目を疲れさせる」と衝突する。
+   *
+   * ★ イージングは --ease-smooth-out。§7.2 が --ease-bounce を
+   *   「リアクションを押した瞬間だけ」に限定しているので、そこは踏まない。
+   *
+   * 動きが無くても分かることは変えていない（ボタンの disabled が外れる）。
+   * reduced motion では --pop-scale が 1 に潰れるので、この演出は自動的に無害になる。
+   */
+  const wasSendableRef = useRef(false);
+  const [justSendable, setJustSendable] = useState(false);
+
+  useEffect(() => {
+    if (canSend && !wasSendableRef.current) {
+      // oxlint-disable-next-line react/set-state-in-effect
+      setJustSendable(true);
+    }
+    wasSendableRef.current = canSend;
+  }, [canSend]);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -247,7 +273,12 @@ export function ComposePanel({
         </button>
 
         {/* 右上：送信 */}
-        <Button className="eg-compose__send" disabled={!canSend} onClick={() => void submit()}>
+        <Button
+          className={cx("eg-compose__send", justSendable && "is-just-sendable")}
+          disabled={!canSend}
+          onClick={() => void submit()}
+          onAnimationEnd={() => setJustSendable(false)}
+        >
           {submitting ? "おくっています…" : isBubble ? "バブる" : "あやす"}
         </Button>
       </header>
@@ -286,13 +317,24 @@ export function ComposePanel({
       ) : null}
 
       <div className="eg-compose__body">
-        <textarea
-          ref={textareaRef}
-          className={cx("eg-textarea", "t-input", over && "is-over")}
-          value={body}
-          placeholder="なにがあった？ ぜんぶ そのままで いいよ。"
-          onChange={(event) => changeBody(event.target.value)}
-        />
+        {/*
+          入力欄は、この画面でいちばん大きい面にする（UI刷新 2026-08-26）。
+          ここは弱音を書く場所なので、道具や注記より先に目に入るのは入力欄であるべき。
+
+          ★ 空のときだけ「しずくのバブル」を中に置く。
+            書き始めると opacity だけで静かに消える（要素は残るので高さが跳ねない）。
+            装飾なので aria-hidden。読み上げは placeholder が担う。
+        */}
+        <div className={cx("eg-compose__field", body.length > 0 && "is-filled")}>
+          <textarea
+            ref={textareaRef}
+            className={cx("eg-textarea", "t-input", over && "is-over")}
+            value={body}
+            placeholder="なにがあった？ ぜんぶ そのままで いいよ。"
+            onChange={(event) => changeBody(event.target.value)}
+          />
+          <Illustration name="drops" className="eg-compose__field-art" />
+        </div>
         {/* あやすの文字数上限は仕様に無いので、カウンタもバブルのときだけ出す */}
         {isBubble ? <CharCounter text={body} /> : null}
 

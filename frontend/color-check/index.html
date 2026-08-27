@@ -1,177 +1,318 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-cc-theme="dark" data-cc-persona="baby">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>engiiro color check</title>
+    <title>えんじいろ仮配色ラボ</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
     <link rel="stylesheet" href="./style.css">
   </head>
-  <body data-mode="calm" data-persona="baby">
-    <aside class="lab-panel" aria-label="色調整パネル">
-      <div>
-        <p class="eyebrow">color lab</p>
-        <h1>えんじいろ仮配色</h1>
-        <p class="lead">疲れたエンジニアが少し赤ちゃんになれる、やさしいSNSの色味チェック用。</p>
+  <!--
+    配色だけを決めるための検討ページ（CLAUDE.md「見た目・フロント」）。
+    このページの UI・レイアウトは画面設計の参考にしない。app を写しているのは「見本」の部分だけ。
+
+    役割名と数値の正本は ../../DESIGN.md（§2 Color Palette & Roles）。
+    ここで色を確定させたら、DESIGN.md の frontmatter と
+    ../app/src/tokens/theme.css の両方へ書き戻す。
+
+    テーマの属性名が app と違う（data-cc-theme）理由は style.css の冒頭に書いた。
+  -->
+  <body>
+    <a class="cc-skip" href="#preview">見本へ飛ぶ</a>
+
+    <aside class="lab" aria-label="配色の検討パネル">
+      <div class="lab__head">
+        <p class="cc-eyebrow">color lab</p>
+        <h1 class="cc-display">えんじいろ仮配色ラボ</h1>
+        <p class="cc-lead">
+          DESIGN.md §2 の役割トークンを触って、3テーマぶんの配色を見るための台。
+          ダークを既定にしてあります。
+        </p>
       </div>
 
-      <section class="mode-switch" aria-label="表示テイスト">
-        <button class="mode-button is-active" type="button" data-mode-button="calm">標準表示</button>
-        <button class="mode-button" type="button" data-mode-button="kid">園児装飾</button>
+      <section class="lab__block" aria-label="テーマ">
+        <h2 class="cc-label">テーマ</h2>
+        <div class="lab__segment" role="group">
+          <button class="lab__seg" type="button" data-theme-button="normal">ノーマル</button>
+          <button class="lab__seg is-active" type="button" data-theme-button="dark">ダーク</button>
+          <button class="lab__seg" type="button" data-theme-button="kid">園児UI</button>
+        </div>
+        <p class="cc-hint" data-theme-status></p>
       </section>
 
-      <section class="persona-switch" aria-label="ペルソナモード">
-        <button class="persona-theme-button is-active" type="button" data-persona-button="baby">赤ちゃん</button>
-        <button class="persona-theme-button" type="button" data-persona-button="mother">お母さん</button>
+      <section class="lab__block" aria-label="ペルソナ">
+        <h2 class="cc-label">見本のペルソナ</h2>
+        <div class="lab__segment" role="group">
+          <button class="lab__seg is-active" type="button" data-persona-button="baby">赤ちゃん</button>
+          <button class="lab__seg" type="button" data-persona-button="mother">お母さん</button>
+        </div>
       </section>
 
-      <section class="controls" aria-label="メインカラー">
-        <label>
-          <span>ベース</span>
-          <input id="basePicker" type="color" value="#fff8f1">
-          <input id="baseText" type="text" value="#FFF8F1" spellcheck="false">
+      <section class="lab__block" aria-label="プリセット">
+        <h2 class="cc-label">プリセット</h2>
+        <p class="cc-hint">値はすべて DESIGN.md 由来。このページで新しい配色を勝手に作っていません。</p>
+        <button class="lab__lead" type="button" data-preset="oyasumi">
+          おやすみ（紺・赤ちゃん主役）
+          <span>いまのダークの既定。紺の地＋お母さんの緑を主役より弱くした案</span>
+        </button>
+        <div class="lab__presets">
+          <button type="button" data-preset="normal">ノーマル（暫定値）</button>
+          <button type="button" data-preset="dark">ダーク（実測値）</button>
+          <button type="button" data-preset="darkNaive">ダーク・臙脂そのまま</button>
+          <button type="button" data-preset="kid">園児UI（実測値）</button>
+        </div>
+        <p class="cc-hint">
+          「臙脂そのまま」は §2.3 の失敗例。<code>#9B3342</code> を暗い地に置くと 2.54:1 で、
+          文字にも枠線にもアイコンにも使えないことを、目で見るための案です。
+        </p>
+
+        <h3 class="cc-label lab__subhead">ダークの地の試作（DESIGN.md 外）</h3>
+        <div class="lab__presets">
+          <button type="button" data-preset="darkSumi">墨</button>
+          <button type="button" data-preset="darkTetsukon">鉄紺</button>
+          <button type="button" data-preset="darkKon">紺</button>
+          <button type="button" data-preset="darkAi">藍</button>
+          <button type="button" data-preset="darkBudou">葡萄</button>
+        </div>
+        <p class="cc-hint">
+          <strong>まだ採用されていない試作です。</strong>
+          地の4色と役割ごとの沈んだ地（<code>*-soft</code>）だけを差し替え、
+          <strong>明度の段（8.8 / 11.4 / 14.5 / 19.6%）と、文字・臙脂・緑は
+          DESIGN.md ダークのまま</strong>にしてあります。5案とも §2.2・§2.3 の条件は全て満たします。
+        </p>
+        <p class="cc-hint">
+          ただし §2.3 の「地は暖色寄りにして、ノーマルの生成りと同じ体温にする」という
+          理由づけからは外れます。<strong>紺・藍は意図的に冷たい地</strong>なので、
+          採るかどうかは人間の決定が必要です。
+        </p>
+      </section>
+
+      <section class="lab__block" aria-label="探索">
+        <h2 class="cc-label">ここから動かす</h2>
+        <p class="cc-hint">1回押すと1段ずつ。テーマごとの面の並び（沈める／浮かせる）は崩しません。</p>
+        <div class="lab__steppers">
+          <div class="lab__stepper">
+            <span>地の明るさ</span>
+            <button type="button" data-step="ground-l" data-dir="-1" aria-label="地を暗くする">−</button>
+            <button type="button" data-step="ground-l" data-dir="1" aria-label="地を明るくする">＋</button>
+          </div>
+          <div class="lab__stepper">
+            <span>地の暖かさ</span>
+            <button type="button" data-step="ground-warm" data-dir="-1" aria-label="地の暖色を抜く">−</button>
+            <button type="button" data-step="ground-warm" data-dir="1" aria-label="地を暖色寄りにする">＋</button>
+          </div>
+          <div class="lab__stepper">
+            <span>線の臙脂</span>
+            <button type="button" data-step="line-l" data-dir="-1" aria-label="線の臙脂を暗くする">−</button>
+            <button type="button" data-step="line-l" data-dir="1" aria-label="線の臙脂を明るくする">＋</button>
+          </div>
+          <div class="lab__stepper">
+            <span>塗りの臙脂</span>
+            <button type="button" data-step="fill-l" data-dir="-1" aria-label="塗りの臙脂を暗くする">−</button>
+            <button type="button" data-step="fill-l" data-dir="1" aria-label="塗りの臙脂を明るくする">＋</button>
+          </div>
+        </div>
+        <button class="lab__reset" type="button" data-reset>このテーマを基準の値に戻す</button>
+
+        <label class="lab__toggle">
+          <input type="checkbox" data-baby-edge>
+          <span>
+            赤ちゃんのバブルの枠を臙脂寄りにする（試作）
+            <em>
+              app の BubbleCard.css はいま <code>hairline</code> で、紺の地だとほぼ見えません。
+              主役のバブルに枠の存在感を持たせる案との比較用です。
+            </em>
+          </span>
         </label>
-        <label>
-          <span>アソート</span>
-          <input id="assortPicker" type="color" value="#d8c7b8">
-          <input id="assortText" type="text" value="#D8C7B8" spellcheck="false">
-        </label>
-        <label>
-          <span>アクセント</span>
-          <input id="accentPicker" type="color" value="#9b3342">
-          <input id="accentText" type="text" value="#9B3342" spellcheck="false">
-        </label>
       </section>
 
-      <section class="preset-list" aria-label="プリセット">
-        <p class="preset-group">ぬくもり避難所</p>
-        <button type="button" data-preset="#FFF8F1,#D8C7B8,#9B3342">避難所 01</button>
-        <button type="button" data-preset="#FFF7EC,#CFC0B0,#8E2F3B">避難所 02</button>
-        <button type="button" data-preset="#FAF4EA,#C7B9AA,#7D2633">避難所 03</button>
-        <button type="button" data-preset="#FDF6EE,#BFAFA2,#8A3440">避難所 05</button>
-
-        <p class="preset-group">鮮やか臙脂</p>
-        <button type="button" data-preset="#FFF8F1,#D7C8BB,#B22342">鮮やか 01</button>
-        <button type="button" data-preset="#FFF7F3,#D9C6D0,#C22648">鮮やか 02</button>
-        <button type="button" data-preset="#FFF9EC,#C6D8C9,#B51F3A">鮮やか 03</button>
-        <button type="button" data-preset="#FFF5EE,#BFD1D6,#AD1E3C">鮮やか 04</button>
-        <button type="button" data-preset="#FAF6F1,#CEC3BC,#C13A50">鮮やか 05</button>
-
-        <p class="preset-group">園児UI配色</p>
-        <button type="button" data-preset="#FFFAED,#BFD4C2,#A43A4A">名札 01</button>
-        <button type="button" data-preset="#FFF4E5,#D9BFA6,#A73D4C">名札 05</button>
-        <button type="button" data-preset="#FFFAE8,#F6D85F,#B22342">園児 01</button>
-        <button type="button" data-preset="#FFF7EC,#8FC8B3,#C22648">園児 02</button>
-        <button type="button" data-preset="#FFFBEF,#7FBAD0,#B61F3A">園児 03</button>
-        <button type="button" data-preset="#FFF3E6,#F2A95F,#A91F3E">園児 04</button>
-        <button type="button" data-preset="#FFFAF2,#C7D987,#C7374F">園児 05</button>
-
-        <p class="preset-group">ふとんの中</p>
-        <button type="button" data-preset="#FFF4E8,#E1BFAE,#8F2D3C">ふとん 01</button>
-        <button type="button" data-preset="#FFF6F4,#E6C9C4,#8A2432">ふとん 02</button>
-        <button type="button" data-preset="#FFF2E0,#D8B9A8,#7A1E2B">ふとん 03</button>
-        <button type="button" data-preset="#FDF1E8,#CDB8AA,#853242">ふとん 05</button>
-
-        <p class="preset-group">比較用</p>
-        <button type="button" data-preset="#FFF6F4,#C9B8A8,#8A2432">おひるねSNS</button>
-        <button type="button" data-preset="#FAF7F2,#B9AAA0,#7A1E2B">大人の逃げ場</button>
+      <section class="lab__block" aria-label="役割トークン">
+        <h2 class="cc-label">役割トークン</h2>
+        <p class="cc-hint">
+          役割名は DESIGN.md §2.1 の契約。<code>accent-line</code>（線・文字）と
+          <code>accent-fill</code>（塗り）が別なのがこの契約の要で、ダークでは必ず別の値になります。
+        </p>
+        <div class="lab__roles" data-role-groups></div>
+        <div class="lab__vivid" data-vivid hidden>
+          <h3 class="cc-label">園児UI の鮮やか色（実測済み・編集対象外）</h3>
+          <div class="lab__vividStrip" data-vivid-strip></div>
+        </div>
       </section>
 
-      <section class="notes" aria-label="チェック観点">
-        <h2>見るところ</h2>
-        <ul>
-          <li>落ち着くモードを標準にして、長時間見ても疲れないか</li>
-          <li>園児UI用の3色が、名札・スタンプ・空状態に使いやすいか</li>
-          <li>臙脂が強すぎず、でも押したくなるか</li>
-          <li>子どもの絵がブランド素材として浮かずに馴染むか</li>
+      <section class="lab__block" aria-label="判定">
+        <h2 class="cc-label">判定</h2>
+        <p class="cc-hint">
+          DESIGN.md §2.2「配色を差し替えるときの条件」と §2.3 のダーク固有の条件を、
+          いま入っている値で測っています。
+        </p>
+        <p class="lab__verdict" data-verdict></p>
+        <div class="lab__checks" data-checks></div>
+      </section>
+
+      <section class="lab__block" aria-label="ホバーの決めごと">
+        <h2 class="cc-label">ホバーの決めごと（試作）</h2>
+        <p class="cc-hint">
+          見本の押せるところは実際の <code>button</code> なので、カーソルを乗せると効きます。
+          <kbd>Tab</kbd> でも同じところに枠が出ます。決めごとは2つだけ：
+        </p>
+        <ul class="cc-notes">
+          <li><strong>面のもの</strong>：<code>ink</code> を 8% 重ねて1段持ち上げ、枠線を <code>accent-line</code> にする</li>
+          <li><strong>臙脂の塗りのもの</strong>：<code>accent-press</code> に差し替える</li>
         </ul>
+        <p class="cc-hint">
+          <code>ink</code> を重ねる形にしたのは、ダークでは明るく、ライトでは暗くなって、
+          どのテーマでも同じ規則で「乗っている」と読めるからです。
+          <strong>浮かせる（影・拡大）はしていません。</strong>
+          BubbleCard.css の「ホバーで浮かせない」を守り、押した瞬間だけ
+          <code>--press-scale</code> で 0.985 倍に縮みます。
+        </p>
       </section>
 
-      <section class="contrast" aria-label="コントラスト">
-        <h2>Contrast</h2>
-        <p><span>Accent / White</span><strong id="accentWhiteRatio">-</strong></p>
-        <p><span>Accent / Base</span><strong id="accentBaseRatio">-</strong></p>
-        <p><span>Text / Base</span><strong id="textBaseRatio">-</strong></p>
+      <section class="lab__block" aria-label="見るところ">
+        <h2 class="cc-label">見るところ（おやすみモード）</h2>
+        <ul class="cc-notes">
+          <li>紺の地が「夜空」に見えるか。真っ暗より落ち着くか、逆に冷たく見えないか</li>
+          <li><strong>赤ちゃんのバブルが主役に見えるか。</strong>お母さんのあやすに目が奪われないか</li>
+          <li>臙脂が地に溶けていないか。線用の薄紅と塗り用が、別の色として成立しているか</li>
+          <li>影が効かないぶん、canvas → surface → card の面色差だけで階層が読めるか</li>
+          <li>本文が滲まないか。暖色の生成りが紺の上で黄ばんで見えないか</li>
+          <li>カーソルを乗せたとき、どこにいるかが迷わず分かるか</li>
+          <li>イラストとブランド素材が、紺の地で浮いていないか</li>
+        </ul>
       </section>
     </aside>
 
-    <main class="preview">
-      <section class="app-shell" aria-label="SNSプレビュー">
-        <nav class="topbar">
-          <div class="brand-mark">え</div>
-          <div>
-            <p>engiiro</p>
-            <span>やさしい現実逃避SNS</span>
+    <main class="preview" id="preview">
+      <!--
+        ここから下は app（frontend/app）の見た目を写した見本。
+        色は必ず役割トークン経由。生の hex は書かない。
+        写した元：App.css（地・光・輪の3層）／BubbleCard.css（吹き出しとしっぽ）／
+        SootheItem.css（返事の形）／ReactionRow.css／BrandMark.tsx／Illustration.tsx
+      -->
+      <div class="pv" aria-label="アプリの見本">
+        <header class="pv__top">
+          <span class="pv__brand" data-brandmark></span>
+          <div class="pv__topText">
+            <p class="cc-heading">えんじいろ</p>
+            <p class="pv__caption">きょうの ばぶ</p>
           </div>
-          <button class="icon-button" type="button" aria-label="通知">♪</button>
-        </nav>
+          <span class="pv__tag">まだ 3</span>
+        </header>
 
-        <section class="drawing-hero" aria-label="子どもの絵を使ったブランドエリア">
-          <img src="./assets/engiiro-crayon-logo.png" alt="子どもが描いたえんじいろロゴ">
-          <div>
-            <p class="eyebrow">crayon identity</p>
-            <h2>ちゃんとしてなくていい場所</h2>
-            <p>園児UIではこのクレヨン線を前面に。落ち着くモードでは、手触りだけを少し残します。</p>
+        <div class="pv__segment" role="group" aria-label="セグメント。card の面に muted が載る">
+          <button class="pv__segItem is-active" type="button">みんな</button>
+          <button class="pv__segItem" type="button">きいたよ</button>
+          <button class="pv__segItem" type="button">わたし</button>
+        </div>
+
+        <!--
+          押せるものは実際に button にしてある。ホバーと :focus-visible を
+          この場で確かめられるようにするため（人間の指示 2026-08-26）。
+          button の中は span で描く（p は入れられない）。app の BubbleCard.css と同じ。
+        -->
+        <article class="pv__bubble">
+          <button class="pv__balloon" type="button">
+            <span class="pv__bubbleBody">
+              本番の障害の夢を見て 3時に起きた。きょうはログもチケットも見ないで、
+              ふとんの中で ばぶばぶ してる。
+            </span>
+            <span class="pv__more">あやす 4</span>
+          </button>
+          <div class="pv__who">
+            <span class="cc-cardTitle">ばぶ太郎</span>
+            <span class="pv__state"><span class="pv__dot"></span>まだ</span>
           </div>
-        </section>
-
-        <section class="composer">
-          <div class="persona-row">
-            <button class="persona is-active" type="button" data-persona-button="baby">赤ちゃん</button>
-            <button class="persona" type="button" data-persona-button="mother">お母さん</button>
+          <div class="pv__reactions">
+            <button class="pv__reaction is-active" type="button">おぎゃー 12</button>
+            <button class="pv__reaction" type="button">ばぶばぶ 8</button>
+            <button class="pv__reaction" type="button">よしよし 3</button>
           </div>
-          <textarea aria-label="投稿本文">もうレビューでつかれた。きょうはコードのことわすれて、ばぶばぶしてたい。</textarea>
-          <div class="stamp-row">
-            <span class="stamp">おぎゃー</span>
-            <span class="stamp">ばぶばぶ</span>
-            <span class="stamp">よしよし</span>
+        </article>
+
+        <article class="pv__soothe is-mother">
+          <div class="pv__sootheHead">
+            <span class="cc-cardTitle">やさし山さん</span>
+            <span class="pv__chip is-mother">お母さん</span>
           </div>
-          <button class="primary-button" type="button">やさしく投稿</button>
-        </section>
+          <p class="pv__quote">きょうはログもチケットも見ないで…</p>
+          <button class="pv__sootheOpen" type="button">
+            <span class="pv__body">えらかったね。今日はぜんぶ、お布団の外に置いておこうね。</span>
+            <span class="pv__count">まだ あやされてない</span>
+          </button>
+          <div class="pv__sootheFoot">
+            <button class="pv__reaction" type="button">よしよし 5</button>
+            <button class="pv__reply" type="button">あやす</button>
+          </div>
+        </article>
 
-        <section class="feed">
-          <article class="post-card">
-            <header>
-              <div class="avatar baby">ば</div>
-              <div>
-                <strong>ばぶ太郎</strong>
-                <span>推定 3さい / 12分前</span>
-              </div>
-            </header>
-            <p>本番障害の夢を見たので、今日はふわふわの毛布にくるまっていることにします。</p>
-            <div class="reaction-row">
-              <button type="button">おぎゃー 12</button>
-              <button type="button">ばぶばぶ 8</button>
-              <button class="accent-link" type="button">よしよしする</button>
-            </div>
-          </article>
+        <article class="pv__soothe">
+          <div class="pv__sootheHead">
+            <span class="cc-cardTitle">ねむ子</span>
+            <span class="pv__chip is-baby">赤ちゃん</span>
+          </div>
+          <button class="pv__sootheOpen" type="button">
+            <span class="pv__body">わかる。ぼくも きょうは ぜんぶ あとまわしにした。</span>
+          </button>
+        </article>
 
-          <article class="post-card mother-card">
-            <header>
-              <div class="avatar mother">母</div>
-              <div>
-                <strong>やさし山さん</strong>
-                <span>お母さんコメント</span>
-              </div>
-            </header>
-            <p>えらかったね。今日はログもチケットもいったんお布団の外に置いておこうね。</p>
-          </article>
+        <div class="pv__note">
+          <p>あやすは、書いた人にはいつ届いたか出ません。数だけが増えます。</p>
+        </div>
 
-          <article class="profile-card">
-            <div>
-              <p class="eyebrow">profile</p>
-              <h2>今日の赤ちゃん度</h2>
-            </div>
-            <div class="meter" aria-hidden="true"><span></span></div>
-            <p>推定 4さい。ちょっと甘えたい日。</p>
-          </article>
-        </section>
+        <div class="pv__field">
+          <p class="pv__fieldLabel">いま言えないこと</p>
+          <textarea class="pv__input" rows="2" placeholder="ここに ばぶ を書く" aria-label="ばぶの本文"></textarea>
+          <p class="pv__counter">0 / 140</p>
+        </div>
+
+        <!--
+          Button.css のとおり、幅のあるボタンだけ accent-fill-large にする。
+          小さい塗りと大きい塗りを並べて、面積効果（§2.2 条件5）が見えるようにしてある。
+        -->
+        <div class="pv__buttons">
+          <button class="pv__button" type="button">ためす</button>
+          <button class="pv__button pv__button--ghost" type="button">やめる</button>
+        </div>
+        <button class="pv__button pv__button--full" type="button">ばぶる</button>
+
+        <div class="pv__empty">
+          <img class="pv__illust" data-illust src="./assets/illust/soft-bubble-haven-dark.svg" alt="" aria-hidden="true" width="320" height="220">
+          <p class="cc-heading">まだ なにもない</p>
+          <p class="pv__caption">ここに置いていい。だれのでもない場所です。</p>
+        </div>
+
+        <div class="pv__semantic">
+          <span class="pv__chip is-success">とどいた</span>
+          <span class="pv__chip is-warning">下書きのまま</span>
+          <span class="pv__chip is-error">送れなかった</span>
+        </div>
+
+        <div class="pv__skeleton" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+
+        <button class="pv__fab" type="button">ばぶる</button>
+      </div>
+
+      <section class="pv__assets" aria-label="ブランド素材">
+        <h2 class="cc-heading">ブランド素材の見え方</h2>
+        <p class="pv__caption">
+          左は app の BrandMark（インライン SVG。<code>currentColor</code> と
+          <code>--accent-soft</code> だけで描いてあるのでテーマに追随する）。
+          右は <code>assets/engiiro-crayon-logo.png</code>（透過なしのビットマップ。
+          テーマに追随しないので、暗い地では紙の白がそのまま残る）。
+        </p>
+        <div class="pv__assetRow">
+          <div class="pv__assetCell"><span class="pv__brand pv__brand--lg" data-brandmark></span></div>
+          <div class="pv__assetCell">
+            <img src="./assets/engiiro-crayon-logo.png" alt="子どもが描いたえんじいろのロゴ">
+          </div>
+        </div>
       </section>
 
-      <section class="swatches" aria-label="色見本">
-        <div class="swatch base"><span>Base</span><strong id="baseValue">#FFF8F1</strong></div>
-        <div class="swatch assort"><span>Assort</span><strong id="assortValue">#D8C7B8</strong></div>
-        <div class="swatch accent"><span>Accent</span><strong id="accentValue">#9B3342</strong></div>
-      </section>
+      <section class="pv__swatches" aria-label="役割の色見本" data-swatches></section>
     </main>
 
     <script src="./script.js"></script>

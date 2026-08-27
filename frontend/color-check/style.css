@@ -1,596 +1,1471 @@
+/*
+ * style.css — 仮配色ラボ
+ *
+ * 正本は ../../DESIGN.md。役割名・数値をここで発明しない。
+ * 骨格のトークン（余白・角丸・書体）は ../app/src/tokens/ から写している。
+ *
+ * ── このファイルの構造 ──────────────────────────────────────────────
+ *   1. 骨格トークン（テーマに依存しない。app と共通）
+ *   2. 役割トークン × 3テーマ（app の tokens/theme.css と同じ値）
+ *   3. 検証台（lab）… 固定色。候補色から独立させる
+ *   4. 見本（pv）… 役割トークンだけを使う
+ *
+ * ── app と違えている点、その理由 ─────────────────────────────────────
+ *
+ * ★ テーマの属性名を data-theme ではなく **data-cc-theme** にしている。
+ *   このページは Artifact として共有していて、その閲覧側が閲覧者のテーマを
+ *   ルート要素の data-theme に書き込む。app と同じ名前を使うと、閲覧者の
+ *   ライト／ダーク設定と、検討中のテーマがぶつかる。
+ *
+ * ★ prefers-color-scheme を見ていない。app では「OS に従う」が既定だが、
+ *   ここでは検討対象のテーマを常に明示的に選ぶ。OS の設定で見本が変わったら、
+ *   何を見ているのか分からなくなる。
+ *
+ * ★ 検証台（左のパネル）の色は候補色から作らない。固定値を持たせている。
+ *   canvas に ink と同じ色を入れたときに、操作するところまで読めなくなるのを避ける。
+ *   台がニュートラルな灰なのは、周囲の色が候補色の見えを引っぱらないようにするため。
+ */
+
+/* ── 1. 骨格トークン（app の tokens/base.css・typography.css から） ────── */
+
 :root {
-  --base: #fff8f1;
-  --assort: #d8c7b8;
-  --accent: #9b3342;
-  --kid-blue: #2d8fb3;
-  --kid-yellow: #f4c51f;
-  --kid-orange: #ef7a22;
-  --ink: #312624;
-  --muted: #776964;
-  --paper: #fffdf9;
-  --line: color-mix(in srgb, var(--assort) 58%, #ffffff);
-  --soft-accent: color-mix(in srgb, var(--accent) 13%, #ffffff);
-  --persona-edge: color-mix(in srgb, var(--accent) 34%, #f7c7ce);
-  --persona-wash: color-mix(in srgb, var(--accent) 13%, #ffe7eb);
-  --persona-border: color-mix(in srgb, var(--accent) 38%, #ffffff);
-  --persona-solid: var(--accent);
-  --shadow: 0 22px 70px rgba(73, 38, 26, 0.14);
-  --radius: 14px;
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  --rounded-xs: 4px;
+  --rounded-sm: 6px;
+  --rounded-md: 10px;
+  --rounded-lg: 16px;
+  --rounded-pill: 999px;
+
+  --feed-max-width: 600px;
+  --control-min-height: 48px;
+  --card-padding: 14px;
+  --card-padding-top: 15px;
+
+  --font-display: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", Meiryo,
+    sans-serif;
+  --font-body: -apple-system, "system-ui", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI", Meiryo, sans-serif;
+  --font-mono: SFMono-Regular, Consolas, Menlo, monospace;
+
+  --size-display: 24px;
+  --size-heading: 18px;
+  --size-card-title: 15px;
+  --size-bubble-body: 16px;
+  --size-body: 15px;
+  --size-label: 12px;
+  --size-caption: 12px;
+
+  --leading-bubble-body: 1.9;
+  --leading-body: 1.75;
+  --tracking-label: 0.04em;
+
+  /* 動き（app の tokens/motion.css より。独自の数値を作らない） */
+  --duration-micro: 80ms;
+  --duration-quick: 150ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --press-scale: 0.985;
+  --press-scale-strong: 0.97;
+
+  /*
+   * ホバーの持ち上げ量（人間の指示 2026-08-26）。
+   * ink を重ねるので、ダークでは明るく・ライトでは暗くなり、
+   * どのテーマでも同じ規則で「カーソルが乗っている」と読める。
+   */
+  --hover-veil: 8%;
 }
 
-* {
+/* ── 2. 役割トークン。値は DESIGN.md frontmatter と theme.css のとおり ──── */
+
+/*
+ * 既定はノーマル（app の :root と同じ）。
+ * JS が読み込み時にルート要素へインラインで全役割を書き込むので、
+ * 実際に効くのはそちら。ここの値は JS が動かなかったときの受け皿。
+ */
+:root {
+  --canvas: #fff8f1;
+  --surface: #fffdf9;
+  --card: #f1e7de;
+  --hairline: #e8ded6;
+  --ink: #312624;
+  --body: #4a3c37;
+  --muted: #6e615c;
+  --accent-line: #9b3342;
+  --accent-fill: #9b3342;
+  --accent-fill-large: #8e2f3b;
+  --accent-press: #7d2633;
+  --accent-soft: #f2e4e6;
+  --on-accent: #fffdf9;
+  --baby: #9b3342;
+  --baby-soft: #f2e4e6;
+  --mother: #39704e;
+  --mother-fill: #4f8f69;
+  --mother-soft: #e3f1e9;
+  --success: #39704e;
+  --warning: #8c5a0c;
+  --error: #8c2f1e;
+
+  /* 派生色。ink から作るのでテーマごとの再定義が要らない（theme.css と同じ） */
+  --skeleton: color-mix(in srgb, var(--ink) 9%, var(--surface));
+
+  /* テーマごとに変わる「装飾の量」（DESIGN.md §1.3） */
+  --border-width: 1px;
+  --input-border-style: solid;
+  --elevation-offset: none;
+  --tilt: 0deg;
+  --radius-control: var(--rounded-md);
+  --radius-balloon: 22px 22px 22px 8px;
+  --radius-reply: 8px 20px 20px 20px;
+  --balloon-tail-size: 14px;
+  --balloon-tail-inset: var(--space-lg);
+
+  /* 背景の層（App.css の地・光・輪） */
+  --aura-warm: color-mix(in srgb, var(--accent-line) 14%, transparent);
+  --aura-cool: color-mix(in srgb, var(--mother) 10%, transparent);
+  --field-ring: color-mix(in srgb, var(--accent-line) 12%, transparent);
+  --field-ring-width: 1.5%;
+}
+
+:root[data-cc-theme="dark"] {
+  --canvas: #1a1513;
+  --surface: #221b18;
+  --card: #2b231f;
+  --hairline: #3a302a;
+  --ink: #f4ede4;
+  --body: #dcd1c6;
+  --muted: #a8998e;
+  --accent-line: #e28e9c;
+  --accent-fill: #b54254;
+  --accent-fill-large: #b54254;
+  --accent-press: #c85c6d;
+  --accent-soft: #3a2226;
+  --on-accent: #fffdf9;
+  --baby: #e28e9c;
+  --baby-soft: #3a2226;
+  --mother: #7fc79a;
+  --mother-fill: #6fb88c;
+  --mother-soft: #1f2e25;
+  --success: #7fc79a;
+  --warning: #e0b25c;
+  --error: #e88a78;
+
+  --skeleton: color-mix(in srgb, var(--ink) 12%, var(--surface));
+
+  /* 暗い地の上の暗い影は見えない。階層は面色差で作る（DESIGN.md §2.3・§6） */
+  --elevation-offset: none;
+
+  /*
+   * 夜空の光（人間の決定 2026-08-26「紺系で夜空っぽく、おやすみモード」）。
+   *
+   * app の theme.css は寒色側の光を --mother（緑）から作っている。
+   * 紺の地に緑の光を置くと、夜空ではなく「暗い森」に見えるので、
+   * ここでは地そのものの明るい段（hairline）から作って「空の明るみ」にした。
+   * 暖色側は accent-line のまま弱く残す ＝ 夜の部屋の灯り。
+   * ★ 生の hex を増やさず、役割トークンからの派生で済ませている。
+   */
+  --aura-warm: color-mix(in srgb, var(--accent-line) 11%, transparent);
+  --aura-cool: color-mix(in srgb, var(--hairline) 62%, transparent);
+  --field-ring: color-mix(in srgb, var(--accent-line) 14%, transparent);
+}
+
+:root[data-cc-theme="kid"] {
+  --canvas: #fff9e3;
+  --surface: #ffffff;
+  --card: #fff3c4;
+  --hairline: #e8c84a;
+  --ink: #2b211c;
+  --body: #5a4a40;
+  --muted: #7a675c;
+  --accent-line: #c22648;
+  --accent-fill: #c22648;
+  --accent-fill-large: #c22648;
+  --accent-press: #a31e3c;
+  --accent-soft: #ffe0e6;
+  --on-accent: #fffdf9;
+  --baby: #c22648;
+  --baby-soft: #ffe0e6;
+  --mother: #2e7a50;
+  --mother-fill: #7fb069;
+  --mother-soft: #e4f3dc;
+
+  /* 装飾はこのテーマの本体。削ると園児UI である意味がなくなる（DESIGN.md §1.3） */
+  --border-width: 2px;
+  --input-border-style: dashed;
+  --elevation-offset: 6px 6px 0 var(--hairline);
+  --tilt: -2.5deg;
+  --radius-control: var(--rounded-pill);
+  --radius-balloon: 26px 20px 24px 8px / 22px 26px 20px 10px;
+  --radius-reply: 8px 24px 18px 22px / 10px 20px 24px 18px;
+
+  --aura-warm: color-mix(in srgb, var(--accent-line) 10%, transparent);
+  --aura-cool: color-mix(in srgb, var(--mother-fill) 16%, transparent);
+  --field-ring: color-mix(in srgb, var(--hairline) 62%, transparent);
+  --field-ring-width: 3%;
+}
+
+/*
+ * 赤ちゃんのバブルの枠（試作。人間の指示 2026-08-26「赤ちゃん側が主役」）。
+ *
+ * app の BubbleCard.css は hairline を使っていて、紺の地ではほとんど見えない。
+ * 主役のバブルに枠の存在感を持たせる案を、検証台のトグルで比べられるようにしてある。
+ * 臙脂を混ぜるだけなので、生の hex は増えない。
+ */
+:root[data-cc-baby-edge="accent"] {
+  --balloon-edge: color-mix(in srgb, var(--accent-line) 32%, var(--hairline));
+}
+
+/* ── 3. 検証台。固定色。ここは候補色に影響されない ─────────────────────── */
+
+:root {
+  --cc-bg: #efedea;
+  --cc-panel: #fbfaf9;
+  --cc-sunken: #e5e2de;
+  --cc-line: #d6d2cd;
+  --cc-ink: #201d1b;
+  --cc-muted: #6a645e;
+  --cc-accent: #8a2e3b;
+  --cc-ok: #2f6b45;
+  --cc-ng: #a32e1e;
+}
+
+:root[data-cc-theme="dark"] {
+  --cc-bg: #191817;
+  --cc-panel: #221f1e;
+  --cc-sunken: #2c2927;
+  --cc-line: #38342f;
+  --cc-ink: #edeae6;
+  --cc-muted: #a49d95;
+  --cc-accent: #e7929f;
+  --cc-ok: #7ec79a;
+  --cc-ng: #e88a78;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 12% 12%, color-mix(in srgb, var(--assort) 24%, transparent), transparent 32%),
-    linear-gradient(135deg, var(--base), color-mix(in srgb, var(--base) 78%, var(--assort)));
-  color: var(--ink);
-  font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
-  line-height: 1.65;
-}
-
-body[data-mode="kid"] {
-  --paper: #fffefa;
-  --line: color-mix(in srgb, var(--accent) 24%, var(--kid-yellow));
-  --soft-accent: color-mix(in srgb, var(--accent) 18%, #fff4cf);
-  --radius: 8px;
-  background:
-    repeating-linear-gradient(-8deg, transparent 0 22px, rgba(244, 197, 31, 0.08) 22px 24px),
-    linear-gradient(135deg, var(--base), color-mix(in srgb, var(--base) 72%, var(--kid-yellow)));
-}
-
-body[data-persona="mother"] {
-  --persona-edge: #a7cdb8;
-  --persona-wash: #e3f1e9;
-  --persona-border: #86b79c;
-  --persona-solid: #4f8f69;
-}
-
-button,
-input,
-textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-.lab-panel {
-  position: fixed;
-  inset: 0 auto 0 0;
-  width: min(360px, 100%);
-  padding: 28px;
-  overflow-y: auto;
-  background: rgba(255, 253, 249, 0.88);
-  border-right: 1px solid var(--line);
-  backdrop-filter: blur(18px);
-  z-index: 2;
-}
-
-.eyebrow {
-  margin: 0 0 4px;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
+  background: var(--cc-bg);
+  color: var(--cc-ink);
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
 }
 
 h1,
 h2,
+h3,
 p {
-  margin-top: 0;
-}
-
-h1 {
-  margin-bottom: 10px;
-  font-size: 30px;
-  line-height: 1.25;
-}
-
-h2 {
-  margin-bottom: 10px;
-  font-size: 17px;
-}
-
-.lead,
-.notes,
-.contrast {
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.mode-switch,
-.persona-switch,
-.controls,
-.preset-list,
-.notes,
-.contrast {
-  margin-top: 24px;
-}
-
-.mode-switch,
-.persona-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 5px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--base) 72%, #ffffff);
-}
-
-.mode-button,
-.persona-theme-button {
-  min-height: 40px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.mode-button.is-active,
-.persona-theme-button.is-active {
-  background: var(--accent);
-  color: #ffffff;
-}
-
-body[data-mode="kid"] .mode-button.is-active {
-  background: linear-gradient(90deg, var(--accent), var(--kid-orange), var(--kid-yellow));
-}
-
-.persona-theme-button.is-active {
-  background: var(--persona-solid);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--persona-border) 52%, #ffffff);
-}
-
-.controls {
-  display: grid;
-  gap: 14px;
-}
-
-.controls label {
-  display: grid;
-  grid-template-columns: 74px 44px 1fr;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.controls input[type="color"] {
-  width: 44px;
-  height: 40px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--paper);
-}
-
-.controls input[type="text"] {
-  min-width: 0;
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--paper);
-  color: var(--ink);
-  text-transform: uppercase;
-}
-
-.preset-list {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.preset-group {
-  grid-column: 1 / -1;
-  margin: 12px 0 0;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.preset-group:first-child {
-  margin-top: 0;
-}
-
-.preset-list button,
-.reaction-row button,
-.persona,
-.icon-button {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--base) 74%, #ffffff);
-  color: var(--ink);
-}
-
-.preset-list button {
-  min-height: 42px;
-  padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.notes ul {
   margin: 0;
-  padding-left: 18px;
 }
 
-.contrast p {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 8px 0;
-}
-
-.contrast strong {
-  color: var(--ink);
-}
-
-.preview {
-  min-height: 100vh;
-  padding: 36px 36px 36px 396px;
-}
-
-.app-shell {
-  width: min(900px, 100%);
-  margin: 0 auto;
-  border: 2px solid var(--persona-border);
-  border-radius: 16px;
-  background:
-    linear-gradient(135deg, var(--persona-wash), transparent 38%),
-    rgba(255, 253, 249, 0.76);
-  box-shadow: 0 0 0 10px color-mix(in srgb, var(--persona-edge) 58%, transparent), var(--shadow);
-  overflow: hidden;
-}
-
-body[data-mode="kid"] .app-shell {
-  border: 2px dashed color-mix(in srgb, var(--accent) 62%, var(--kid-yellow));
-  border-radius: 18px;
-}
-
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 18px 22px;
-  background:
-    linear-gradient(90deg, var(--persona-wash), color-mix(in srgb, var(--persona-edge) 22%, transparent)),
-    color-mix(in srgb, var(--assort) 34%, #ffffff);
-  border-bottom: 2px solid color-mix(in srgb, var(--persona-border) 68%, #ffffff);
-}
-
-body[data-mode="kid"] .topbar {
-  background:
-    linear-gradient(90deg, rgba(244, 197, 31, 0.18), rgba(239, 122, 34, 0.10)),
-    color-mix(in srgb, var(--base) 65%, #ffffff);
-}
-
-.brand-mark,
-.avatar {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
-  border-radius: 13px;
-  background: var(--accent);
-  color: #ffffff;
-  font-weight: 900;
-}
-
-body[data-mode="kid"] .brand-mark,
-body[data-mode="kid"] .avatar {
-  border: 2px solid var(--kid-yellow);
-  border-radius: 35% 48% 40% 44%;
-  transform: rotate(-3deg);
-}
-
-.topbar p {
-  margin: 0;
-  font-weight: 900;
-}
-
-.topbar span,
-.post-card span,
-.profile-card p,
-.drawing-hero p {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.icon-button {
-  width: 42px;
-  height: 42px;
-  margin-left: auto;
-  color: var(--accent);
-  font-weight: 900;
-}
-
-.drawing-hero {
-  display: grid;
-  grid-template-columns: minmax(180px, 280px) 1fr;
-  align-items: center;
-  gap: 18px;
-  margin: 22px 22px 0;
-  padding: 18px;
-  border: 1px solid color-mix(in srgb, var(--persona-border) 65%, #ffffff);
-  border-radius: var(--radius);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.38)),
-    color-mix(in srgb, var(--base) 72%, #ffffff);
-}
-
-.drawing-hero img {
-  display: block;
-  width: 100%;
-  max-height: 150px;
-  object-fit: contain;
-  filter: saturate(0.78) opacity(0.76);
-}
-
-.drawing-hero h2,
-.drawing-hero p {
-  margin-bottom: 0;
-}
-
-body[data-mode="kid"] .drawing-hero {
-  border: 2px solid color-mix(in srgb, var(--accent) 50%, var(--kid-yellow));
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 247, 212, 0.68)),
-    color-mix(in srgb, var(--base) 78%, var(--kid-yellow));
-}
-
-body[data-mode="kid"] .drawing-hero img {
-  max-height: 190px;
-  filter: saturate(1.18) opacity(1);
-}
-
-body[data-mode="kid"] .drawing-hero h2::after {
-  content: " ★";
-  color: var(--kid-yellow);
-}
-
-.composer {
-  margin: 22px;
-  padding: 18px;
-  border: 1px solid color-mix(in srgb, var(--persona-border) 68%, #ffffff);
-  border-radius: var(--radius);
-  background: var(--paper);
-}
-
-body[data-mode="kid"] .composer,
-body[data-mode="kid"] .post-card,
-body[data-mode="kid"] .profile-card {
-  border-width: 2px;
-  box-shadow: 7px 7px 0 color-mix(in srgb, var(--kid-yellow) 32%, transparent);
-}
-
-.persona-row,
-.stamp-row,
-.reaction-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.persona {
-  padding: 7px 12px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.persona.is-active {
-  background: color-mix(in srgb, var(--persona-solid) 14%, #ffffff);
-  border-color: color-mix(in srgb, var(--persona-solid) 35%, #ffffff);
-  color: var(--persona-solid);
-}
-
-body[data-mode="kid"] .persona.is-active {
-  background: color-mix(in srgb, var(--kid-yellow) 34%, #ffffff);
+/* app の tokens/base.css と同じ地ならし。見本の button を素の面から組めるようにする */
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 textarea {
-  width: 100%;
-  min-height: 112px;
-  margin: 14px 0;
-  padding: 14px;
-  resize: vertical;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--base) 54%, #ffffff);
-  color: var(--ink);
+  font: inherit;
+  color: inherit;
 }
 
-body[data-mode="kid"] textarea {
-  border: 2px dashed color-mix(in srgb, var(--accent) 42%, var(--kid-yellow));
+code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
 }
 
-.stamp {
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--assort) 42%, #ffffff);
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 800;
+:focus-visible {
+  outline: 2px solid var(--cc-accent);
+  outline-offset: 1px;
+  border-radius: var(--rounded-xs);
 }
 
-body[data-mode="kid"] .stamp {
-  background: color-mix(in srgb, var(--kid-yellow) 30%, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--kid-yellow));
+.cc-skip {
+  position: absolute;
+  left: -9999px;
+  top: var(--space-xs);
+  z-index: 5;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rounded-sm);
+  background: var(--cc-panel);
+  color: var(--cc-ink);
 }
 
-.primary-button {
-  width: 100%;
-  min-height: 48px;
-  margin-top: 16px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--accent);
-  color: #ffffff;
-  font-weight: 900;
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 24%, transparent);
+.cc-skip:focus {
+  left: var(--space-xs);
 }
 
-body[data-mode="kid"] .primary-button {
-  border: 2px solid color-mix(in srgb, var(--accent) 64%, #ffffff);
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 74%, var(--kid-orange)));
+/* 書体階層（DESIGN.md §3）。見出し・ラベルだけ丸ゴシックに palt を当てる */
+.cc-display,
+.cc-heading,
+.cc-cardTitle,
+.cc-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-feature-settings: "palt" 1, "kern" 1;
 }
 
-.feed {
+.cc-display {
+  font-size: var(--size-display);
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+}
+
+.cc-heading {
+  font-size: var(--size-heading);
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+
+.cc-cardTitle {
+  font-size: var(--size-card-title);
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+
+.cc-label {
+  font-size: var(--size-label);
+  line-height: 1.7;
+  letter-spacing: var(--tracking-label);
+}
+
+.cc-eyebrow {
+  color: var(--cc-accent);
+  font-family: var(--font-display);
+  font-size: var(--size-label);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cc-lead,
+.cc-hint,
+.cc-notes {
+  color: var(--cc-muted);
+  font-size: var(--size-caption);
+  line-height: 1.7;
+}
+
+.cc-notes {
   display: grid;
-  gap: 14px;
-  padding: 0 22px 22px;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding-left: 1.1em;
 }
 
-.post-card,
-.profile-card {
-  padding: 18px;
-  border: 1px solid color-mix(in srgb, var(--persona-border) 62%, #ffffff);
-  border-radius: var(--radius);
-  background: var(--paper);
+/* ── 検証台のレイアウト ────────────────────────────────────────────── */
+
+.lab {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 2;
+  display: grid;
+  align-content: start;
+  gap: var(--space-lg);
+  width: min(380px, 100%);
+  padding: var(--space-lg);
+  overflow-y: auto;
+  background: var(--cc-panel);
+  border-right: 1px solid var(--cc-line);
 }
 
-.post-card header {
+.lab__head {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.lab__block {
+  display: grid;
+  gap: var(--space-xs);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--cc-line);
+}
+
+.lab__block > .cc-label {
+  color: var(--cc-ink);
+}
+
+/* セグメント */
+.lab__segment {
+  display: flex;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs);
+  border-radius: var(--rounded-md);
+  background: var(--cc-sunken);
+}
+
+.lab__seg {
+  flex: 1;
+  min-height: 38px;
+  border: 0;
+  border-radius: var(--rounded-sm);
+  background: transparent;
+  color: var(--cc-muted);
+  font-family: var(--font-display);
+  font-size: var(--size-label);
+  font-weight: 700;
+}
+
+.lab__seg.is-active {
+  background: var(--cc-panel);
+  color: var(--cc-accent);
+  box-shadow: inset 0 0 0 1px var(--cc-line);
+}
+
+/* プリセット・探索 */
+.lab__presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xxs);
+}
+
+.lab__presets button,
+.lab__reset {
+  min-height: 40px;
+  padding: var(--space-xs);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--rounded-sm);
+  background: var(--cc-panel);
+  color: var(--cc-ink);
+  font-size: var(--size-label);
+  font-weight: 700;
+}
+
+.lab__presets button:hover,
+.lab__reset:hover,
+.lab__stepper button:hover {
+  border-color: var(--cc-accent);
+  color: var(--cc-accent);
+}
+
+/* いま基準にしている案。ほかのプリセットより一段強く出す */
+.lab__lead {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-sm);
+  border: 1px solid var(--cc-accent);
+  border-radius: var(--rounded-sm);
+  background: var(--cc-sunken);
+  color: var(--cc-ink);
+  font-family: var(--font-display);
+  font-size: var(--size-card-title);
+  font-weight: 700;
+  text-align: start;
+}
+
+.lab__lead span {
+  color: var(--cc-muted);
+  font-family: var(--font-body);
+  font-size: var(--size-caption);
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.lab__lead:hover {
+  border-color: var(--cc-ink);
+}
+
+.lab__toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--rounded-sm);
+  cursor: pointer;
+  font-size: var(--size-label);
+  font-weight: 700;
+}
+
+.lab__toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  accent-color: var(--cc-accent);
+}
+
+.lab__toggle em {
+  display: block;
+  margin-top: 2px;
+  color: var(--cc-muted);
+  font-size: var(--size-caption);
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.lab__subhead {
+  margin-top: var(--space-xs);
+  color: var(--cc-ink);
+}
+
+.lab__steppers {
+  display: grid;
+  gap: var(--space-xxs);
+}
+
+.lab__stepper {
+  display: grid;
+  grid-template-columns: 1fr 40px 40px;
+  align-items: center;
+  gap: var(--space-xxs);
+  font-size: var(--size-label);
+}
+
+.lab__stepper button {
+  min-height: 34px;
+  border: 1px solid var(--cc-line);
+  border-radius: var(--rounded-sm);
+  background: var(--cc-panel);
+  color: var(--cc-ink);
+  font-weight: 700;
+}
+
+.lab__reset {
+  margin-top: var(--space-xxs);
+}
+
+/* 役割トークンの編集行 */
+.lab__roles {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.lab__group {
+  display: grid;
+  gap: var(--space-xxs);
+  padding: var(--space-xs);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--rounded-sm);
+  background: var(--cc-sunken);
+}
+
+.lab__group > summary {
+  cursor: pointer;
+  color: var(--cc-ink);
+  font-family: var(--font-display);
+  font-size: var(--size-label);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+}
+
+.lab__row {
+  display: grid;
+  grid-template-columns: 1fr 34px 88px;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xxs);
+}
+
+.lab__rowName {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.lab__rowName span {
+  display: block;
+  color: var(--cc-muted);
+  font-family: var(--font-body);
+  font-size: 10px;
+}
+
+.lab__row input[type="color"] {
+  width: 34px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid var(--cc-line);
+  border-radius: var(--rounded-xs);
+  background: var(--cc-panel);
+}
+
+.lab__row input[type="text"] {
+  min-width: 0;
+  height: 30px;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--rounded-xs);
+  background: var(--cc-panel);
+  color: var(--cc-ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.lab__vivid {
+  display: grid;
+  gap: var(--space-xxs);
+  margin-top: var(--space-sm);
+}
+
+.lab__vividStrip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-xxs);
+}
+
+.lab__vividChip {
+  padding: var(--space-xxs);
+  border-radius: var(--rounded-xs);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-align: center;
+}
+
+/* 判定 */
+.lab__verdict {
+  font-family: var(--font-display);
+  font-size: var(--size-card-title);
+  font-weight: 700;
+}
+
+.lab__verdict.is-ok {
+  color: var(--cc-ok);
+}
+
+.lab__verdict.is-ng {
+  color: var(--cc-ng);
+}
+
+.lab__checks {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.lab__checkGroup {
+  display: grid;
+  gap: 2px;
+}
+
+.lab__checkGroup > h3 {
+  color: var(--cc-muted);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+}
+
+.lab__check {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: var(--space-xs);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--cc-line);
+  font-size: 11px;
+}
+
+.lab__checkName {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.lab__checkName span {
+  display: block;
+  color: var(--cc-muted);
+  font-family: var(--font-body);
+  font-size: 10px;
+}
+
+.lab__checkRatio {
+  color: var(--cc-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 判定は記号・文字・色の3つで出す。色だけに頼らない（DESIGN.md §2.5） */
+.lab__checkVerdict {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lab__checkVerdict.is-ok {
+  color: var(--cc-ok);
+}
+
+.lab__checkVerdict.is-ng {
+  color: var(--cc-ng);
+}
+
+/* しきい値が DESIGN.md に無い行。測った値だけ出して合否は付けない */
+.lab__checkVerdict.is-info {
+  color: var(--cc-muted);
+  font-weight: 400;
+}
+
+/* ── 4. 見本。ここから下は役割トークンだけを使う ───────────────────────── */
+
+.preview {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-lg);
+  min-height: 100vh;
+  padding: var(--space-lg) var(--space-lg) var(--space-xl);
+  padding-left: calc(380px + var(--space-lg));
+}
+
+/*
+ * App.css の「地 → 光 → 輪 → 中身」の4層。
+ *
+ * ★ app では光と輪を position: fixed で viewport に敷いている。
+ *   ここは画面の一部を切り取った見本なので、.pv の中に absolute で閉じている。
+ *   層の順序と色の作り方は同じ。
+ */
+.pv {
+  position: relative;
+  isolation: isolate;
+  width: min(632px, 100%);
+  padding: var(--space-md);
+  overflow: hidden;
+  border: 1px solid var(--cc-line);
+  border-radius: var(--rounded-lg);
+  background: var(--canvas);
+  color: var(--body);
+  font-size: var(--size-body);
+}
+
+.pv::before,
+.pv::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* 第2層：光。動かさない */
+.pv::before {
+  background-image:
+    radial-gradient(62% 46% at 8% 2%, var(--aura-warm), transparent 68%),
+    radial-gradient(48% 38% at 96% 26%, var(--aura-cool), transparent 70%),
+    radial-gradient(72% 52% at 46% 112%, var(--aura-warm), transparent 66%);
+}
+
+/* 第3層：輪。塗りではなく線なので、上に載る文字のコントラストを落とさない */
+.pv::after {
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0 calc(50% - var(--field-ring-width)),
+      var(--field-ring) calc(50% - var(--field-ring-width)) 50%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0 calc(50% - var(--field-ring-width)),
+      var(--field-ring) calc(50% - var(--field-ring-width)) 50%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0 calc(50% - var(--field-ring-width)),
+      var(--field-ring) calc(50% - var(--field-ring-width)) 50%,
+      transparent 50%
+    );
+  background-size:
+    360px 360px,
+    200px 200px,
+    120px 120px;
+  background-position:
+    -12% 4%,
+    98% 18%,
+    86% 82%;
+}
+
+.pv > * + * {
+  margin-top: var(--space-sm);
+}
+
+/*
+ * ── ホバーとフォーカスの決めごと（人間の指示 2026-08-26） ─────────────────
+ *
+ * 「カーソルがそこにあることを分かりやすくしたい」。決めごとは2つだけ：
+ *   1. 面のもの … ink を --hover-veil 重ねて1段持ち上げ、枠線を accent-line にする
+ *   2. 臙脂の塗りのもの … accent-press に差し替える
+ *
+ * ink を重ねる形にしたので、ダークでは明るく・ライトでは暗くなり、
+ * どのテーマでも同じ規則で「乗っている」と読める。テーマごとの分岐が要らない。
+ *
+ * ★ 浮かせない。BubbleCard.css の「ホバーで浮かせない。押した反応は面色で返す」を守る。
+ *   影も拡大も足さず、押した瞬間だけ --press-scale で縮む。
+ *
+ * ★ 自前の面を持つ要素（吹き出し・リアクション）は、透かしではなく
+ *   自分の面色に混ぜる。透かしにすると面が消えて地が透けてしまう。
+ */
+.pv__balloon,
+.pv__sootheOpen,
+.pv__reaction,
+.pv__segItem,
+.pv__reply,
+.pv__button,
+.pv__fab {
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-micro) var(--ease-smooth-out);
+}
+
+.pv__balloon:active,
+.pv__sootheOpen:active,
+.pv__segItem:active,
+.pv__reply:active,
+.pv__button:active,
+.pv__fab:active {
+  transform: scale(var(--press-scale));
+}
+
+.pv__reaction:active {
+  transform: scale(var(--press-scale-strong));
+}
+
+/* 狙われているところは、見本側の臙脂で示す（検証台の色を持ち込まない） */
+.pv :focus-visible,
+.pv__assets :focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+
+/* ヘッダ */
+.pv__top {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
 }
 
-.post-card strong,
-.post-card span {
-  display: block;
+.pv__topText {
+  flex: 1;
+  min-width: 0;
 }
 
-.avatar.baby {
-  background: var(--accent);
-}
-
-.avatar.mother {
-  background: color-mix(in srgb, var(--assort) 78%, var(--accent));
+.pv__top .cc-heading {
   color: var(--ink);
 }
 
-.post-card p {
-  margin: 14px 0;
-}
-
-.reaction-row button {
-  padding: 7px 11px;
+.pv__caption {
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: var(--size-caption);
+  line-height: 1.6;
 }
 
-.reaction-row .accent-link {
-  border-color: color-mix(in srgb, var(--accent) 38%, #ffffff);
-  color: var(--accent);
+/* card の面に muted が載るところ。DESIGN.md §2.2 の条件2 がここ */
+.pv__tag {
+  flex: none;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-pill);
+  background: var(--card);
+  color: var(--muted);
+  font-size: var(--size-caption);
+  font-variant-numeric: tabular-nums;
 }
 
-.mother-card {
-  background: color-mix(in srgb, var(--assort) 22%, #ffffff);
-}
-
-.profile-card {
-  display: grid;
-  gap: 12px;
-}
-
-.profile-card h2,
-.profile-card p {
-  margin-bottom: 0;
-}
-
-.meter {
-  height: 12px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--assort) 42%, #ffffff);
-}
-
-.meter span {
+/* ブランドの印（BrandMark.tsx。currentColor と --accent-soft だけで描く） */
+.pv__brand {
   display: block;
-  width: 64%;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  color: var(--accent-line);
+  transform: rotate(var(--tilt));
+}
+
+.pv__brand--lg {
+  width: 84px;
+  height: 84px;
+}
+
+.pv__brand svg {
+  display: block;
+  width: 100%;
   height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
 }
 
-body[data-mode="kid"] .meter span {
-  background: linear-gradient(90deg, var(--kid-blue), var(--kid-yellow), var(--accent));
+.pv__segment {
+  display: flex;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs);
+  border-radius: var(--radius-control);
+  background: var(--card);
 }
 
-.swatches {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  width: min(900px, 100%);
-  margin: 16px auto 0;
+.pv__segItem {
+  flex: 1;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-sm);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: var(--size-label);
+  font-weight: 700;
+  text-align: center;
 }
 
-.swatch {
-  min-height: 92px;
-  padding: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
+.pv__segItem.is-active {
+  background: var(--surface);
+  color: var(--accent-line);
 }
 
-.swatch span,
-.swatch strong {
+/* バブルカード（BubbleCard.css） */
+.pv__bubble {
+  display: flex;
+  flex-direction: column;
+}
+
+.pv__balloon {
+  position: relative;
   display: block;
+  width: 100%;
+  padding: var(--card-padding-top) var(--space-md) var(--card-padding);
+  border: var(--border-width) solid var(--balloon-edge, var(--hairline));
+  border-radius: var(--radius-balloon);
+  background: var(--surface);
+  box-shadow: var(--elevation-offset);
+  text-align: start;
 }
 
-.swatch span {
-  font-size: 12px;
-  font-weight: 800;
+/*
+ * しっぽ。45度に回した正方形の右辺と下辺だけに線を引くと「∨」になる。
+ * 塗りが吹き出しと同じ面色なので、下辺の線がしっぽの幅ぶんだけ隠れて輪郭がつながる。
+ */
+.pv__balloon::after {
+  content: "";
+  position: absolute;
+  left: var(--balloon-tail-inset);
+  bottom: calc(var(--balloon-tail-size) / -2);
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: var(--surface);
+  border-right: var(--border-width) solid var(--balloon-edge, var(--hairline));
+  border-bottom: var(--border-width) solid var(--balloon-edge, var(--hairline));
+  border-bottom-right-radius: var(--rounded-xs);
+  transform: rotate(45deg);
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out);
 }
 
-.swatch strong {
-  margin-top: 20px;
+/* しっぽも一緒に動かす。箱だけ動くと輪郭が1本につながって見えなくなる */
+.pv__balloon:hover,
+.pv__balloon:hover::after {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
 }
 
-.swatch.base {
-  background: var(--base);
+.pv__bubbleBody {
+  display: block;
+  color: var(--body);
+  font-size: var(--size-bubble-body);
+  line-height: var(--leading-bubble-body);
 }
 
-.swatch.assort {
-  background: var(--assort);
+.pv__more {
+  display: block;
+  margin-top: var(--space-xs);
+  color: var(--muted);
+  font-size: var(--size-caption);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }
 
-.swatch.accent {
-  background: var(--accent);
-  color: #ffffff;
+.pv__who {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  margin-top: calc(var(--balloon-tail-size) / 2 + var(--space-xxs));
+  padding-left: var(--space-xs);
 }
 
-@media (max-width: 860px) {
-  .lab-panel {
+.pv__who .cc-cardTitle {
+  color: var(--ink);
+}
+
+.pv__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  flex: none;
+  color: var(--accent-line);
+  font-size: var(--size-caption);
+}
+
+.pv__dot {
+  width: var(--space-xs);
+  height: var(--space-xs);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-line);
+}
+
+.pv__reactions,
+.pv__sootheFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+  padding-left: var(--space-xs);
+}
+
+.pv__reaction {
+  padding: 6px var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--size-caption);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pv__reaction:hover {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
+  color: var(--ink);
+}
+
+.pv__reaction.is-active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-line);
+}
+
+/* 活性のものは「活性のまま1段」。ホバーで非活性と同じ見え方にしない */
+.pv__reaction.is-active:hover {
+  border-color: var(--accent-press);
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--accent-soft));
+  color: var(--accent-line);
+}
+
+.pv__segItem:hover {
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), transparent);
+  color: var(--ink);
+}
+
+.pv__segItem.is-active:hover {
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
+  color: var(--accent-line);
+}
+
+/* あやす（SootheItem.css）。バブルと左右を反転した形にする */
+.pv__soothe {
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-reply);
+  background: var(--surface);
+  box-shadow: var(--elevation-offset);
+  transform: rotate(calc(var(--tilt) / -2));
+}
+
+.pv__soothe.is-mother {
+  background: var(--mother-soft);
+  border-color: var(--mother);
+}
+
+.pv__sootheHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.pv__sootheHead .cc-cardTitle {
+  color: var(--ink);
+}
+
+.pv__quote {
+  margin-top: var(--space-xs);
+  padding-left: var(--space-xs);
+  border-left: var(--border-width) solid var(--hairline);
+  color: var(--muted);
+  font-size: var(--size-caption);
+}
+
+/*
+ * あやすの本文＝詳細を開くところ（SootheItem.css の __open）。
+ * ★ ここは透かしで持ち上げる。自分の面を持たせると、お母さんの mother-soft が
+ *   消えて役割が読めなくなる。透かしなら下の面色がそのまま残る。
+ */
+.pv__sootheOpen {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  border-radius: var(--rounded-sm);
+  text-align: start;
+}
+
+.pv__sootheOpen:hover {
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), transparent);
+}
+
+.pv__body {
+  display: block;
+  color: var(--body);
+}
+
+.pv__count {
+  display: block;
+  margin-top: var(--space-xs);
+  color: var(--muted);
+  font-size: var(--size-caption);
+  text-align: end;
+}
+
+.pv__reply {
+  margin-left: auto;
+  padding: var(--space-xxs) var(--space-sm);
+  border-radius: var(--radius-control);
+  color: var(--accent-line);
+  font-family: var(--font-display);
+  font-size: var(--size-label);
+  font-weight: 700;
+}
+
+/* ここは app（SootheItem.css）が既に accent-soft を敷いている。そのまま採る */
+.pv__reply:hover {
+  background: var(--accent-soft);
+}
+
+/* 注記ボックス（accent-soft の地） */
+.pv__note {
+  padding: var(--space-sm);
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  color: var(--body);
+  font-size: var(--size-caption);
+}
+
+/* 入力欄 */
+.pv__field {
+  padding: var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.pv__fieldLabel {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--size-label);
+  font-weight: 700;
+}
+
+.pv__input {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-xs);
+  padding: var(--space-sm);
+  resize: vertical;
+  border: var(--border-width) var(--input-border-style) var(--hairline);
+  border-radius: var(--rounded-sm);
+  background: var(--surface);
+  color: var(--body);
+  line-height: var(--leading-body);
+}
+
+.pv__input::placeholder {
+  color: var(--muted);
+}
+
+.pv__input:hover {
+  border-color: var(--accent-line);
+}
+
+/*
+ * あやすを書くときだけペルソナを選べる（投稿は常に赤ちゃん）。
+ * 選んでいるペルソナの色が、入力欄の縁と見出しに出る。
+ * 夜の地の上で、お母さんの緑が「役割の色」として読めるかを見るところ。
+ */
+:root[data-cc-persona="baby"] .pv__fieldLabel {
+  color: var(--baby);
+}
+
+:root[data-cc-persona="mother"] .pv__field {
+  border-color: var(--mother);
+}
+
+:root[data-cc-persona="mother"] .pv__fieldLabel {
+  color: var(--mother);
+}
+
+.pv__counter {
+  margin-top: var(--space-xxs);
+  color: var(--muted);
+  font-size: var(--size-caption);
+  font-weight: 700;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ボタン（Button.css）。小さい塗りは accent-fill、全幅だけ accent-fill-large */
+.pv__buttons {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.pv__button {
+  min-height: var(--control-min-height);
+  padding: 13px 20px;
+  border: var(--border-width) solid var(--accent-fill);
+  border-radius: var(--radius-control);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-family: var(--font-display);
+  font-size: var(--size-body);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  box-shadow: var(--elevation-offset);
+}
+
+.pv__button--ghost {
+  border-color: var(--accent-line);
+  background: transparent;
+  color: var(--accent-line);
+}
+
+/* 面積の大きい塗りには、小面積用より少し暗い値（DESIGN.md §2.2 条件5・§5.3-2） */
+.pv__button--full {
+  width: 100%;
+  border-color: var(--accent-fill-large);
+  background: var(--accent-fill-large);
+}
+
+.pv__button:hover {
+  background: var(--accent-press);
+  border-color: var(--accent-press);
+}
+
+.pv__button--ghost:hover {
+  background: var(--accent-soft);
+}
+
+/* 空状態。イラストはテーマごとのファイルを差し替える（Illustration.tsx と同じ） */
+.pv__empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-md) 0;
+  text-align: center;
+}
+
+.pv__empty .cc-heading {
+  color: var(--ink);
+}
+
+.pv__illust {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+}
+
+.pv__semantic,
+.pv__skeleton {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.pv__chip {
+  padding: var(--space-xxs) var(--space-xs);
+  border: var(--border-width) solid currentColor;
+  border-radius: var(--rounded-pill);
+  font-size: var(--size-caption);
+  font-weight: 700;
+}
+
+.pv__chip.is-success {
+  color: var(--success);
+}
+
+.pv__chip.is-warning {
+  color: var(--warning);
+}
+
+.pv__chip.is-error {
+  color: var(--error);
+}
+
+.pv__chip.is-mother {
+  border-color: var(--mother);
+  background: var(--mother-soft);
+  color: var(--mother);
+}
+
+.pv__chip.is-baby {
+  border-color: var(--baby);
+  background: var(--baby-soft);
+  color: var(--baby);
+}
+
+.pv__skeleton {
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.pv__skeleton span {
+  height: 12px;
+  border-radius: var(--rounded-pill);
+  background: var(--skeleton);
+}
+
+.pv__skeleton span:nth-child(1) {
+  width: 92%;
+}
+
+.pv__skeleton span:nth-child(2) {
+  width: 78%;
+}
+
+.pv__skeleton span:nth-child(3) {
+  width: 46%;
+}
+
+/* 主操作。丸い「バブル」の形にして、ほかのボタンと形でも区別する */
+.pv__fab {
+  position: relative;
+  width: fit-content;
+  margin-left: auto;
+  padding: 13px 20px;
+  border: var(--border-width) solid var(--accent-fill-large);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-fill-large);
+  color: var(--on-accent);
+  font-family: var(--font-display);
+  font-size: var(--size-body);
+  font-weight: 700;
+}
+
+.pv__fab:hover,
+.pv__fab:hover::after {
+  background: var(--accent-press);
+  border-color: var(--accent-press);
+}
+
+.pv__fab::after {
+  content: "";
+  position: absolute;
+  left: var(--space-lg);
+  bottom: calc(var(--balloon-tail-size) / -2 + var(--border-width));
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: inherit;
+  border-right: var(--border-width) solid var(--accent-fill-large);
+  border-bottom: var(--border-width) solid var(--accent-fill-large);
+  transform: rotate(45deg);
+}
+
+/* ブランド素材の比較 */
+.pv__assets {
+  display: grid;
+  gap: var(--space-xs);
+  width: min(632px, 100%);
+  padding: var(--space-md);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--rounded-lg);
+  background: var(--canvas);
+}
+
+.pv__assets .cc-heading {
+  color: var(--ink);
+}
+
+.pv__assetRow {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-xs);
+}
+
+.pv__assetCell {
+  display: grid;
+  place-items: center;
+  padding: var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+}
+
+.pv__assetCell img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+}
+
+/* 役割の色見本 */
+.pv__swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-xs);
+  width: min(632px, 100%);
+}
+
+.pv__swatch {
+  display: grid;
+  gap: 2px;
+  min-height: 76px;
+  padding: var(--space-xs);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--rounded-sm);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.pv__swatchName {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pv__swatchHex {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.pv__swatchUse {
+  margin-top: auto;
+  opacity: 0.85;
+}
+
+/* ── 画面が狭いとき ────────────────────────────────────────────────── */
+
+@media (max-width: 1039px) {
+  .lab {
     position: static;
     width: auto;
     border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--cc-line);
   }
 
   .preview {
-    padding: 18px;
+    padding: var(--space-md);
   }
 
-  .drawing-hero {
+  .pv__assetRow {
     grid-template-columns: 1fr;
   }
+}
 
-  .swatches {
-    grid-template-columns: 1fr;
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
   }
 }

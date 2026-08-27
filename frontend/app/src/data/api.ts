@@ -206,7 +206,6 @@ function ready(): Promise<void> {
           createdAt: isoMinutesAgo(seed.minutesAgo),
           reactions: seed.reactions,
           isMine: isMinePersona(seed.authorPersonaId),
-          read: seed.read,
           affinity: seed.affinity,
           // 返す直前に数え直す。ここは器を埋めるだけ
           sootheCount: 0,
@@ -542,7 +541,6 @@ export async function createBubble(input: CreateBubbleInput): Promise<CreateBubb
     createdAt: new Date().toISOString(),
     reactions: { counts: {}, mine: {} },
     isMine: true,
-    read: true,
     affinity: 1,
     sootheCount: 0,
   };
@@ -733,11 +731,6 @@ export async function deleteBubble(bubbleId: string): Promise<{ readonly ok: boo
   return { ok: true };
 }
 
-/** バブルを開いたことを覚えておく（S2 の未読／押下済の出しわけ用） */
-export function markRead(bubbleId: string): void {
-  bubbles = bubbles.map((bubble) => (bubble.id === bubbleId ? { ...bubble, read: true } : bubble));
-}
-
 /*
  * ────────────── S6 他人の公開プロフィール ──────────────
  *
@@ -855,6 +848,38 @@ export const NICKNAME_MAX_LENGTH = 20;
 
 export const ACCOUNT_ID_RULE_TEXT = "半角の 英小文字・数字・_ で 3〜20 文字";
 
+/** 生年月日の下限。仮置き（これより前は入力の誤りとして扱う） */
+export const BIRTHDAY_MIN = "1900-01-01";
+
+/** きょうの日付（"YYYY-MM-DD"）。入力欄の上限と、未来日の判定に使う */
+export function todayIsoDate(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return String(now.getFullYear()) + "-" + month + "-" + day;
+}
+
+/**
+ * 生年月日として受け取れる形かどうか。
+ *
+ * ★ 見ているのは「日付として成り立つか」だけ。年齢で入会を断る判定は入れていない。
+ *   年齢制限は仕様書に無く、決めるのは人間（Issue #7 と同じ扱い）。
+ */
+function isValidBirthday(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const parsed = new Date(value + "T00:00:00Z");
+  if (Number.isNaN(parsed.getTime())) {
+    return false;
+  }
+  // "2026-02-31" のような、形は合っているが存在しない日を弾く
+  if (parsed.toISOString().slice(0, 10) !== value) {
+    return false;
+  }
+  return value >= BIRTHDAY_MIN && value <= todayIsoDate();
+}
+
 /**
  * アカウントを作る（POST /api/accounts 相当）。
  *
@@ -884,6 +909,9 @@ export async function createAccount(input: CreateAccountInput): Promise<CreateAc
   if (input.password.length < PASSWORD_MIN_LENGTH) {
     return { ok: false, reason: "password_weak" };
   }
+  if (!isValidBirthday(input.birthday)) {
+    return { ok: false, reason: "birthday_invalid" };
+  }
 
   const baby = input.babyNickname.trim();
   const mother = input.motherNickname.trim();
@@ -910,6 +938,13 @@ export async function createAccount(input: CreateAccountInput): Promise<CreateAc
     mother: { ...ME.mother, nickname: mother },
   };
   setMe(next);
+  /*
+   * 生年月日はアカウント側に持つ。ペルソナには付けない（人間の指示、2026-08-27）。
+   * ★ ここから先へ出ていく道が1本も無いことが要点。
+   *   公開プロフィール（S6）の型にこの項目は無く、AI へ渡す入力にも入らない
+   *   （FR-PRIV-003/004）。読めるのは S8 の fetchMyProfile だけ。
+   */
+  birthday = input.birthday;
   bubbles = bubbles.map((bubble) =>
     bubble.author.id === next.baby.id ? { ...bubble, author: next.baby } : bubble,
   );

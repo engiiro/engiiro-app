@@ -12,8 +12,13 @@ import "./TimelineScreen.css";
 /*
  * S2 タイムライン。
  *
- * 主役はバブルカード1枚（本文 16px / 行間 1.9）。1画面に 2.5 枚見える密度。
- * 視線は ニックネーム → 本文 → リアクション の順。
+ * 主役はバブル1つ（本文 16px / 行間 1.9）。カードは吹き出しの形で、
+ * 書いた人はしっぽの先に付く（BubbleCard）。
+ *
+ * ★ 先頭に「口上」を置く（UI刷新 2026-08-26）。
+ *   ここが多くの人にとって最初に見る画面なので、
+ *   「これは何をする場所か」を、機能の説明ではなく1行の呼びかけで出す。
+ *   スクロールすれば流れて消え、上の細い見出しだけが残る。
  *
  * 上に「おなじくらい つかれてる子」の帯を置いているのは、単純な新着順にしないため
  * （FR-FEED-002）。並べ替えの判断は data/api.ts の fetchFeed が持っている。
@@ -21,9 +26,17 @@ import "./TimelineScreen.css";
  * 見出しの右に「あたらしくする」。読み込み中は押せなくして、アイコンを回す（NFR-006）。
  * 自動で入れ替えない。読んでいる途中で並びが変わると、どこを読んでいたか分からなくなる。
  *
- * 状態は4つ：未読／押下済（カードごと）、読み込み中（skeleton）、空。
- * 置いていないもの：フォロワー数、通報、DM、絶対時刻、本文の自動リンク化。
+ * 状態は3つ：読み込み中（skeleton）、空、並んだあと。
+ * ★ カードごとの「よんだ／まだ」は持たない（人間の指示、2026-08-27 で廃止）。
+ * 置いていないもの：既読、フォロワー数、通報、DM、絶対時刻、本文の自動リンク化。
  */
+
+/*
+ * 出てくるときのずらしの頭打ち。
+ * 40ms × 6 = 240ms で、合計 300ms 未満に収まる（DESIGN.md §7.2）。
+ * これを超えると、下のほうのカードだけ遅れて出てきて「重い」画面になる。
+ */
+const MAX_STAGGER_STEPS = 6;
 
 type TimelineScreenProps = {
   readonly feed: FeedResult | null;
@@ -65,11 +78,30 @@ export function TimelineScreen({
       />
 
       <div className={cx("eg-column", "eg-timeline")}>
+        {/*
+          口上。見出し（h1）は上の細い帯が持っているので、ここは段落として書く。
+          同じ画面に h1 を2つ置かないため。
+        */}
+        <div className="eg-timeline__lede">
+          <p className={cx("eg-timeline__kicker", "t-label")}>よふけの えんじいろ</p>
+          <p className={cx("eg-timeline__headline", "t-display")}>
+            よわねは、ここで
+            <br />
+            バブルに なります。
+          </p>
+          <p className={cx("eg-timeline__sub", "t-body")}>
+            だれが 言ったかより、なにを かかえているか。
+            <br />
+            読むだけでも、そっと あやすだけでも いい。
+          </p>
+        </div>
+
         {loading || feed === null ? <SkeletonFeed count={3} /> : null}
 
         {isEmpty ? (
           <div className="eg-timeline__empty">
             <EmptyState
+              illustration="haven"
               lines={[
                 "ここから先はまだ、だれも吐き出していません。",
                 "いちばん最初に なってみる？",
@@ -92,10 +124,11 @@ export function TimelineScreen({
                   </p>
                 </div>
                 <div className="eg-feed-list">
-                  {feed.recommended.map((bubble) => (
+                  {feed.recommended.map((bubble, index) => (
                     <BubbleCard
                       key={bubble.id}
                       bubble={bubble}
+                      index={Math.min(index, MAX_STAGGER_STEPS)}
                       onOpen={onOpenBubble}
                       onOpenProfile={onOpenProfile}
                       onReact={onReact}
@@ -111,10 +144,11 @@ export function TimelineScreen({
                   そのほかの バブル
                 </h2>
                 <div className="eg-feed-list">
-                  {feed.rest.map((bubble) => (
+                  {feed.rest.map((bubble, index) => (
                     <BubbleCard
                       key={bubble.id}
                       bubble={bubble}
+                      index={Math.min(index, MAX_STAGGER_STEPS)}
                       onOpen={onOpenBubble}
                       onOpenProfile={onOpenProfile}
                       onReact={onReact}

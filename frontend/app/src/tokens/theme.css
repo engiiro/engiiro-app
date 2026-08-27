@@ -13,6 +13,16 @@
 
 /* ── 1. 既定＝ノーマル（DESIGN.md §2.2。配色は検討中の暫定値） ───────────── */
 :root {
+  /*
+   * ブラウザが自前で描くもの（日付入力のカレンダーの印、スクロールバー、
+   * 選択中の文字の地）を、テーマと同じ側に寄せる。
+   *
+   * ★ 色の値ではないので、役割名トークンの規則の外にある。
+   *   ここに無いと、生年月日の入力欄（登録画面）の印がダークで黒いまま出て、
+   *   地に沈んで見えなくなる（人間の指示 2026-08-27 で入力欄を足したときに判明）。
+   */
+  color-scheme: light;
+
   /* 面 */
   --canvas: #fff8f1;
   --surface: #fffdf9;
@@ -60,15 +70,56 @@
   --tilt: 0deg;
   --radius-blob: var(--rounded-lg);
   --radius-control: var(--rounded-md);
+
+  /*
+   * ── 背景の層（UI刷新 2026-08-26） ────────────────────────────────
+   *
+   * 画面の地を1色で塗らず、「地 → 光 → 輪 → 中身」の4層にする。
+   * 光と輪は position: fixed の擬似要素で、常時は動かさない（DESIGN.md §7）。
+   *
+   * ★ 値は既存の役割名から color-mix で作る。生の hex をここで増やさない。
+   *   カスタムプロパティの var() は使う側で解決されるので、:root に1度書けば
+   *   [data-theme] を切り替えたときの臙脂・緑にそのまま追随する。
+   *   テーマごとに「量」を変えたいものだけ、下で上書きする。
+   */
+  --aura-warm: color-mix(in srgb, var(--accent-line) 14%, transparent);
+  --aura-cool: color-mix(in srgb, var(--mother) 10%, transparent);
+  --field-ring: color-mix(in srgb, var(--accent-line) 12%, transparent);
+  --field-ring-width: 1.5%;
+
+  /*
+   * 吹き出しの形。フィードのカードは「面」ではなく「バブル」として出す。
+   * 左下にしっぽが付くので、そこだけ角を落とす。
+   */
+  --radius-balloon: 22px 22px 22px 8px;
+  --balloon-tail-size: 14px;
+  --balloon-tail-inset: var(--space-lg);
+
+  /*
+   * 返事（あやす）は、バブルとは左右を反転した形にする。
+   * 落とした角が左上に来るので、上のバブルのほうを向いて見える。
+   * しっぽは付けない。1画面にしっぽを何本も出すと、どれが主役か読めなくなる。
+   */
+  --radius-reply: 8px 20px 20px 20px;
 }
 
 /* ── 2. OS のダーク。明示指定が無いときだけ効かせる ─────────────────────── */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="normal"]):not([data-theme="kid"]) {
-    --canvas: #1a1513;
-    --surface: #221b18;
-    --card: #2b231f;
-    --hairline: #3a302a;
+    color-scheme: dark;
+
+    /*
+     * 地は紺（人間の決定 2026-08-26、docs/color_and_ui_findings.md §0-1）。
+     * 「夜空っぽく、おやすみモード的な雰囲気」にする。
+     *
+     * ★ 明度の段は前の暖色ダーク（8.8 / 11.4 / 14.5 / 19.6%）のまま、色相と彩度だけを替えている。
+     *   暗い地では影が効かず、階層は面色差だけで作っているので（DESIGN.md §6）、
+     *   段の間隔を動かすとカードと地の境目が消える。
+     */
+    --canvas: #11151c;
+    --surface: #161b24;
+    --card: #1c222e;
+    --hairline: #262e3e;
 
     --ink: #f4ede4;
     --body: #dcd1c6;
@@ -84,7 +135,20 @@
 
     --baby: #e28e9c;
     --baby-soft: #3a2226;
-    --mother: #7fc79a;
+    /*
+     * ★ お母さんの緑を暗くする（人間の決定 2026-08-26 §0-2「赤ちゃん側が主役」）。
+     *   前の #7FC79A は canvas 上 9.18:1 で、主役の臙脂 7.48:1 を追い越していた。
+     *   #4AAA6E は 6.33:1 で、赤ちゃんとの差は +1.15（赤ちゃんが前）。
+     *
+     * ★ 明度だけでは補色の振動（臙脂との色相差 152°）は消えない。
+     *   面積のほうは SootheItem.css 側で削っている（あやすカードの地をやめた）。
+     *   色相を動かす案（藤 #AC8DB3）は「お母さん＝緑」というコンセプトの変更になるので、
+     *   人間の決定待ち（findings §7-2）。ここでは触っていない。
+     *
+     * 副次的に、--success（#7FC79A のまま）と別の色になった。
+     * 以前はダークで mother と success が同じ hex で、意味の違うものが同じ色だった（findings §2）。
+     */
+    --mother: #4aaa6e;
     --mother-fill: #6fb88c;
     --mother-soft: #1f2e25;
 
@@ -95,6 +159,19 @@
     --scrim: color-mix(in srgb, var(--canvas) 82%, transparent);
     --skeleton: color-mix(in srgb, var(--ink) 12%, var(--surface));
 
+    /*
+     * 夜空の光（findings §1）。
+     *
+     * ★ 冷たい側を --mother（緑）から --hairline（地の明るい段）由来に変えた。
+     *   紺の地に緑の光を置くと、夜空ではなく「暗い森」に見える。
+     *   地の明るい段から作れば「空の明るみ」になる。
+     * ★ 暖かい側は accent-line のまま弱く残す。夜の部屋の灯り。
+     * ★ 輪も同じ理由で空の側（hairline 由来）にする。輪は「灯り」ではなく「空に浮かぶバブル」。
+     */
+    --aura-warm: color-mix(in srgb, var(--accent-line) 11%, transparent);
+    --aura-cool: color-mix(in srgb, var(--hairline) 62%, transparent);
+    --field-ring: color-mix(in srgb, var(--hairline) 72%, transparent);
+
     /* 暗い地の上の暗い影は見えない。階層は面色差で作る（DESIGN.md §6） */
     --elevation-modal: none;
   }
@@ -102,15 +179,26 @@
 
 /* ── 3. 明示指定は常に勝つ ─────────────────────────────────────────────── */
 :root[data-theme="dark"] {
-  --canvas: #1a1513;
-  --surface: #221b18;
-  --card: #2b231f;
-  --hairline: #3a302a;
+  color-scheme: dark;
+
+  /*
+   * 地は紺（人間の決定 2026-08-26、docs/color_and_ui_findings.md §0-1）。
+   * 「夜空っぽく、おやすみモード的な雰囲気」にする。
+   *
+   * ★ 明度の段は前の暖色ダーク（8.8 / 11.4 / 14.5 / 19.6%）のまま、色相と彩度だけを替えている。
+   *   暗い地では影が効かず、階層は面色差だけで作っているので（DESIGN.md §6）、
+   *   段の間隔を動かすとカードと地の境目が消える。
+   */
+  --canvas: #11151c;
+  --surface: #161b24;
+  --card: #1c222e;
+  --hairline: #262e3e;
 
   --ink: #f4ede4;
   --body: #dcd1c6;
   --muted: #a8998e;
 
+  /* 臙脂 #9B3342 は暗い地で 2.54:1。線用は明度を上げた薄紅、塗りは別値（DESIGN.md §2.3） */
   --accent-line: #e28e9c;
   --accent-fill: #b54254;
   --accent-fill-large: #b54254;
@@ -120,7 +208,20 @@
 
   --baby: #e28e9c;
   --baby-soft: #3a2226;
-  --mother: #7fc79a;
+  /*
+   * ★ お母さんの緑を暗くする（人間の決定 2026-08-26 §0-2「赤ちゃん側が主役」）。
+   *   前の #7FC79A は canvas 上 9.18:1 で、主役の臙脂 7.48:1 を追い越していた。
+   *   #4AAA6E は 6.33:1 で、赤ちゃんとの差は +1.15（赤ちゃんが前）。
+   *
+   * ★ 明度だけでは補色の振動（臙脂との色相差 152°）は消えない。
+   *   面積のほうは SootheItem.css 側で削っている（あやすカードの地をやめた）。
+   *   色相を動かす案（藤 #AC8DB3）は「お母さん＝緑」というコンセプトの変更になるので、
+   *   人間の決定待ち（findings §7-2）。ここでは触っていない。
+   *
+   * 副次的に、--success（#7FC79A のまま）と別の色になった。
+   * 以前はダークで mother と success が同じ hex で、意味の違うものが同じ色だった（findings §2）。
+   */
+  --mother: #4aaa6e;
   --mother-fill: #6fb88c;
   --mother-soft: #1f2e25;
 
@@ -131,11 +232,26 @@
   --scrim: color-mix(in srgb, var(--canvas) 82%, transparent);
   --skeleton: color-mix(in srgb, var(--ink) 12%, var(--surface));
 
+  /*
+   * 夜空の光（findings §1）。
+   *
+   * ★ 冷たい側を --mother（緑）から --hairline（地の明るい段）由来に変えた。
+   *   紺の地に緑の光を置くと、夜空ではなく「暗い森」に見える。
+   *   地の明るい段から作れば「空の明るみ」になる。
+   * ★ 暖かい側は accent-line のまま弱く残す。夜の部屋の灯り。
+   * ★ 輪も同じ理由で空の側（hairline 由来）にする。輪は「灯り」ではなく「空に浮かぶバブル」。
+   */
+  --aura-warm: color-mix(in srgb, var(--accent-line) 11%, transparent);
+  --aura-cool: color-mix(in srgb, var(--hairline) 62%, transparent);
+  --field-ring: color-mix(in srgb, var(--hairline) 72%, transparent);
+
   --elevation-modal: none;
 }
 
 /* 園児UI。OS 設定からは選ばれない、利用者が明示的に選ぶテーマ（DESIGN.md §8.3） */
 :root[data-theme="kid"] {
+  color-scheme: light;
+
   --canvas: #fff9e3;
   --surface: #ffffff;
   --card: #fff3c4;
@@ -157,6 +273,19 @@
   --mother: #2e7a50;
   --mother-fill: #7fb069;
   --mother-soft: #e4f3dc;
+
+  /*
+   * 園児UI の背景は「工作用紙」。光は弱く、輪は太くはっきり出す。
+   * ここを色の差だけにすると、園児UI である意味がなくなる（DESIGN.md §1.3）。
+   */
+  --aura-warm: color-mix(in srgb, var(--accent-line) 10%, transparent);
+  --aura-cool: color-mix(in srgb, var(--mother-fill) 16%, transparent);
+  --field-ring: color-mix(in srgb, var(--hairline) 62%, transparent);
+  --field-ring-width: 3%;
+
+  /* 吹き出しも不定形にする */
+  --radius-balloon: 26px 20px 24px 8px / 22px 26px 20px 10px;
+  --radius-reply: 8px 24px 18px 22px / 10px 20px 24px 18px;
 
   /* 装飾はこのテーマの本体。削ると園児UI である意味がなくなる（DESIGN.md §1.3） */
   --border-width: 2px;

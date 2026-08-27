@@ -6,13 +6,31 @@
 .eg-compose {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  /* 右の列の高さいっぱい。viewport から取ると上に積まれたぶんだけ下へはみ出す */
+  height: 100%;
   padding: var(--space-lg) var(--space-md);
   border-left: var(--border-width) solid var(--hairline);
   background: var(--surface);
   /* 起点は右。出た経路で帰す（DESIGN.md §7.4） */
   transform-origin: right center;
   animation: eg-panel-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+/*
+ * パネルの地にも、ごく弱い光を1つ置く（UI刷新 2026-08-26）。
+ * 面が真っ平らだと、右から出てきたときに「別のページ」に見える。
+ * 光があると、同じ場の一部が手前に来ただけに見える。
+ */
+.eg-compose::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(70% 34% at 50% 0%, var(--aura-warm), transparent 72%);
+}
+
+.eg-compose > * {
+  position: relative;
 }
 
 .eg-compose.is-leaving {
@@ -83,6 +101,16 @@
 .eg-compose__send {
   min-height: var(--touch-target-min);
   padding: var(--space-xs) var(--space-md);
+}
+
+/*
+ * 送れる状態に変わった瞬間だけ、一度 pop する（ComposePanel.tsx の注記）。
+ * 型は既存の eg-like-pop を使い回す（DESIGN.md §7.3「MVP で入れる動きは5つだけ」）。
+ * 幅は控えめにして、リアクションの pop（1.08〜1.26）より弱くする。主役の序列を崩さない。
+ */
+.eg-compose__send.is-just-sendable {
+  --pop-scale: 1.06;
+  animation: eg-like-pop var(--duration-medium) var(--ease-smooth-out);
 }
 
 /* ペルソナ変更 */
@@ -160,12 +188,69 @@
   overflow-y: auto;
 }
 
+/*
+ * 入力欄（＝この画面の主役）。
+ *
+ * 吹き出しの形にして、書いているものが そのまま バブルになることを形で示す。
+ * しっぽの作りは BubbleCard.css と同じ。
+ */
+.eg-compose__field {
+  position: relative;
+  margin-bottom: calc(var(--balloon-tail-size) / 2);
+}
+
 .eg-compose__body .eg-textarea {
-  min-height: calc(var(--space-xxl) * 3);
+  /* 道具や注記より先に目に入る大きさにする（刷新の優先順位 3） */
+  min-height: calc(var(--space-xxl) * 4);
+  border-radius: var(--radius-balloon);
+  padding: var(--space-md);
   resize: none;
 }
 
+.eg-compose__field::after {
+  content: "";
+  position: absolute;
+  left: var(--balloon-tail-inset);
+  bottom: calc(var(--balloon-tail-size) / -2);
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: var(--surface);
+  border-right: var(--border-width) var(--input-border-style) var(--hairline);
+  border-bottom: var(--border-width) var(--input-border-style) var(--hairline);
+  transform: rotate(45deg);
+  transition: border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* 超過中もしっぽまで色を合わせる。輪郭が途中で切り替わらないように */
+.eg-compose__field:has(.eg-textarea.is-over)::after {
+  border-color: var(--accent-line);
+}
+
+/*
+ * 入力前だけ出る「しずくのバブル」。
+ *
+ * ★ 要素は消さずに opacity だけ落とす。取り除くと、1文字目を打った瞬間に
+ *   下の注記が飛び上がってしまう。
+ * ★ Illustration の登場アニメーション（fill: both）は opacity を固定してしまうので、
+ *   ここでは切って transition に任せる。
+ */
+.eg-compose__field-art {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-md);
+  width: min(180px, 56%);
+  transform: translateX(-50%);
+  animation: none;
+  transition: opacity var(--duration-fast) var(--ease-smooth-out);
+}
+
+.eg-compose__field.is-filled .eg-compose__field-art {
+  opacity: 0;
+}
+
+/* モック専用の足場。製品の UI ではないので、いちばん静かな見た目にして最後に置く */
 .eg-compose__mock {
+  margin-top: auto;
   padding-top: var(--space-sm);
   border-top: var(--border-width) dashed var(--hairline);
   color: var(--muted);
@@ -347,6 +432,8 @@
     right: 0;
     bottom: 0;
     z-index: 40;
+    /* ここは列から出て画面に重なるので、高さも画面から取り直す */
+    height: 100dvh;
     width: min(var(--compose-width), 100vw);
     box-shadow: var(--elevation-modal);
   }

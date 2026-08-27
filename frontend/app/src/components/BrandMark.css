@@ -1,0 +1,14 @@
+/* ブランドの印。大きさは置き場所が決める */
+
+.eg-brandmark {
+  display: block;
+  flex: none;
+  width: var(--brandmark-size, 28px);
+  height: var(--brandmark-size, 28px);
+  color: var(--accent-line);
+}
+
+/* 園児UI だけ、印も少し傾ける（DESIGN.md §1.3） */
+.eg-brandmark {
+  transform: rotate(var(--tilt));
+}

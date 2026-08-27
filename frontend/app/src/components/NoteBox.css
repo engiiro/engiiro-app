@@ -4,8 +4,9 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-xs);
-  padding: var(--space-sm);
-  border-radius: var(--rounded-xs);
+  padding: var(--space-sm) var(--space-md);
+  /* 返事と同じ形。画面から出る「ことば」は、どれも同じ形にそろえる */
+  border-radius: var(--radius-reply);
   background: var(--accent-soft);
   color: var(--accent-line);
 }

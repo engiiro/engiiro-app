@@ -1,10 +1,31 @@
 /* DESIGN.md §7.3 skeleton-reveal。空白より不安が少ない */
 
+/*
+ * 読み込み中の1枚も、来るものと同じ吹き出しの形にする（UI刷新 2026-08-26）。
+ * 形が変わると、入れ替わった瞬間にレイアウトが跳ねて「読み込み直した」ように見える。
+ */
 .eg-skeleton-card {
-  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  position: relative;
+  margin-bottom: calc(var(--balloon-tail-size) / 2);
+  padding: var(--card-padding-top) var(--space-md) var(--card-padding);
   border: var(--border-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
+  border-radius: var(--radius-balloon);
   background: var(--surface);
+}
+
+/* しっぽ。作りは BubbleCard.css と同じ */
+.eg-skeleton-card::after {
+  content: "";
+  position: absolute;
+  left: var(--balloon-tail-inset);
+  bottom: calc(var(--balloon-tail-size) / -2);
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: var(--surface);
+  border-right: var(--border-width) solid var(--hairline);
+  border-bottom: var(--border-width) solid var(--hairline);
+  border-bottom-right-radius: var(--rounded-xs);
+  transform: rotate(45deg);
 }
 
 .eg-skeleton-line {

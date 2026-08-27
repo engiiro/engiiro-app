@@ -61,6 +61,7 @@ export function FavoritesScreen({
 
         {isEmpty ? (
           <EmptyState
+            illustration="haven"
             lines={[
               "まだ だれも 大好きに していません。",
               "気になる子の アイコンから、その子の ページを ひらいてみる？",

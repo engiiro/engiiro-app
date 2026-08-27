@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { cx } from "../lib/cx";
+import { BrandMark } from "./BrandMark";
 import { IconBell, IconGear, IconHeart, IconHome, IconPerson, IconSearch } from "./icons";
 import "./LeftRail.css";
 
@@ -57,7 +58,12 @@ export function LeftRail({
 }) {
   return (
     <nav className="eg-rail" aria-label="メインナビゲーション">
+      {/*
+        名乗り。細い列（1199px 以下）では印だけが残り、文字は消える。
+        印そのものは全利用者で同じ絵柄なので、誰かを識別する手がかりにはならない。
+      */}
       <div className="eg-rail__brand">
+        <BrandMark className="eg-rail__mark" />
         <span className={cx("eg-rail__logo", "t-display")}>えんじいろ</span>
       </div>
       <ul className="eg-rail__list">
@@ -68,6 +74,14 @@ export function LeftRail({
               <button
                 type="button"
                 aria-current={current === item.view ? "page" : undefined}
+                /*
+                 * 1199px 未満（さらに 767px 未満のボトムバーでも）は .eg-rail__label /
+                 * .eg-rail__soon を display:none にして文字を消している（LeftRail.css）。
+                 * display:none は読み上げからも消えるので、そのままだとボタンに
+                 * アクセシブルネームが1つも残らない。aria-label は見た目の表示状態に
+                 * 依存しないので、ここで明示しておく（人間の指摘）。
+                 */
+                aria-label={item.ready ? item.label : item.label + "（準備中）"}
                 className={cx("eg-rail__item", "eg-touch", current === item.view && "is-current")}
                 onClick={() => onNavigate(item.view)}
               >

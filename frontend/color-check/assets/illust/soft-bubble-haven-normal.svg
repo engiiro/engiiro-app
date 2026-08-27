@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-labelledby="title desc">
+  <!--
+    えんじいろ / soft-bubble-haven / normal
+    Illustration palette: normal #F4C7B8 fill / #A95757 line / #E7A24B accent
+    Theme candidates: dark #FFD27D / #FF9F88 / #A7D6C1, kid #FFE28A / #E34D67 / #4FA4C8
+    These colors intentionally contrast with UI surfaces so the illustration can support text-only states.
+  -->
+  <title id="title">ひとやすみのバブル</title>
+  <desc id="desc">余白の中に静かに置ける、やわらかな吹き出しのイラスト</desc>
+  <style>
+    .haven-fill { fill: var(--illustration-fill, #F4C7B8); }
+    .haven-line { fill: none; stroke: var(--illustration-line, #A95757); }
+    .haven-accent { fill: var(--illustration-accent, #E7A24B); }
+  </style>
+
+  <path class="haven-accent" d="M69 91 C69 84 74 79 81 79 C88 79 93 84 93 91 C93 98 88 103 81 103 C74 103 69 98 69 91 Z" />
+  <path class="haven-accent" d="M235 164 C235 160 238 157 242 157 C246 157 249 160 249 164 C249 168 246 171 242 171 C238 171 235 168 235 164 Z" />
+
+  <!-- One continuous silhouette; the tail is part of the path, so no outlines can misalign. -->
+  <path
+    class="haven-fill haven-line"
+    d="M86 117 C86 86 111 64 144 64 H196 C229 64 252 85 252 115 C252 144 228 162 198 162 H151 C138 175 122 181 103 183 C111 172 113 163 109 155 C95 147 86 135 86 117 Z"
+    stroke-width="3"
+    stroke-linejoin="round"
+  />
+</svg>
