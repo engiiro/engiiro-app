@@ -1,138 +1,335 @@
-# AI方式比較環境
+# ai/ — AI推論サービス
 
-Sprint 1では、次の2方式を分離して実行時間を比較します。
+「えんじいろ」の`POST /api/ai/evaluate`（文章の年齢評価）と`POST /api/ai/transform`
+（赤ちゃん語・お母さん語への文章変換）を提供するFastAPIサービスです。
+`docs/design_doc.md` 7章のAPI契約を実装します。
 
-1. **PyTorch-only Colab方式**
-   - `ai/notebooks/engiiro_colab.ipynb`
-   - Google Colab上で小型seq2seqモデルをゼロから学習・推論する
-   - 事前学習済み大規模言語モデルやTransformers系ライブラリは使わない
-2. **Gemma通常Python方式**
-   - `ai/gemma_benchmark.py`
-   - 通常のPython環境で、人間が別途用意したローカルGemmaモデルを読み込んで推論する
-   - モデルの取得元、認証方法、配置先、デプロイ先は決めない
+このファイルは2026-08-27に、AI文章変換（`/transform`）の実装に合わせて全面的に
+書き直しました。以前のバージョンはGemma/PyTorchの速度比較実験の説明でしたが、
+現在のコードとは一致していないため置き換えています。
 
-両方式は同じ2入力を3回ずつ処理し、共通形式のJSONへ時間を記録します。
-現時点ではどちらも実測していないため、どちらが速いかは未決定です。
+## 1. このディレクトリでできること
 
-## 比較する時間
+| エンドポイント | 内容 | 担当・詳細設計 |
+|---|---|---|
+| `GET /health` | ヘルスチェック | - |
+| `POST /api/ai/evaluate`相当（`/evaluate`） | 文章から推定年齢を返す | `ai/src/evaluate.py`。Issue #36 |
+| `POST /api/ai/transform`相当（`/transform`） | 文章を赤ちゃん語・お母さん語へ変換する | 本README、`docs/ai_transform_design.md` |
+| （投稿可否の判定） | `ai/moderation_rules.py`の`check_rules()` | `/transform`の内部でのみ使用。単独のHTTPエンドポイントは無い |
 
-主判定にはcold startの `workload_seconds` を使います。これは依存import、モデル準備、
-推論の合計です。ノートブック表示やCLI出力の差が混ざる `end_to_end_seconds` は参考値として残します。
+`/evaluate`（文章の年齢評価）は本READMEの対象外です。実装は`ai/src/evaluate.py`
+にあり、Issue #36の担当領域なのでここでは触れません。
 
-| 項目 | PyTorch Colab | Gemma Python |
-| --- | --- | --- |
-| `dependency_import_seconds` | PyTorch import | PyTorch・Transformers import |
-| `model_prepare_seconds` | 小型モデル初期化・学習 | ローカルGemma読込 |
-| `inference_seconds` | 同じ2入力×3回 | 同じ2入力×3回 |
-| `workload_seconds` | 上記3項目の合計 | 上記3項目の合計 |
-| `end_to_end_seconds` | 最初の設定セルから結果作成まで | スクリプト開始から結果作成まで |
+## 2. AI文章変換（`/transform`）の仕組み
 
-Colabの起動待ち、Python環境を手で作る時間、モデルを別途用意する時間は含みません。
-異なるハードウェア上の結果は、方式だけでなく実行環境の差も含む「実際の作業経路」の比較です。
+詳細設計は`docs/ai_transform_design.md`を参照してください。ここでは要点だけ書きます。
 
-比較できるのは、両JSONで次が一致し、両方が `success=true` の場合だけです。
+### 2.1 なぜ2段構えなのか
 
-- `benchmark_id`
-- `input_digest`
-- `repeat_count`
+変換は2つの経路を持ちます。
 
-この比較は速度だけを対象とし、出力品質、開発工数、費用、運用性、安全性は別に評価します。
+1. **一次経路：Gemini API**（`ai/transform_api.py`）。文脈を理解した自然な言い換え
+   ができますが、外部APIなので遅延・エラー・レート制限が起こり得ます。
+2. **フォールバック経路：ルールベース変換**（`ai/src/fallback/`）。外部通信を
+   一切せず、辞書と正規表現だけで変換します。Gemini APIが遅い・止まっている
+   ときに自動で切り替わります。
 
-## 方式1: PyTorch-only Colab
+利用者からもバックエンドからも、どちらの経路で変換されたかは見えません
+（レスポンスの形は`{ action, transformedText, reasonCodes }`で共通）。
 
-1. GitHub上の `ai/notebooks/engiiro_colab.ipynb` をGoogle Colabで開きます。
-2. CPUまたはGPUランタイムを選びます。
-3. 「すべてのセルを実行」で上から順に実行します。
-4. `/content/pytorch_colab_benchmark.json` を保存します。
+### 2.2 処理の流れ
 
-ノートブックはColabに導入済みのPyTorchをそのまま使い、再インストールしません。
-固定された小さな学習データを使い、40 epochだけ学習します。これは速度経路の成立確認用であり、
-モデル品質を評価できるデータではありません。
+```
+POST /transform { body, style }
+  │
+  ├─ 1. NGワードの端処理（マサカリ寄りの語を穏当な表現へ機械的に置換）
+  ├─ 2. 事前モデレーション（個人情報・自傷他害等はここで block）
+  ├─ 3. Gemini APIで変換を試みる（既定4秒でタイムアウト）
+  │      失敗・タイムアウト → ルールベースのフォールバックへ切り替え
+  ├─ 4. 事後モデレーション（変換後の文章も検査する）
+  └─ 5. { action: "allow", transformedText, reasonCodes: [] }
+```
 
-Colabは一時環境です。ランタイム終了後はモデルと一時ファイルが消えます。
-本番サーバ、常時公開API、永続ストレージとしては使いません。
+`action`は`allow`/`block`の2値です（`docs/design_doc.md` 9.2章、FR-MOD-023に
+統一。以前の7章の記載は`allow`/`rewrite_required`/`block`の3値でしたが、
+9.2章と矛盾していたため2026-08-27に2値へ揃えました）。
 
-## 方式2: Gemma通常Python
+### 2.3 フォールバック変換の中身（辞書と正規表現）
 
-`ai/gemma_benchmark.py` は、ローカルに存在するGemma互換モデルディレクトリだけを読み込みます。
-モデルのダウンロード、認証、外部サービス接続、公開、デプロイは行いません。
+`ai/dictionaries/`にJSON辞書、`ai/src/fallback/`に変換ロジックがあります。
 
-### Python環境
+- `baby_daily_words.json`：実際の育児語彙に基づく辞書（家族の呼称・動物・
+  食べ物・乗り物・体の部位・生活動作・排泄・場所・遊び）。1つの大人の言葉に
+  複数の赤ちゃん語バリエーションがある場合は配列で持たせています
+  （例：「ママ」→「まんま」「ま」「まー」「まま」）。「セダン」等の一般的な
+  車は「ぶーぶー」、「救急車」「パトカー」「消防車」のような緊急車両は
+  「ぴーぽーぴーぽー」と、車カテゴリを2つに分けています
+- `baby_engineer_words.json`：エンジニアが日常的に使う語の辞書。同じ意味
+  グループの類義語をまとめて1つの赤ちゃん語へ寄せるサブカテゴリ化にしています
+  （例：「お約束」「規約」→「おやくそくのかみ」、「バグ」「エラー」
+  「障害」→「ばぐばぐ」）。「えんじいろ」の利用者はエンジニアが中心という
+  前提で、ここを重点的に育てています
+- `baby_engineer_word_parts.json`：複合語を構成する「部品」の辞書（例：
+  「仕様」→「おやくそく」、「書」→「のかみ」）。上の`baby_engineer_words.json`
+  が「仕様書」のような複合語を丸ごと1つのキーとして登録するのに対し、
+  こちらは部品ごとに登録することで、辞書に無い似た構造の複合語（例：
+  「仕様概要図」）にも自動的に対応する（人間監督の指摘）。詳しくは
+  `docs/ai_transform_design.md` 6.4.1章
+- `harsh_word_softeners.json`：NGワードの端処理用の辞書（1対1、バリエーション
+  無し。例：「無能」→「まだ慣れていない」）。投稿を`block`するほどでは
+  ないマサカリ寄りの語を、変換前に穏当化します
+- `dictionary_loader.py`：上記のJSON辞書を読み込む共通ロジック。バリエーション
+  辞書（`{サブカテゴリ: {語: [候補, ...]}}`という2階層、または`{語: [候補, ...]}`
+  という1階層）を`{語: 選ばれた候補}`のフラットな置換辞書へ変換する
+  `load_variant_dictionary()`と、1対1の辞書をそのまま読み込む
+  `load_flat_dictionary()`がある。候補が複数あるときは、単語自体の文字数から
+  機械的に1つを選ぶ（同じ単語には常に同じ変換結果を返す）
+- `dictionary_match.py`：`baby_daily_words.json`・`baby_engineer_words.json`
+  （統合してから使う）を「最長一致」で置換する共通ロジック。形態素解析
+  （fugashi）だけだと「自動車」が「自動」+「車」に割れてしまう問題を、
+  原文の文字列に対する辞書引きで回避しています（詳しくはこのファイルの
+  docstring、および`docs/ai_transform_design.md` 6.3章）
+- `token_match.py`：`baby_engineer_word_parts.json`を、形態素解析で名詞・
+  接尾辞のトークンだけを対象に置換する共通ロジック。「書」のような短い
+  部品を動詞「書く」の活用形と混同しないための工夫（詳しくはこのファイルの
+  docstring、および`docs/ai_transform_design.md` 6.4.1章）
+- `sentence_split.py`：複数の文からなる入力を句点・感嘆符・疑問符で分割する
+  共通ロジック
+- `toddler_accent.py`：赤ちゃん語だけに適用する、幼児語訛り（舌足らず）の
+  音韻変換（例：「わたし」→「あたち」、「うさぎ」→「うしゃぎ」）。4つの
+  音韻規則を機械的に適用します。詳しくは2.5章
+- `baby_fallback.py` / `mother_fallback.py`：上記を組み合わせて、実際の変換を
+  行う本体
 
-仮想環境はリポジトリ外へ作成してください。依存関係の例は次のとおりです。
+辞書は最初から全部の語を網羅していません。「よく使う語を重点的に育てる」
+前提です。新しい語を追加する場合は7章「辞書の育て方」を読んでください。
+動詞（「食べる」「座る」等）は活用形（食べた／食べます等）まで正確に変換
+しようとすると日本語の活用処理が複雑になるため、辞書のキー（基本形）と
+完全一致した場合のみ変換します（既知の制限、`docs/ai_transform_design.md`
+10章）。
+
+### 2.4 NGワードの端処理と、投稿可否のモデレーションの違い
+
+どちらも`ai/moderation_rules.py`の語彙・仕組みと関係していますが、レイヤーが
+違います。
+
+| | 何をするか | どこで判定するか |
+|---|---|---|
+| 投稿可否のモデレーション（`check_rules`、既存） | 個人情報・自傷他害・露骨なNG語を`block`にする。**置き換えない** | `/transform`の変換前・変換後 |
+| NGワードの端処理（`harsh_word_softeners.py`、今回追加） | `block`ほど重篤ではないマサカリ寄りの語を、**投稿を止めずに**穏当な表現へ機械的に置換する | `/transform`の変換に入る前 |
+
+`block`にする語のリスト（`NG_WORDS_BLOCK`・`SELF_HARM_WORDS`）は今回変更して
+いません。
+
+### 2.5 幼児語訛り（舌足らず）の音韻変換
+
+赤ちゃん語だけに、次の4つの規則を辞書変換より前に適用します（お母さん語には
+適用しません）。詳しい理由は`docs/ai_transform_design.md` 6.8章を参照してください。
+
+| # | 規則 | 例 |
+|---|---|---|
+| 1 | た行の直後のさ行が、同じ段のた行に変わる | わたし → わたち |
+| 2 | 単語の先頭のか行が、同じ段のた行に変わる | きのう → ちのう |
+| 3 | わ・を の子音が抜け落ちて母音だけになる | わたし → あたし |
+| 4 | 「さ」が「しゃ」に変わる | うさぎさん → うしゃぎしゃん |
+
+カタカナ・漢字はどの規則にも一致しないため対象外です（「セダン」「カレー」
+のような外来語の辞書キーを壊さないための挙動でもあります）。「うさぎ」の
+ように、この変換で辞書のキー自体が変わってしまう語は、`dictionary_loader.py`
+が訛った形を自動的に別名登録するため、辞書ファイルを手で直す必要はありません。
+
+## 3. ディレクトリ構成
+
+```
+ai/
+├── app.py                          FastAPIアプリ本体。/health /evaluate /transform
+├── requirements.txt                  依存パッケージ
+├── moderation_rules.py               投稿可否のモデレーション（NG辞書・個人情報検出）
+├── transform_api.py                  Gemini APIクライアント（CLIとしても実行可能）
+├── transform_colab.ipynb             Gemini呼び出しをColabで試すためのノートブック
+├── src/
+│   ├── evaluate.py                    文章の年齢評価（Issue #36の担当領域）
+│   ├── transform.py                   /transform の本体。Gemini→フォールバックの制御
+│   └── fallback/
+│       ├── dictionary_loader.py         JSON辞書の読み込み・フラット化
+│       ├── dictionary_match.py          辞書の最長一致置換
+│       ├── token_match.py               品詞を考慮した部品辞書の置換
+│       ├── toddler_accent.py            幼児語訛り（舌足らず）の音韻変換
+│       ├── sentence_split.py            文単位への分割
+│       ├── baby_fallback.py             赤ちゃん語のルールベース変換
+│       └── mother_fallback.py           お母さん語のルールベース変換
+├── dictionaries/
+│   ├── baby_daily_words.json          日常語彙辞書（家族・動物・食べ物・車・体・動作等）
+│   ├── baby_engineer_words.json       エンジニア用語辞書（サブカテゴリ化）
+│   ├── baby_engineer_word_parts.json  複合語の部品辞書（「仕様」＋「書」等）
+│   └── harsh_word_softeners.json      NGワードの端処理用の辞書
+└── tests/
+    ├── test_environment.py            開発環境の依存関係スモークテスト
+    ├── test_moderation_rules.py       投稿可否のモデレーションのテスト
+    └── test_fallback_transform.py     AI文章変換（本README対象）のテスト
+```
+
+## 4. セットアップ
+
+Python 3.11以上を想定しています（`Dockerfile`が`python:3.11-slim`を使うため）。
 
 ```sh
-python -m pip install "torch>=2.4" "transformers>=4.51,<5" "accelerate>=1.4,<2"
+cd ai
+
+# 仮想環境を作る（1回だけ）
+python3 -m venv .venv
+
+# 仮想環境を有効化する
+source .venv/bin/activate   # Windows の場合は .venv\Scripts\activate
+
+# 依存パッケージをインストールする
+pip install -r requirements.txt
 ```
 
-CUDAで4bit量子化を明示的に試す場合だけ、追加で導入します。
+Gemini APIを使う場合は、環境変数`GOOGLE_API_KEY`を設定してください
+（[Google AI Studio](https://aistudio.google.com/app/apikey)で取得）。
+**設定しなくても、フォールバック経路だけでサーバーは動きます**（`GOOGLE_API_KEY`
+未設定は6.1章の想定どおり、フォールバックの発動条件の1つです）。
+
+## 5. 動かし方
+
+### 5-1. サーバーを立てて、API として使ってみる
 
 ```sh
-python -m pip install "bitsandbytes>=0.45,<1"
+uvicorn app:app --host 127.0.0.1 --port 8001
 ```
-
-既存の `ai/requirements.txt` はAPI環境用なので、このGemma実験の依存固定には使いません。
-比較条件を実測するまで、Gemma用requirementsファイルも新設しません。
-
-### 実行
-
-モデルディレクトリは人間が選び、リポジトリ外のパスを渡します。
 
 ```sh
-python ai/gemma_benchmark.py \
-  --model-path "/path/to/local-gemma-model" \
-  --output "/path/to/results/gemma_python_benchmark.json"
+curl -X POST http://127.0.0.1:8001/transform \
+  -H "Content-Type: application/json" \
+  -d '{"body": "お約束を破ってしまいました。", "style": "baby"}'
 ```
 
-CUDA 4bitを使う場合は `--device cuda --four-bit` を追加します。CPUを明示する場合は
-`--device cpu`、自動選択は既定の `--device auto` です。
+```json
+{"action": "allow", "transformedText": "おやくそくのかみを破ってしまいたのー。", "reasonCodes": []}
+```
 
-スクリプトは `local_files_only=True` で読み込みます。指定ディレクトリに必要ファイルがなければ停止し、
-ネットワークから自動取得しません。結果JSONにはモデルディレクトリの絶対パスを保存せず、末尾名だけを記録します。
+`http://127.0.0.1:8001/docs`でSwagger UIから対話的に試せます。
 
-## 結果を比較する
+### 5-2. 各ファイルを直接実行して、仕組みを1つずつ確認する
 
-Gemma側でPyTorch結果と比較する例です。
+`ai/src/fallback/`配下と`ai/src/transform.py`は、それぞれ単体で実行すると
+動作確認ができます（`if __name__ == "__main__":`）。`ai/`ディレクトリを
+起点にして、モジュールとして実行してください（相対インポートを解決するため）。
 
 ```sh
-python ai/gemma_benchmark.py \
-  --model-path "/path/to/local-gemma-model" \
-  --output "/path/to/results/gemma_python_benchmark.json" \
-  --compare-with "/path/to/results/pytorch_colab_benchmark.json"
+# 辞書の最長一致置換だけを試す
+python -m src.fallback.dictionary_match
+
+# 赤ちゃん語のフォールバック変換だけを試す
+python -m src.fallback.baby_fallback
+
+# お母さん語のフォールバック変換だけを試す
+python -m src.fallback.mother_fallback
+
+# Gemini→フォールバックを含めた全体を試す（GOOGLE_API_KEY が無くても動く）
+python -m src.transform
 ```
 
-または、PyTorchノートブックの `OTHER_RESULT_PATH` にGemma結果JSONを指定して比較セルを実行します。
+### 5-3. Python のコードから直接関数として呼び出す
 
-結果JSON、モデル重み、学習データ、認証情報はGitへ追加しないでください。
+```python
+from src.transform import transform
 
-## 責務の境界
-
-今回の成果物は2方式の速度実験だけを担当します。次は変更・確定しません。
-
-- モデルの取得元、認証方式、配布先、デプロイ先
-- 常時公開APIや公開トンネル
-- モデレーションや投稿可否判定
-- バックエンド／フロントエンド統合
-- APIのリクエスト・レスポンス契約
-- 本番運用、モデル品質、安全性の保証
-
-## 既存CPU環境テスト
-
-`ai/tests/test_environment.py` は、既存API環境の補助スモークテストとして残します。
-
-```powershell
-$engiiroAiVenv = Join-Path $env:LOCALAPPDATA "engiiro\venvs\ai"
-py -3.11 -m venv $engiiroAiVenv
-& "$engiiroAiVenv\Scripts\Activate.ps1"
-python -m pip install -r ai/requirements.txt
-python -m unittest discover -s ai/tests -p "test_*.py" -v
+result = transform("お約束を破ってしまいました。", "baby")
+print(result)
+# {"action": "allow", "transformedText": "おやくそくのかみを破ってしまいたのー。", "reasonCodes": []}
 ```
 
-これはPyTorch Colab方式とGemma方式の速度比較を代替しません。Dockerも従来の補助手段であり、
-今回の2方式比較の標準実行環境には含めません。
+### 5-4. テストを実行する
 
-## 現時点の検証状態
+```sh
+python -m pytest tests/ -v
+```
 
-ファイル構造、Python構文、ノートブックJSON、共通比較契約はローカルで検証します。
-Colab上の学習と、ローカルGemmaモデルを使った推論は、各実行環境がないため未実測です。
-両方のJSONが揃うまでは勝者を決めません。
+`GOOGLE_API_KEY`を設定しなくても全テストが通ります（Gemini呼び出しは
+`unittest.mock`でモックしています）。
+
+## 6. 環境変数
+
+| 変数名 | 既定値 | 内容 |
+|---|---|---|
+| `GOOGLE_API_KEY` | なし | Gemini APIキー。未設定でもフォールバック経路のみでサーバーは動く |
+| `AI_TRANSFORM_TIMEOUT_SECONDS` | `4.0` | Gemini API呼び出しの待機上限（秒）。超えたらフォールバックへ切り替える |
+
+## 7. 辞書の育て方
+
+`ai/dictionaries/`の各ファイルはJSONです。`_comment`キーに辞書全体の説明を
+書いています（JSON自体にコメント構文が無いため）。
+
+### 7.1 バリエーション辞書（`baby_daily_words.json` / `baby_engineer_words.json`）への追加
+
+これらは`{サブカテゴリ: {大人の言葉: [赤ちゃん語の候補, ...]}}`という2階層の
+形です。新しい語を追加する場合：
+
+1. 当てはまるサブカテゴリ（例：「動物」「トラブル」）を決める。無ければ
+   新しいサブカテゴリを1つ作る（サブカテゴリはファイルを読みやすくする
+   ためだけのグルーピングで、変換ロジックには影響しない）
+2. **具体と抽象の関係**：ある語の下位に具体的な種類・品種があるなら
+   （例：「馬」の下位に「駿馬」「サラブレッド」等）、新しい赤ちゃん語を
+   作らず、既存の値へ大人の言葉（キー）だけを追加する（例：`"サラブレッド":
+   ["んま", "おんま", "ぱかぱか"]`。「馬」と同じ配列にする）。ただし多義語
+   （将棋の「駒」等、文脈次第で別の意味になる語）は、誤変換のリスクが高い
+   場合は追加を見送る
+4. `{大人の言葉: [候補, ...]}`の形で追加する。**意味が変わらないか**
+   （例：「セダン」は車だが「サーバー」は車ではない）、**技術用語・製品名・
+   数値をひらがな化していないか**（「React.js」「index.ts」等はどの辞書にも
+   入れない）を確認する
+5. 候補が1つしか無くても配列で書く（`["まんま"]`）。将来バリエーションが
+   増えたときに配列のまま追記できるようにするため
+6. 同じ大人の言葉を複数のサブカテゴリへ重複登録しない。`baby_daily_words.json`
+   と`baby_engineer_words.json`の間でもキーを重複させない（`baby_fallback.py`は
+   この2つを統合してから最長一致させるため。`DictionaryConsistencyTest`で
+   重複が無いことをテストしている）
+7. 動詞を追加する場合、活用形（食べた／食べます等）は変換されない
+   （2.3章の既知の制限）。基本形1つだけを登録すれば十分
+8. 数が多い場合は`ai/tests/test_fallback_transform.py`へ代表的な数件だけ
+   回帰テストを足せば十分（全語をテストする必要はない）
+
+どんな語が実際に使われているか分からない場合は、Web検索で実在するメニュー名・
+車種名・IT用語などを調べてから追加してください。**思いつきで作った語より、
+実在する語彙のほうが変換の網羅率が上がります。**
+
+### 7.2 部品辞書（`baby_engineer_word_parts.json`）への追加
+
+`{語: [候補, ...]}`という1階層の形です。「仕様書」を丸ごと1語で登録する
+代わりに、「仕様」＋「書」のように部品ごとに登録することで、辞書に無い
+似た構造の複合語（例：「規約書」「手順書」）にも自動的に対応させたい場合に
+使います。追加する前に、必ず次の2点を確認してください（`docs/ai_transform_design.md`
+6.4.1章に詳しい理由がある）。
+
+1. **単語自体の変換結果が、`baby_daily_words.json`・`baby_engineer_words.json`
+   に登録済みの同じ語の変換結果と重複・矛盾しないか。** 重複すると「規約書」が
+   「おやくそくのかみのかみ」のように二重変換される
+2. **`baby_daily_words.json`・`baby_engineer_words.json`のどのキーの一部としても
+   出現しないか。** 出現すると、その複合語が`token_match.py`の処理で先に
+   壊されてから複合語辞書に届き、変換に失敗する（例：「手」（体の部位）と
+   衝突する「手順」は部品化せず、「手順書」のまま`baby_engineer_words.json`に
+   残している）
+
+条件を満たさない場合は、部品化せず複合語のまま`baby_engineer_words.json`へ
+追加してください。
+
+### 7.3 NGワード置換辞書（`harsh_word_softeners.json`）への追加
+
+こちらは1対1（`{語: 置換後の語}`）です。`block`にする語（`ai/moderation_rules.py`
+の`NG_WORDS_BLOCK`・`SELF_HARM_WORDS`）とは別物なので、追加する前に
+「文脈次第では技術的な指摘としても使われる語か」「自傷・他害・差別・個人情報の
+ように文脈によらず投稿させるべきでない語か」を見極めてください（後者は
+`harsh_word_softeners.json`ではなく`ai/moderation_rules.py`側に追加する）。
+
+## 8. 責務の境界
+
+このREADMEが説明する範囲は、`/transform`（Gemini + フォールバック変換）と
+`/evaluate`・投稿可否モデレーションとの関係だけです。次は本READMEの対象外です。
+
+- 投稿可否のモデレーションそのもの（`ai/moderation_rules.py`の中身）
+- 文章の年齢評価（`ai/src/evaluate.py`、Issue #36）
+- 文体の点数化・学習データに基づく分類（`naive-bayes-sample`のような別の
+  取り組みで扱う想定）
+- バックエンド（`backend/`）・フロントエンド（`frontend/`）との実際の接続

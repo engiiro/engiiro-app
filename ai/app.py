@@ -39,7 +39,11 @@ class TransformRequest(BaseModel):
 
 
 class TransformResponse(BaseModel):
-    transformedText: str
+    # docs/design_doc.md 7章の確定仕様（2026-08-27、action は allow/block の
+    # 2値に統一）に合わせる。ai/src/transform.py の TransformResult と同じ形。
+    action: str  # "allow" | "block"
+    transformedText: str | None
+    reasonCodes: list[str]
 
 
 @app.get("/health")
@@ -56,5 +60,5 @@ def post_evaluate(req: EvaluateRequest):
 
 @app.post("/transform", response_model=TransformResponse)
 def post_transform(req: TransformRequest):
-    transformed_text = transform(req.body, req.style)
-    return TransformResponse(transformedText=transformed_text)
+    result = transform(req.body, req.style)
+    return TransformResponse(**result)
