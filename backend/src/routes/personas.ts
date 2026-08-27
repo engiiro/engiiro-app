@@ -24,18 +24,29 @@ export async function handleGetBabyPersona(
   const persona = personaResult.rows[0];
   if (!persona) return error("見つかりませんでした。", 404);
 
-  const postsResult = await query<IdRow>(
-    `select id from posts
-     where baby_persona_id = $1 and deleted_at is null
-     order by created_at desc`,
-    [id],
-  );
+  // babyAllタブ（人間の指示、2026-08-25）は「赤ちゃんとしてのバブルとあやすの両方」を
+  // 含むため、投稿だけでなく赤ちゃんペルソナとして書いたあやすのidも合わせて返す。
+  const [postsResult, commentsResult] = await Promise.all([
+    query<IdRow>(
+      `select id from posts
+       where baby_persona_id = $1 and deleted_at is null
+       order by created_at desc`,
+      [id],
+    ),
+    query<IdRow>(
+      `select id from comments
+       where baby_persona_id = $1 and deleted_at is null
+       order by created_at desc`,
+      [id],
+    ),
+  ]);
 
   return json({
     id: persona.id,
     nickname: persona.nickname,
     bio: persona.bio,
     postIds: postsResult.rows.map((r: IdRow) => r.id),
+    commentIds: commentsResult.rows.map((r: IdRow) => r.id),
   });
 }
 
