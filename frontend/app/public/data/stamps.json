@@ -1,10 +1,17 @@
 [
-  { "id": "nemui", "name": "ねむい" },
-  { "id": "ogya", "name": "おぎゃー" },
-  { "id": "bottle", "name": "ほにゅうびん" },
-  { "id": "pacifier", "name": "おしゃぶり" },
-  { "id": "heart", "name": "すき" },
-  { "id": "star", "name": "きらきら" },
-  { "id": "cloud", "name": "もやもや" },
-  { "id": "drop", "name": "ぽろり" }
+  { "id": "naku", "name": "ないちゃう", "shelf": "weak", "imageUrl": "/images/stamps/naku.png" },
+  { "id": "akubi", "name": "あくび", "shelf": "weak", "imageUrl": "/images/stamps/akubi.png" },
+  { "id": "hoshii", "name": "ほしい", "shelf": "weak", "imageUrl": "/images/stamps/hoshii.png" },
+
+  { "id": "banzai", "name": "ばんざい", "shelf": "glad", "imageUrl": "/images/stamps/banzai.png" },
+  { "id": "niko", "name": "にこにこ", "shelf": "glad", "imageUrl": "/images/stamps/niko.png" },
+  { "id": "suki", "name": "すき", "shelf": "glad", "imageUrl": "/images/stamps/suki.png" },
+
+  { "id": "wakaru", "name": "わかる", "shelf": "soothe", "imageUrl": "/images/stamps/wakaru.png" },
+  { "id": "ganbare", "name": "がんばれ", "shelf": "soothe", "imageUrl": "/images/stamps/ganbare.png" },
+  { "id": "arigato", "name": "ありがとう", "shelf": "soothe", "imageUrl": "/images/stamps/arigato.png" },
+
+  { "id": "ryokai", "name": "りょうかい", "shelf": "reply", "imageUrl": "/images/stamps/ryokai.png" },
+  { "id": "bikkuri", "name": "びっくり", "shelf": "reply", "imageUrl": "/images/stamps/bikkuri.png" },
+  { "id": "gomen", "name": "ごめんね", "shelf": "reply", "imageUrl": "/images/stamps/gomen.png" }
 ]

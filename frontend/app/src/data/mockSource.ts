@@ -1,4 +1,4 @@
-import type { Me, PublicPersona, ReactionState } from "./types";
+import type { Me, PublicPersona, ReactionState, Stamp } from "./types";
 
 /*
  * モックデータの読み込み（PO の指示、2026-08-26 / Issue #30）。
@@ -48,7 +48,7 @@ export type MockSource = {
   readonly me: MeSeed;
   readonly bubbles: readonly BubbleSeed[];
   readonly soothes: readonly SootheSeed[];
-  readonly stamps: readonly { readonly id: string; readonly name: string }[];
+  readonly stamps: readonly Stamp[];
   /** 大好きにしているペルソナの id。フォロー**されている**側は持たない（OUT-004） */
   readonly following: readonly string[];
 };
@@ -71,7 +71,7 @@ export async function loadMockSource(): Promise<MockSource> {
     load<MeSeed>("profile-me.json"),
     load<readonly BubbleSeed[]>("bubbles.json"),
     load<readonly SootheSeed[]>("soothes.json"),
-    load<readonly { readonly id: string; readonly name: string }[]>("stamps.json"),
+    load<readonly Stamp[]>("stamps.json"),
     load<readonly string[]>("follows-me.json"),
   ]);
   return { personas, me, bubbles, soothes, stamps, following };

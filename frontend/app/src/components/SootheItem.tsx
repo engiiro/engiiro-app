@@ -1,6 +1,7 @@
 import { reactionTargetOfSoothe } from "../data/reactions";
 import type { ReactionType, Soothe } from "../data/types";
 import { cx } from "../lib/cx";
+import { sootheCountText } from "../lib/sootheCountText";
 import { BubbleBody } from "./BubbleBody";
 import { PersonaChip } from "./PersonaChip";
 import { ReactionRow } from "./ReactionRow";
@@ -24,7 +25,6 @@ import "./SootheItem.css";
 
 type SootheItemProps = {
   readonly soothe: Soothe;
-  readonly replyToNickname?: string;
   /** ニックネームから S6 公開プロフィールへ */
   readonly onOpenProfile: (personaId: string) => void;
   readonly onReact: (sootheId: string, reaction: ReactionType) => void;
@@ -35,7 +35,6 @@ type SootheItemProps = {
 
 export function SootheItem({
   soothe,
-  replyToNickname,
   onOpenProfile,
   onReact,
   onReply,
@@ -52,17 +51,11 @@ export function SootheItem({
         />
       </div>
 
-      {replyToNickname ? (
-        <p className={cx("eg-soothe__quote", "t-caption")}>{replyToNickname} へ</p>
-      ) : null}
-
       {/* 1件のなかで focus できる主役はこの1つ。中身は phrasing content だけにしてある */}
       <button type="button" className="eg-soothe__open" onClick={() => onOpen(soothe)}>
         <BubbleBody body={soothe.body} className="eg-soothe__body" as="span" />
         <span className={cx("eg-soothe__count", "t-caption")}>
-          {soothe.replyCount > 0
-            ? "あやす " + String(soothe.replyCount)
-            : "まだ あやされてない"}
+          {sootheCountText(soothe.replyCount)}
         </span>
       </button>
 

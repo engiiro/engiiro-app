@@ -5,7 +5,7 @@ import type { SootheTarget } from "../lib/soothePersonaRule";
 import { BottomAction, BottomActionNote } from "../components/BottomAction";
 import { BubbleBody } from "../components/BubbleBody";
 import { Button } from "../components/Button";
-import { EmptyState } from "../components/EmptyState";
+import { NoSootheState } from "../components/EmptyState";
 import { IconSoothe } from "../components/icons";
 import { PersonaChip } from "../components/PersonaChip";
 import { ReactionRow } from "../components/ReactionRow";
@@ -120,9 +120,7 @@ export function SootheDetailScreen({
           </h2>
 
           {replies.length === 0 ? (
-            <EmptyState
-              lines={["まだ だれも あやしていません。", "さいしょの ひとりに なってみる？"]}
-            />
+            <NoSootheState />
           ) : (
             <ul className="eg-soothe-detail__list">
               {replies.map((reply) => (

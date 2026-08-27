@@ -5,8 +5,8 @@ import { cx } from "../lib/cx";
 import type { SootheTarget } from "../lib/soothePersonaRule";
 import { BottomAction } from "../components/BottomAction";
 import { Button } from "../components/Button";
-import { ConfirmDialog } from "../components/ConfirmDialog";
-import { EmptyState } from "../components/EmptyState";
+import { BubbleDeleteConfirm } from "../components/ConfirmDialog";
+import { NoSootheState } from "../components/EmptyState";
 import { IconSoothe, IconTrash } from "../components/icons";
 import { BubbleBody } from "../components/BubbleBody";
 import { PersonaChip } from "../components/PersonaChip";
@@ -115,9 +115,7 @@ export function BubbleDetailScreen({
           </h2>
 
           {soothes.length === 0 ? (
-            <EmptyState
-              lines={["まだ だれも あやしていません。", "さいしょの ひとりに なってみる？"]}
-            />
+            <NoSootheState />
           ) : (
             <ul className="eg-detail__soothe-list">
               {soothes.map((soothe) => (
@@ -164,11 +162,7 @@ export function BubbleDetailScreen({
       </BottomAction>
 
       {confirming ? (
-        <ConfirmDialog
-          title="このバブル、消しちゃう？"
-          body="元には戻せないよ。あやしてくれた ことばも いっしょに 消えます。"
-          confirmLabel="けす"
-          cancelLabel="やめる"
+        <BubbleDeleteConfirm
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setConfirming(false);

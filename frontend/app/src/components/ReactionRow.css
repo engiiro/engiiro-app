@@ -15,7 +15,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xxs);
+  justify-content: center;
   /* 高さは縦 padding と .eg-touch の min-height で 44px を確保する（DESIGN.md §8.2） */
   padding: var(--space-xs) var(--space-sm);
   border: var(--border-width) solid var(--hairline);
@@ -24,7 +24,17 @@
    * そっと触れる反応なので、角のある操作ボタンと形で分ける。
    */
   border-radius: var(--rounded-pill);
-  background: var(--surface);
+  /*
+   * 水面より上の地（--react-face）。押した回数ぶん、ほんの少しだけ濃くする。
+   *
+   * ★ 濃さの主役は水位（.eg-reaction__flood）のほう。ここは薄いまま止める。
+   *   ここを中間の濁った色（臙脂と surface の半々）まで濃くすると、
+   *   上に乗る accent-line も on-accent も 4.5:1 を割る。中間色の上に文字を置かない。
+   */
+  --react-face: var(--surface);
+  --react-level: 0;
+  --react-veil: 0%;
+  background: var(--react-face);
   color: var(--muted);
   transition:
     background-color var(--duration-quick) var(--ease-smooth-out),
@@ -44,7 +54,7 @@
  */
 .eg-reaction:not(:disabled):hover {
   border-color: var(--accent-line);
-  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--react-face));
   color: var(--body);
 }
 
@@ -54,8 +64,8 @@
 
 /* 1回でも押していたら活性。色と文字の太さで二重化する（DESIGN.md §2.5） */
 .eg-reaction.is-mine {
+  --react-face: color-mix(in srgb, var(--accent-fill) var(--react-veil), var(--accent-soft));
   border-color: var(--accent-line);
-  background: var(--accent-soft);
   color: var(--accent-line);
 }
 
@@ -63,13 +73,12 @@
   font-weight: 700;
 }
 
-/* 押下済みは地が accent-soft なので、混ぜる先もそちらに合わせる */
+/* 押下済みの hover は地だけを持ち上げる。文字は活性の色を保つ */
 .eg-reaction.is-mine:not(:disabled):hover {
-  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--accent-soft));
   color: var(--accent-line);
 }
 
-/* 5回ぜんぶ押した状態。これ以上は押せない */
+/* 5回ぜんぶ押した状態。これ以上は押せない。地は満タンの水位が塗っている */
 .eg-reaction.is-maxed {
   cursor: default;
   border-color: var(--accent-fill);
@@ -84,40 +93,67 @@
   text-align: right;
 }
 
-/* ── 5回ぶんの点メーター ───────────────────────────────────────── */
+/* ── 水位（5つの点メーターの置きかえ。人間の指示 2026-08-27） ───────────────
+ *
+ * 押した回数ぶん、下から地が満ちる。1回ごとに 20%、5回で満タン。
+ *
+ * ★ 文字を濁った中間色の上に置かないための2枚重ね。
+ *   .eg-reaction__face  … 水面より上。薄い地の上の accent-line
+ *   .eg-reaction__flood … 水面より下。accent-fill べた塗りの上の on-accent
+ *   同じ中身を重ねて、下の面を水位ぶんだけ clip-path で切って見せる。
+ *   こうすると、水面がラベルの途中を横切っても、文字のどの部分も
+ *   自分が乗っている面に対して 4.5:1 を保てる。
+ *
+ * ★ 高さ（形）で回数を伝えるので、色だけに意味を持たせていない（DESIGN.md §2.5）。
+ *
+ * ★ 数（--react-level）は CSS 側で持ち、TSX からは data-mine を渡すだけにする。
+ *   演出の強さ（data-step）と同じ渡し方に揃えている。
+ */
 
-.eg-reaction__meter {
+.eg-reaction__face,
+.eg-reaction__flood {
   display: inline-flex;
   align-items: center;
-  gap: calc(var(--space-xxs) / 2);
-  flex: none;
+  gap: var(--space-xxs);
 }
 
-/*
- * 残りの点は「輪」、押した点は「塗り」。
- * 4px の点では色の違いが読めないので、形で分ける（DESIGN.md §2.5 の二重化）。
- */
-.eg-dot {
-  box-sizing: border-box;
-  width: var(--space-xxs);
-  height: var(--space-xxs);
-  border-radius: var(--rounded-pill);
-  background: transparent;
-  box-shadow: inset 0 0 0 var(--border-width) var(--muted);
-  transition:
-    background-color var(--duration-quick) var(--ease-smooth-out),
-    box-shadow var(--duration-quick) var(--ease-smooth-out),
-    transform var(--duration-quick) var(--ease-bounce);
+.eg-reaction__flood {
+  position: absolute;
+  inset: 0;
+  /* ボタン自身の padding をそのまま受ける。--compact でも自動で揃う */
+  padding: inherit;
+  justify-content: center;
+  border-radius: inherit;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 700;
+  clip-path: inset(calc(100% - var(--react-level) * 20%) 0 0 0);
+  transition: clip-path var(--duration-fast) var(--ease-smooth-out);
+  pointer-events: none;
 }
 
-.eg-dot.is-on {
-  background: var(--accent-line);
-  box-shadow: inset 0 0 0 var(--border-width) var(--accent-line);
+.eg-reaction[data-mine="1"] {
+  --react-level: 1;
 }
 
-/* 灯った瞬間だけ点が跳ねる */
-.eg-reaction[data-step] .eg-dot.is-on:last-of-type {
-  transform: scale(1.4);
+.eg-reaction[data-mine="2"] {
+  --react-level: 2;
+  --react-veil: 5%;
+}
+
+.eg-reaction[data-mine="3"] {
+  --react-level: 3;
+  --react-veil: 9%;
+}
+
+.eg-reaction[data-mine="4"] {
+  --react-level: 4;
+  --react-veil: 12%;
+}
+
+.eg-reaction[data-mine="5"] {
+  --react-level: 5;
+  --react-veil: 12%;
 }
 
 /* ── 押した瞬間の演出。回数が増えるほど強くする ───────────────── */
@@ -151,15 +187,45 @@
   animation: eg-number-pop-in var(--duration-quick) var(--ease-smooth-out);
 }
 
-/* 5回目に一度だけ広がる波紋 */
+/*
+ * 満タンの合図（人間の指示 2026-08-27「5回押すと気持ちよさのある演出」）。
+ *
+ * 4つを同時に出す。輪が2重・粒子が最大数・粒が5つ立ちのぼる・アイコンが跳ねる。
+ *
+ * ★ 全部この場（押した瞬間）から始める。以前はサーバの返事を待って回数が確定していたので、
+ *   合図が出るのが遅れ、pop の終わりに巻き込まれて一瞬しか見えなかった
+ *   （人間の指摘 2026-08-27）。回数は押した時点で決まる（ReactionRow.tsx の popping）。
+ * ★ 終わりは animationend では決めない。いちばん早く終わった animation が
+ *   data-step を外すと、残りが途中で切れる。
+ */
+.eg-reaction[data-step="5"]::before,
 .eg-reaction[data-step="5"]::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   border: var(--border-width) solid var(--accent-line);
-  animation: eg-ring-out var(--duration-very-slow) var(--ease-smooth-out);
+  /*
+   * 素の状態は透明。2波目は遅らせて出すので、待っているあいだに
+   * 枠がそのまま見えていると、輪ではなく「太い枠」に見える。
+   */
+  opacity: 0;
   pointer-events: none;
+}
+
+.eg-reaction[data-step="5"]::after {
+  animation: eg-ring-out var(--duration-very-slow) var(--ease-smooth-out);
+}
+
+/* 2波目。少し遅らせて、ひろがりを重ねる */
+.eg-reaction[data-step="5"]::before {
+  animation: eg-ring-out var(--duration-very-slow) var(--ease-smooth-out)
+    calc(var(--duration-stagger) * 3);
+}
+
+/* 水面の上と下、2枚のアイコンが同じだけ跳ねる */
+.eg-reaction[data-step="5"] .eg-reaction__icon {
+  animation: eg-reaction-cheer var(--duration-slow) var(--ease-bounce);
 }
 
 /* ── 粒子 ─────────────────────────────────────────────────────── */
@@ -213,6 +279,80 @@
 .eg-burst span:nth-child(15) { --burst-x: calc(var(--distance-medium) * -0.6); --burst-y: calc(var(--distance-medium) * 1.6); }
 .eg-burst span:nth-child(16) { --burst-x: calc(var(--distance-medium) * 0.6);  --burst-y: calc(var(--distance-medium) * 1.6); }
 
+/* ── 満タンで立ちのぼる粒 ─────────────────────────────────────── */
+
+.eg-reaction__spark {
+  position: absolute;
+  /* ボタンの上辺。ここから上へ抜ける */
+  inset: 0 0 auto;
+  height: 0;
+  pointer-events: none;
+}
+
+.eg-reaction__spark span {
+  position: absolute;
+  bottom: 0;
+  width: var(--space-xs);
+  height: var(--space-xs);
+  border-radius: var(--rounded-pill);
+  /* 枠だけの粒。「バブる」の立ちのぼるバブルと同じ作り（DESIGN.md §7.3） */
+  border: var(--border-width) solid var(--accent-line);
+  /* 上がる高さ。真ん中ほど高く上げる。reduced motion では 0 に潰れる */
+  --spark-rise: calc(var(--distance-medium) * -2);
+  opacity: 0;
+}
+
+/* 5つを横に配る。両端は低く、真ん中は高く */
+.eg-reaction__spark span:nth-child(1) {
+  left: 14%;
+}
+
+.eg-reaction__spark span:nth-child(2) {
+  left: 32%;
+  --spark-rise: calc(var(--distance-medium) * -2.6);
+}
+
+.eg-reaction__spark span:nth-child(3) {
+  left: 50%;
+  --spark-rise: calc(var(--distance-medium) * -3.2);
+}
+
+.eg-reaction__spark span:nth-child(4) {
+  left: 68%;
+  --spark-rise: calc(var(--distance-medium) * -2.6);
+}
+
+.eg-reaction__spark span:nth-child(5) {
+  left: 86%;
+}
+
+/*
+ * ずらして上げる（人間の指摘 2026-08-27「5回目の演出が一瞬すぎて見えない」）。
+ *
+ * 1粒ずつ 40ms ずらす。ずらしの合計は 160ms で、300ms 未満に収める（DESIGN.md §7.2）。
+ * 最後の粒が消えるまで 500 + 160 = 660ms。pop より長いが、
+ * 演出を外す合図は animationend ではなくサーバの返事なので、途中で切れない。
+ */
+.eg-reaction[data-step="5"] .eg-reaction__spark span {
+  animation: eg-reaction-rise var(--duration-very-slow) var(--ease-smooth-out);
+}
+
+.eg-reaction[data-step="5"] .eg-reaction__spark span:nth-child(2) {
+  animation-delay: var(--duration-stagger);
+}
+
+.eg-reaction[data-step="5"] .eg-reaction__spark span:nth-child(3) {
+  animation-delay: calc(var(--duration-stagger) * 2);
+}
+
+.eg-reaction[data-step="5"] .eg-reaction__spark span:nth-child(4) {
+  animation-delay: calc(var(--duration-stagger) * 3);
+}
+
+.eg-reaction[data-step="5"] .eg-reaction__spark span:nth-child(5) {
+  animation-delay: calc(var(--duration-stagger) * 4);
+}
+
 /* 自分のものに付いたリアクション。押せる形にしない */
 .eg-reaction--readonly {
   background: var(--card);
@@ -223,4 +363,16 @@
 .eg-reactions__none {
   color: var(--muted);
   text-align: right;
+}
+
+/*
+ * 水位が上がる動きそのものは「移動」なので、reduced motion では即座に切り替える
+ * （DESIGN.md §7.5：消すのではなく、前庭系に触らない等価物に置き換える）。
+ * 水位は残す。回数を伝えているのは水位の高さなので、これは動きではなく情報。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .eg-reaction,
+  .eg-reaction__flood {
+    transition: none;
+  }
 }

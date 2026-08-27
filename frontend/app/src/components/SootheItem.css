@@ -41,15 +41,6 @@
   z-index: 1;
 }
 
-.eg-soothe__quote {
-  position: relative;
-  z-index: 1;
-  margin-top: var(--space-xs);
-  padding-left: var(--space-xs);
-  border-left: var(--border-width) solid var(--hairline);
-  color: var(--muted);
-}
-
 /* 本文＝あやす詳細を開くボタン。当たり判定は1件の全面（人間の指示、2026-08-26） */
 .eg-soothe__open {
   display: block;

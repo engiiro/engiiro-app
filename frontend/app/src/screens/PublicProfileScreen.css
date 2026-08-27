@@ -8,19 +8,3 @@
   padding-bottom: var(--space-xl);
 }
 
-.eg-pubprofile__panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.eg-pubprofile__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.eg-pubprofile__more {
-  display: flex;
-  justify-content: center;
-}

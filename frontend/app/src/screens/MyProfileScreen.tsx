@@ -9,10 +9,10 @@ import type {
 } from "../data/types";
 import { birthdayText } from "../lib/birthday";
 import { cx } from "../lib/cx";
-import { ActivityItem } from "../components/ActivityItem";
+import { personaStatusCaption } from "../lib/personaStatusText";
+import { ActivityPanel } from "../components/ActivityPanel";
 import { Button } from "../components/Button";
-import { ConfirmDialog } from "../components/ConfirmDialog";
-import { EmptyState } from "../components/EmptyState";
+import { BubbleDeleteConfirm } from "../components/ConfirmDialog";
 import { NoteBox } from "../components/NoteBox";
 import { PersonaSummaryCard } from "../components/PersonaSummaryCard";
 import { RowLink } from "../components/RowLink";
@@ -61,9 +61,6 @@ const EMPTY_LINES: Readonly<Record<ActivityTab, readonly string[]>> = {
   motherSoothes: ["お母さんとして あやした ことばは まだ ありません。"],
 };
 
-/** 一度に見せる件数。押すたびにこの数ずつ増える */
-const PAGE_SIZE = 5;
-
 type MyProfileScreenProps = {
   readonly profile: MyProfile | null;
   readonly activity: readonly ActivityEntry[];
@@ -92,12 +89,7 @@ export function MyProfileScreen({
   onOpenFollowing,
   onCompose,
 }: MyProfileScreenProps) {
-  const [visible, setVisible] = useState(PAGE_SIZE);
   const [deleting, setDeleting] = useState<string | null>(null);
-
-  const shown = activity.slice(0, visible);
-  const hasMore = activity.length > shown.length;
-  const isEmpty = !activityLoading && activity.length === 0;
 
   return (
     <>
@@ -116,12 +108,20 @@ export function MyProfileScreen({
             <div className="eg-myprofile__personas">
               <PersonaSummaryCard
                 persona={profile.baby.persona}
-                caption={babyCaption(profile.baby)}
+                caption={personaStatusCaption(
+                  profile.baby.status,
+                  "baby",
+                  "バブルを かくと はかれます",
+                )}
                 note={axisNote(profile.baby)}
               />
               <PersonaSummaryCard
                 persona={profile.mother.persona}
-                caption={motherCaption(profile.mother)}
+                caption={personaStatusCaption(
+                  profile.mother.status,
+                  "mother",
+                  "あやすと はかれます",
+                )}
                 note={axisNote(profile.mother)}
               />
             </div>
@@ -162,66 +162,33 @@ export function MyProfileScreen({
           <SegmentedTabs
             tabs={TABS}
             current={tab}
-            onChange={(next) => {
-              onTabChange(next);
-              setVisible(PAGE_SIZE);
-            }}
+            onChange={onTabChange}
             panelId="eg-myprofile-list"
             label="表示する記録の切り替え"
           />
         </div>
 
-        <div
-          id="eg-myprofile-list"
-          role="tabpanel"
-          aria-labelledby={"eg-myprofile-list-tab-" + tab}
-          className="eg-myprofile__panel"
-        >
-          {activityLoading ? <SkeletonFeed count={2} /> : null}
-
-          {isEmpty ? (
-            <EmptyState
-              lines={EMPTY_LINES[tab]}
-              action={
-                tab === "motherSoothes" ? undefined : (
-                  <Button onClick={onCompose}>バブルを かく</Button>
-                )
-              }
-            />
-          ) : null}
-
-          {!activityLoading && !isEmpty ? (
-            <>
-              <ul className="eg-myprofile__list">
-                {shown.map((item) => (
-                  <ActivityItem
-                    key={item.kind === "bubble" ? item.bubble.id : item.soothe.id}
-                    item={item}
-                    onOpenBubble={onOpenBubble}
-                    onOpenSoothe={onOpenSoothe}
-                    onDelete={item.kind === "bubble" ? setDeleting : undefined}
-                  />
-                ))}
-              </ul>
-              {hasMore ? (
-                <div className="eg-myprofile__more">
-                  <Button variant="quiet" onClick={() => setVisible(visible + PAGE_SIZE)}>
-                    さらに よみこむ
-                  </Button>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </div>
+        <ActivityPanel
+          panelId="eg-myprofile-list"
+          tab={tab}
+          items={activity}
+          loading={activityLoading}
+          emptyLines={EMPTY_LINES[tab]}
+          /* お母さんの一覧に「バブルを かく」は出さない。お母さんは投稿できない（FR-POST-003） */
+          emptyAction={
+            tab === "motherSoothes" ? undefined : (
+              <Button onClick={onCompose}>バブルを かく</Button>
+            )
+          }
+          onOpenBubble={onOpenBubble}
+          onOpenSoothe={onOpenSoothe}
+          onDelete={setDeleting}
+        />
       </div>
 
       {/* 削除は不可逆なので確認を出す（DESIGN.md §4 バブルの削除、FR-POST-006） */}
       {deleting === null ? null : (
-        <ConfirmDialog
-          title="このバブル、消しちゃう？"
-          body="元には戻せないよ。あやしてくれた ことばも いっしょに 消えます。"
-          confirmLabel="けす"
-          cancelLabel="やめる"
+        <BubbleDeleteConfirm
           onCancel={() => setDeleting(null)}
           onConfirm={() => {
             const target = deleting;
@@ -232,29 +199,6 @@ export function MyProfileScreen({
       )}
     </>
   );
-}
-
-/** 赤ちゃん側：「推定 1歳2か月」（FR-PROFILE-001。文章そのものの幼さ） */
-function babyCaption(entry: MyProfileEntry): string {
-  if (entry.status === null) {
-    return "いま はかれません";
-  }
-  if (entry.status.sampleCount === 0) {
-    return "バブルを かくと はかれます";
-  }
-  return "推定 " + entry.status.label;
-}
-
-/** お母さん側：「推定 1歳児を あやし中」（FR-PROFILE-002。向けている相手の年齢） */
-function motherCaption(entry: MyProfileEntry): string {
-  if (entry.status === null) {
-    return "いま はかれません";
-  }
-  if (entry.status.sampleCount === 0) {
-    return "あやすと はかれます";
-  }
-  const years = Math.floor(entry.status.months / 12);
-  return "推定 " + String(years) + "歳児を あやし中";
 }
 
 /**

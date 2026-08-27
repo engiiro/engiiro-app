@@ -347,9 +347,47 @@
   color: var(--muted);
 }
 
+/*
+ * スタンプの見え方（人間の指示 2026-08-28）。
+ *
+ * 入力欄と同じ幅の箱に、出したあとの本文を出す。
+ * バブルカードの吹き出しには寄せない。ここは「確認」であって、投稿されたものではない。
+ * 枠を破線にして、これがまだ下書きだと形でも分かるようにする。
+ */
+.eg-compose__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin-top: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--border-width) dashed var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.eg-compose__preview-label {
+  color: var(--muted);
+}
+
+.eg-compose__preview-body {
+  color: var(--ink);
+}
+
+/* スタンプ一覧：棚のタブ ─ 絵の並び ─ 使い方の一行（人間の指示 2026-08-27 / 28） */
+
+.eg-stamps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
 .eg-stamp-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  /*
+   * 絵（52px）＋名前が収まる幅。細い引き出しでも2列は残る。
+   * 棚で絞ってあるので、1つの棚は3個ずつしか並ばない。
+   */
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
   gap: var(--space-xs);
 }
 
@@ -357,24 +395,51 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--space-xxs);
-  padding: var(--space-xs);
+  padding: var(--space-xs) var(--space-xxs);
   border: var(--border-width) solid var(--hairline);
-  border-radius: var(--rounded-md);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--muted);
   transition:
     border-color var(--duration-quick) var(--ease-smooth-out),
-    background-color var(--duration-quick) var(--ease-smooth-out);
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-micro) var(--ease-smooth-out);
 }
 
-.eg-stamp-pick:hover {
+/* 自分の面を持つので、自分の面色に ink を混ぜて1段持ち上げる（base.css の --hover-veil） */
+.eg-stamp-pick:not(:disabled):hover {
   border-color: var(--accent-line);
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
+  color: var(--body);
 }
 
-.eg-stamp-pick:active {
+.eg-stamp-pick:not(:disabled):active {
   transform: scale(var(--press-scale-strong));
+}
+
+/* 上限に届いて押せないとき。押せないことを枠の形でも示す */
+.eg-stamp-pick:disabled {
+  border-style: dashed;
+  cursor: default;
+}
+
+.eg-stamp-pick__name {
+  /* 「ほにゅうびん」で折り返しても、名前の行で高さが揃うようにする */
+  text-align: center;
+  line-height: 1.3;
+}
+
+.eg-stamps__hint {
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-stamp-pick {
+    transition: none;
+  }
 }
 
 /* 赤ちゃん度・お母さん度（DESIGN.md §4 Meter） */

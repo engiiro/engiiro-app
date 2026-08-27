@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createBubble, createSoothe } from "../data/api";
-import { isOverLimit } from "../data/constants";
+import { BUBBLE_MAX_LENGTH, containsStamp, countChars, isOverLimit } from "../data/constants";
 import { BLOCK_DEMO_INPUT, REWRITE_DEMO_INPUT } from "../data/moderationSamples";
-import { STAMP_CATALOG } from "../data/stampCatalog";
+import { stampGroups } from "../data/stampCatalog";
 import type { Me, PersonaKind } from "../data/types";
 import { cx } from "../lib/cx";
 import { AiUnavailableError, mockAiTransform } from "../lib/mockAiTransform";
@@ -16,7 +16,8 @@ import type { AiPanelState } from "../components/AiTransformPanel";
 import { Button } from "../components/Button";
 import { CharCounter } from "../components/CharCounter";
 import { Illustration } from "../components/Illustration";
-import { StampGlyph } from "../components/BubbleBody";
+import { SegmentedTabs } from "../components/SegmentedTabs";
+import { BubbleBody, StampGlyph } from "../components/BubbleBody";
 import {
   IconClose,
   IconGauge,
@@ -82,6 +83,8 @@ export function ComposePanel({
   const [persona, setPersona] = useState<PersonaKind>("baby");
   const [body, setBody] = useState("");
   const [drawer, setDrawer] = useState<DrawerKind>("none");
+  /* いま開いているスタンプの棚（気持ち）。空なら先頭の棚に落ちる */
+  const [stampEmotion, setStampEmotion] = useState("");
   const [ai, setAi] = useState<AiPanelState>({ kind: "idle" });
   const [evaluation, setEvaluation] = useState<AiEvaluateResult | null>(null);
   const [evaluating, setEvaluating] = useState(false);
@@ -160,6 +163,32 @@ export function ComposePanel({
     setEvaluation(null);
     setEvaluateFailed(false);
     setGateRejected(false);
+  }
+
+  /*
+   * スタンプを本文に挟む。
+   *
+   * ★ 末尾ではなく、いまカーソルがある位置に入れる。選択している範囲があれば
+   *   置きかえる（textarea のふつうの作法に合わせる）。書いている途中で挟めないと、
+   *   一度書いた文を消して並べ直すことになる。
+   * ★ 入れたあとのカーソルはスタンプの直後。そのまま書き続けられる。
+   *   本文欄は制御された入力なので、DOM に値が入るのを1フレーム待ってから戻す。
+   */
+  function insertStamp(id: string) {
+    const marker = ":" + id + ":";
+    const field = textareaRef.current;
+    if (!field) {
+      changeBody(body + marker);
+      return;
+    }
+    const start = field.selectionStart;
+    const end = field.selectionEnd;
+    changeBody(body.slice(0, start) + marker + body.slice(end));
+    const caret = start + marker.length;
+    requestAnimationFrame(() => {
+      field.focus();
+      field.setSelectionRange(caret, caret);
+    });
   }
 
   function toggleDrawer(next: DrawerKind) {
@@ -338,6 +367,21 @@ export function ComposePanel({
         {/* あやすの文字数上限は仕様に無いので、カウンタもバブルのときだけ出す */}
         {isBubble ? <CharCounter text={body} /> : null}
 
+        {/*
+          スタンプの見え方（人間の指示、2026-08-28）。
+
+          ★ 入力欄は textarea なので、中に絵を出せない。押して入るのは `:naku:` という
+            目印の文字で、絵になるのは出したあと。そこが分かるように、
+            **スタンプが入っているときだけ** 出たあとの姿をその場に出す。
+          ★ 常時は出さない。文字だけ書いているときに同じ本文を2回見せる意味が無い。
+        */}
+        {containsStamp(body) ? (
+          <div className="eg-compose__preview">
+            <p className={cx("eg-compose__preview-label", "t-label")}>こう 出ます</p>
+            <BubbleBody body={body} className="eg-compose__preview-body" />
+          </div>
+        ) : null}
+
 
         {rejected ? (
           <NoteBox variant="reject" title="匿名性を守るため、投稿できません" role="alert">
@@ -428,19 +472,17 @@ export function ComposePanel({
 
           <div className="eg-drawer__body">
             {drawer === "stamp" ? (
-              <div className="eg-stamp-grid">
-                {STAMP_CATALOG.map((stamp) => (
-                  <button
-                    key={stamp.id}
-                    type="button"
-                    className={cx("eg-stamp-pick", "eg-touch")}
-                    onClick={() => changeBody(body + ":" + stamp.id + ":")}
-                  >
-                    <StampGlyph id={stamp.id} picker />
-                    <span className={cx("t-caption")}>{stamp.name}</span>
-                  </button>
-                ))}
-              </div>
+              <StampPicker
+                emotion={stampEmotion}
+                onEmotionChange={setStampEmotion}
+                /*
+                 * 上限に届いていたら押せない。スタンプ1つで1文字ぶん使うので、
+                 * 入れた瞬間に保存できない本文になる（FR-POST-002 / NFR-005）。
+                 * あやすには上限が無いので、ここも見ない。
+                 */
+                full={isBubble && countChars(body) >= BUBBLE_MAX_LENGTH}
+                onPick={insertStamp}
+              />
             ) : null}
 
             {drawer === "evaluate" ? (
@@ -467,6 +509,80 @@ export function ComposePanel({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/*
+ * スタンプ一覧（FR-STAMP-001）。棚に分けたのは人間の指示（2026-08-27）、
+ * 絵を入れたのも人間の指示（2026-08-28）。
+ *
+ * ★ 棚の並びとラベルは data/stampCatalog.ts が持つ。ここで並べ直さない。
+ * ★ タブは SegmentedTabs の横に流す変種。ここ用のタブを新しく作らない
+ *   （DESIGN.md §4：画面ごとに似て非なるタブを作らない）。
+ * ★ 押すと本文には目印の文字が入る。絵になるのは出したあとなので、
+ *   入力欄の下に「こう 出ます」を出している（上の ★ 参照）。
+ */
+function StampPicker({
+  emotion,
+  onEmotionChange,
+  full,
+  onPick,
+}: {
+  readonly emotion: string;
+  readonly onEmotionChange: (next: string) => void;
+  readonly full: boolean;
+  readonly onPick: (id: string) => void;
+}) {
+  const groups = stampGroups();
+  if (groups.length === 0) {
+    return <p className={cx("t-body", "eg-drawer__note")}>スタンプを 読み込めませんでした。</p>;
+  }
+  /* 読み込みより先に選ばれていることがある。無い棚なら先頭に落とす */
+  const current = groups.find((group) => group.key === emotion) ?? groups[0];
+
+  return (
+    <div className="eg-stamps">
+      <SegmentedTabs
+        tabs={groups.map((group) => ({ value: group.key, label: group.label }))}
+        current={current.key}
+        onChange={onEmotionChange}
+        panelId="eg-stamp-panel"
+        label="スタンプの たな"
+        variant="scroll"
+      />
+
+      <div
+        id="eg-stamp-panel"
+        role="tabpanel"
+        aria-labelledby={"eg-stamp-panel-tab-" + current.key}
+        className="eg-stamp-grid"
+      >
+        {current.stamps.map((stamp) => (
+          <button
+            key={stamp.id}
+            type="button"
+            disabled={full}
+            /*
+              図と名前は見るためのもの。読み上げには「入れる」という操作を渡す。
+              aria-label を置くと中の文字は読み上げの名前に使われないので、
+              「ねむいのスタンプ ねむい」と二重に読まれない。
+            */
+            aria-label={stamp.name + " を 本文に 入れる"}
+            className={cx("eg-stamp-pick", "eg-touch")}
+            onClick={() => onPick(stamp.id)}
+          >
+            <StampGlyph id={stamp.id} picker />
+            <span className={cx("eg-stamp-pick__name", "t-caption")}>{stamp.name}</span>
+          </button>
+        ))}
+      </div>
+
+      <p className={cx("eg-stamps__hint", "t-caption")}>
+        {full
+          ? "150文字に なったので、これ以上 入れられません。"
+          : "カーソルの ある ところに 入ります。絵1つで 1文字ぶん。"}
+      </p>
     </div>
   );
 }

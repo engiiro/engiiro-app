@@ -82,6 +82,14 @@
   --input-padding: 12px;
   --avatar-size: 34px;
   --avatar-size-sm: 26px;
+  /*
+   * スタンプ（DESIGN.md §11 で未定だった「本文中でのインライン表示サイズ」）。
+   * 本文は 16px / 行間 1.9（＝行の高さ 30.4px）。そこに 32px の絵を沈めると、
+   * 1行ぶんの高さをほとんど超えずに「貼ってある」と読める。
+   * 一覧は指で押す的なので、大きめに出す。
+   */
+  --stamp-size: 32px;
+  --stamp-size-picker: 52px;
   /* プロフィールの見出しに置く大きいアバター（S8 / S6） */
   --avatar-size-lg: 64px;
   --meter-height: 9px;

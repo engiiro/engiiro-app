@@ -1,0 +1,18 @@
+/* プロフィールの一覧（S8 / S6 で共通。2026-08-28 に両画面から寄せた） */
+
+.eg-activity-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.eg-activity-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.eg-activity-panel__more {
+  display: flex;
+  justify-content: center;
+}

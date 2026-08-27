@@ -10,10 +10,13 @@ import "./LeftRail.css";
  *
  * どれを押しても中央の列が差し替わる。右サイドは動かない。
  *
- * ホーム・おきにいり・プロフィール以外は docs/design_doc.md §4.1 の画面一覧（S1〜S8）に
- * 無い画面で、
+ * ホーム・おきにいり・プロフィール・せってい以外は docs/design_doc.md §4.1 の画面一覧
+ * （S1〜S8）に無い画面で、
  * 今は「準備中」を出すだけのプレースホルダ。設計書の画面一覧の更新は
  * backend / 設計担当の領域なので、こちらでは触っていない。
+ *
+ * せっていも画面一覧には無いが、テーマの切り替え（DESIGN.md §8.3）という
+ * 決まっている設定があるので中身を作った（人間の指示、2026-08-27）。
  *
  * プロフィールは S8（本人専用プロフィール）。両ペルソナを同時に出してよい唯一の画面
  * （FR-PERSONA-005）なので、他の画面から同じ中身を出さない。
@@ -46,7 +49,7 @@ const RAIL_ITEMS: readonly RailItem[] = [
   { view: "notifications", label: "おしらせ", icon: IconBell, ready: false },
   { view: "favorites", label: "おきにいり", icon: IconHeart, ready: true },
   { view: "profile", label: "プロフィール", icon: IconPerson, ready: true },
-  { view: "settings", label: "せってい", icon: IconGear, ready: false },
+  { view: "settings", label: "せってい", icon: IconGear, ready: true },
 ];
 
 export function LeftRail({

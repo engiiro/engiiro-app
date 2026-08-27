@@ -44,16 +44,26 @@ npm run build    # tsc -b + vite build
 npm run lint     # oxlint
 ```
 
-## 画面の上にある「モック操作」帯
+## モックの状態は URL で切り替える
 
-**製品の UI ではない。** 画面の操作だけでは作れない状態を出すための足場で、
-実 API に差し替えるときにこの帯ごと外す（`src/components/MockControls.tsx`）。
+画面の操作だけでは作れない状態（AI が止まっている・フィードが空）を見るための足場。
+**製品の UI ではない**ので、画面の上に帯として置くのをやめ、URL のクエリに退避した
+（人間の決定、2026-08-28。それまでは `components/MockControls.tsx` が画面の一番上を占めていた）。
 
-| つまみ | できること |
+読むのは `src/lib/mockScenario.ts` の1か所だけで、実 API に差し替えるときにこのファイルごと消える。
+
+| クエリ | できること |
 |---|---|
-| テーマ | OSに従う / ノーマル / ダーク / 園児UI を切り替える |
-| AI | AI 推論が停止している状態を作る（NFR-001〜003 の確認用） |
-| フィード | ふつう / 読み込み中（skeleton）/ 空 を切り替える |
+| `?feed=empty` / `?feed=loading` | フィードが空 / 読み込み中（skeleton）の状態 |
+| `?ai-eval=off` | AI 文章評価が停止（NFR-003：投稿できない） |
+| `?ai-transform=off` | AI 文章生成が停止（NFR-001：投稿は続けられる） |
+| `?entry=intro` / `signup` / `login` | 入り口の画面から始める |
+| `?theme=dark` / `kid` / `normal` / `system` | テーマを1回だけ選び直す（以後は保存された選択が勝つ） |
+
+- `off` の代わりに `false` / `0` も効く。知らない値は既定に落とす（URL は未検証の入力）
+- 読むのは起動時の1回だけ。URL を書き換えたら再読み込みする
+- テーマの切り替えは製品側の **せってい** 画面にある。`?theme=` は見比べ用の近道
+- 例：`http://localhost:5173/?ai-eval=off&feed=empty`
 
 S3 の下端にも「block になる例」「rewrite_required になる例」というモック用のボタンがある。
 入る文言は `src/data/moderationSamples.ts`。フィードには流していない。
@@ -70,9 +80,11 @@ src/
   components/  共通部品（LeftRail / RightRail / ReactionRow / BubbleCard / BubbleBody …）
     Illustration.tsx ★ イラストの出し口。テーマごとに SVG ファイルを選び替える
     BrandMark.tsx    ブランドの印（しっぽ付きの吹き出しに「…」）
+    ActivityPanel.tsx ★ プロフィールの一覧（S8 / S6 共通。件数の巻き戻しもここが持つ）
   screens/     TimelineScreen / BubbleDetailScreen / ComposePanel /
                MyProfileScreen / PublicProfileScreen / FavoritesScreen /
-               SignUpScreen / LoginScreen / IntroScreen / PlaceholderScreen
+               SettingsScreen / SignUpScreen / LoginScreen / IntroScreen /
+               PlaceholderScreen
   data/        データ層
     api.ts           ★ サーバとの境界。実 API 差し替え時はここだけ触る
     mockSource.ts    public/data/*.json を読みに行くだけの層。実 API 差し替え時に消える
@@ -80,6 +92,9 @@ src/
     reactions.ts     ★ 対象別リアクションの唯一の定義
   lib/         mockAiTransform / mockAiEvaluate / mockModeration / 相対時刻 /
                生年月日 / テーマ / あやすの返信規則
+    mockScenario.ts     ★ モックの状態を URL から読む。実 API 差し替え時に消える
+    personaStatusText.ts 「推定 …」の一行（S8 / S6 共通。FR-PROFILE-001/002）
+    sootheCountText.ts   「あやす N / まだ あやされてない」（3か所共通）
     useResolvedTheme.ts ★ いま実際に効いているテーマ（normal/dark/kid）を返す。
                           <img> の SVG には CSS 変数が継承されないので、
                           「変数を渡す」のではなく「ファイルを選ぶ」ために要る
@@ -214,9 +229,10 @@ shadcn/ui・Tailwind・Motion のいずれも入れていない。
 
 原因はボタンの側ではなく**外側の骨組み**にあった。
 
-- 上にモックの操作帯（`.eg-mock`、78〜206px）が積まれている。中央の列は `100vh` で作られていたので、
-  **列の下端＝ viewport の下端 ＋ 操作帯の高さ**。そこに貼りついたボタンは最初から画面の外に居た
-  （1440×800 で `top: 807px`）
+- 上にモックの操作帯（`.eg-mock`、78〜206px）が積まれていた（2026-08-28 に URL クエリへ退避して削除）。
+  中央の列は `100vh` で作られていたので、**列の下端＝ viewport の下端 ＋ 操作帯の高さ**。
+  そこに貼りついたボタンは最初から画面の外に居た（1440×800 で `top: 807px`）。
+  帯が無くなっても下の直し方はそのまま残している。下端に貼りつくものが増えたときに同じことが起きる
 - 直し方：`.eg-app--shell` を縦に積む箱にして高さを `100dvh` に固定し、余りを `.eg-layout` に配る。
   さらに `grid-template-rows: minmax(0, 1fr)` で行の高さを**決まった値**にした。
   ここが `auto`（＝決まっていない）だと、中の `.eg-center` が書いている `100%` が `auto` に化けて効かない
@@ -277,13 +293,134 @@ shadcn/ui・Tailwind・Motion のいずれも入れていない。
 - 併せて `tokens/theme.css` に `color-scheme` を足した。これが無いと、ブラウザが自前で描く
   カレンダーの印がダークで黒いまま出て地に沈む。スクロールバーと選択文字の地も同時に揃う
 
+## リアクションの2件の指摘への対応（2026-08-27）
+
+人間から直接受けた指摘2件。原因はどちらも同じで、**リアクションを押すと詳細画面を
+skeleton に差し替えて引き直していた**こと（`App.tsx` の `refresh` → `loadDetail`）。
+
+### 1. 5回目の演出が一瞬すぎて見えない
+
+3つ重なっていた。
+
+- **押したボタンごと画面が外れていた。** 引き直しのあいだ `BubbleDetailScreen` を
+  skeleton に差し替えていたので、演出は始まった直後に DOM ごと消えていた
+  → `loadDetail(ref, { quiet: true })` を足し、引き直しでは skeleton を出さない
+- **演出の強さがサーバの返事待ちだった。** 押した回数が反映されるのはモックの 520ms 後で、
+  それまで data-step は「4」のまま。5回目の合図は pop が終わりかけてから始まっていた
+  → 押した時点で回数を決める（`ReactionRow` の `popping.step`）。水位も同じ数から作るので、
+  合図と地の満ち方がずれない
+- **終わりを `animationend` で決めていた。** 連続で押すと pop は走ったままなので、
+  最後の押下より早く終わりが来て演出を切っていた
+  → 見込みを捨てる合図はサーバの返事にし、返事が来ないときだけ 2 秒で捨てる
+- あわせて合図そのものを長くした（粒 3 → 5、40ms ずらし、最後の粒まで 660ms）
+
+### 2. 詳細でリアクションすると、一瞬前の画面に戻ってロードされる
+
+同じ原因。skeleton へ差し替えていたので、520ms のあいだ「読み込み中の別の画面」に見え、
+戻ってきたときにスクロール位置も頭に戻っていた。引き直しを quiet にして直した。
+タイムラインは前から `loadFeed()` を静かに呼んでいたので、この症状は詳細だけで出ていた。
+
+## 全体の見直し（2026-08-28）
+
+人間の指示で全体を読み直した。直したものは次の15件。
+
+### 直した不具合
+
+| # | 何が起きていたか | 直し方 |
+|---|---|---|
+| 1 | **引き直しで画面が skeleton に戻る。** リアクション・投稿・削除のあと、プロフィールや大好きの一覧まで中身が消えていた。詳細画面で直したのと同じ形の問題 | 読み込み関数に `quiet` を足し、着いたとき（`enter`）だけ skeleton を出す。引き直し（`refresh`）と大好きの解除では出さない |
+| 2 | **文字数が読み上げから読めない。** `134 / 150` に `aria-hidden` が付いていて、画面を見ない人には 150 を超えるまで文字数が分からなかった | `aria-hidden` を外し、`.eg-sr-only` で「つかった文字」を添えた。live ではないので打つたびには読まれない |
+| 3 | **ゲストの見え方を画面側で作り直していた。** `isMe` / `liked` を `App.tsx` の描画時に落としていた | `data/api.ts` の `fetchPublicProfile` が閲覧者に合わせて返す。境界の外に出た値を画面が直す形をやめた（FR-AUTH-001 の立場） |
+| 4 | **定義の無いトークンを参照していた。** `MockControls.css` の `var(--nav-width-desktop)` はどこにも定義が無く、`padding-left` が黙って捨てられていた | 帯ごと削除（URL クエリへ退避）。あわせて `App.css` の「操作帯があるから」という説明も経緯として書き直した |
+| 5 | **誰も渡していない prop。** `SootheItem` の `replyToNickname` は2つの呼び出し元のどちらも渡しておらず、分岐と CSS が生きていなかった | prop・分岐・`.eg-soothe__quote` を落とした |
+| 6 | **説明と実装がずれた注釈。** `STAMP_GROUP_FALLBACK` は「タブの初期値に使う」と書いてあるが使っていない。`ReactionRow` の説明は粒が3つのまま（実装は5つ） | export をやめて中だけで使う形にし、注釈を実装に合わせた |
+| 7 | **取り残された説明。** `guard` の説明が、間の関数が挟まって `applySession` の上に付いていた | `guard` へ戻した |
+
+### 寄せた重複
+
+| # | どこにあったか | 寄せた先 |
+|---|---|---|
+| 8 | 削除の確認の文言が S4 と S8 に同じものが2つ | `components/ConfirmDialog.tsx` の `BubbleDeleteConfirm`（文言つきの部品として出す） |
+| 9 | 「まだ だれも あやしていません」が S4 と S4b に2つ | `components/EmptyState.tsx` の `NoSootheState` |
+| 10 | 「あやす N / まだ あやされてない」が3か所 | `lib/sootheCountText.ts` |
+| 11 | 「推定 …」の組み立て（月齢から年を出す割り算）が S8 と S6 に2つ | `lib/personaStatusText.ts`。材料が無いときの文言だけ画面から渡す |
+| 12 | プロフィールの一覧（skeleton → 空 → 一覧 → さらに よみこむ）が S8 と S6 に同じ40行。CSS も `__panel` / `__list` / `__more` が複製 | `components/ActivityPanel.tsx`（＋ CSS 1本）。件数の巻き戻しも部品が持つので、画面側の `setVisible(PAGE_SIZE)` が消えた |
+| 13 | `reactToBubble` / `reactToSoothe` がほぼ同じ。上限の「5回」も文言に直書き | 1つの `react(input)` にまとめ、`REACTION_MAX_PER_USER` から出す |
+| 14 | `MockControls` の呼び出しが `App.tsx` の2か所に同じ props で並んでいた | 帯ごと削除 |
+| 15 | モックのつまみが画面の一番上を常に占めていた | URL クエリへ退避（上の節） |
+
+### 見たが直していないもの
+
+- **`fetchStamps()` を誰も呼んでいない。** スタンプ一覧は `STAMP_CATALOG` を直接読んでいる
+  （本文の文字数の数え方も同じ）。`api.ts` を通す原則からは外れるが、
+  文字数を数えるたびに await が要る形にするほうが害が大きいので、そのままにしている。**要確認**
+- **`addReaction` だけモックの遅延（520ms）が無い。** 他の書き込みは全部入っている。
+  リアクションは押した瞬間に返るほうが自然なので、あえて揃えていない
+- **`--success` / `--warning` / `--blur-small` が未使用。** トークンの段として置いてあるもの
+
+## スタンプ（2026-08-28）
+
+**押すと本文に絵が入る。** 以前は `components/BubbleBody.tsx` の中に線だけの仮図形を置いていたので、
+挿入しても絵に見えなかった（人間の指摘）。
+
+### 絵柄
+
+`frontend/images/stamps/` にある候補のうち、**「ベタ塗りシンプル」（接頭辞 `06_` / `16_`）だけ**を採った。
+同じキャラ・同じ線幅・透過 PNG で揃うのがこの一族だけで、絵柄が混ざると本文の中で喧嘩する。
+
+| 棚 | id | 名前 | 元ファイル（`frontend/images/stamps/`） |
+|---|---|---|---|
+| よわね | `naku` | ないちゃう | `crying/16_flat-simple_crying.png` |
+| よわね | `akubi` | あくび | `greeting/06_flat-simple_good-morning.png` |
+| よわね | `hoshii` | ほしい | `gimme/16_flat-simple_gimme.png` |
+| うれしい | `banzai` | ばんざい | `joy/06_flat-simple_joy.png` |
+| うれしい | `niko` | にこにこ | `joy/16_flat-simple_happy.png` |
+| うれしい | `suki` | すき | `love/06_flat-simple_love.png` |
+| よしよし | `wakaru` | わかる | `empathy/16_flat-simple_exactly.png` |
+| よしよし | `ganbare` | がんばれ | `encourage/06_flat-simple_cheer-up.png` |
+| よしよし | `arigato` | ありがとう | `thanks/06_flat-simple_thanks.png` |
+| へんじ | `ryokai` | りょうかい | `roger/06_flat-simple_roger.png` |
+| へんじ | `bikkuri` | びっくり | `surprised/06_flat-simple_surprised.png` |
+| へんじ | `gomen` | ごめんね | `sorry/06_flat-simple_sorry.png` |
+
+書き出しは3手で、素材を差し替えるときも同じことをすればよい（Pillow を使った使い捨てスクリプト）。
+
+1. 透明の余白を落とす（トリム）… 12枚の大きさをそろえる
+2. 128px の正方の中央に置く … 表示は 32px / 52px なので3倍前後
+3. `optimize` で保存 … 1枚 200〜400KB → **合計 237KB / 12枚**
+
+- 元ファイル名（`06_` / `16_`）は素材の分類で、**棚の名前とは一致しない**。
+  「おはよう」の絵は大あくびで伸びをしているので、このサービスでは `akubi`（よわね）に置いた
+- 採らなかった一族：リアル写真風（`03` / `07`〜`13`）、水彩（`04` / `18`）、3Dぬいぐるみ（`05` / `19`）、
+  ピクセル（`25`）ほか。**どれも「その気持ちだけ」しか無く、12個をひとつの見た目で揃えられない**。
+  棚を増やすなら、まず同じ一族の絵を足すほうが先
+
+### 入力欄では文字、出したあとに絵
+
+textarea の中に画像は出せない。押して入るのは `:naku:` という**目印の文字**で、絵になるのは表示側。
+そのままだと「文字が入っただけ」に見えるので、**本文にスタンプがあるときだけ**、
+入力欄の下に「こう 出ます」を出している（`containsStamp` で判定）。
+
+contenteditable の入力欄にすれば入力欄の中に絵を出せるが、日本語の変換（IME）・カーソル・
+貼り付けの掃除・文字数の数え方が全部作り直しになるので採っていない。**要相談**。
+
+### サイズ（DESIGN.md §11 で未定だった項目）
+
+| 場所 | 大きさ | トークン |
+|---|---|---|
+| 本文の中 | 32px（本文 16px / 行間 1.9 ＝ 行の高さ 30.4px にほぼ収まる） | `--stamp-size` |
+| 一覧 | 52px | `--stamp-size-picker` |
+
+下地は敷かない。絵の側が濃い輪郭と明るい塗りを持っているので、ノーマル・ダーク・園児UI の
+どの地の上でも形が残る。敷くと、絵の中の白と二重の面に見える。
+
 ## 仕様のうち、UI で担保している要点
 
 | 仕様 | どこで |
 |---|---|
 | 対象別リアクション（バブル・赤ちゃんあやす=3種／お母さんあやす=`ばぶー`のみ） | `data/reactions.ts` の表 → `components/ReactionRow.tsx`。画面ごとにボタンを並べ直さない |
-| 1種類につき5回まで（人間の決定） | `data/constants.ts` の `REACTION_MAX_PER_USER`。点メーターで残りを見せ、6回目は `data/api.ts` が `max_reached` で弾く |
-| スタンプを本文に挿入（FR-POST-005） | `:nemui:` の目印で本文に埋め、`components/BubbleBody.tsx` が図に置き換える |
+| 1種類につき5回まで（人間の決定） | `data/constants.ts` の `REACTION_MAX_PER_USER`。**水位**（ボタンの地が下から満ちる。5回で満タン）で回数を見せ、6回目は `data/api.ts` が `max_reached` で弾く |
+| スタンプを本文に挿入（FR-POST-005 / FR-STAMP-001） | `:naku:` の目印で本文に埋め、`components/BubbleBody.tsx` が絵（`public/images/stamps/<id>.png`）に置き換える。一覧は棚別のタブ（`data/stampCatalog.ts` の `STAMP_SHELVES`）。押すと本文のカーソル位置に入る |
 | 赤ちゃん度・お母さん度（FR-AI-EVAL-001〜004） | `lib/mockAiEvaluate.ts`。軸が別であることを画面にも書く。結果で投稿を止めない |
 | リアクションにペルソナの要素は無い（人間の決定） | `ReactionState` にペルソナの別を持たせていない。「赤ちゃんとして押す」という区別がない |
 | 自分のバブル・自分のあやすにはリアクションしない（人間の決定） | `ReactionRow` の `readOnly`。押せるボタンを出さず、付いた数だけを見せる。`data/api.ts` でも弾く |
@@ -301,7 +438,7 @@ shadcn/ui・Tailwind・Motion のいずれも入れていない。
 
 ## 確認のしかた
 
-`npm run dev` で開いて、モック操作帯を動かしながら見る。実装時に通した確認は次のとおり。
+`npm run dev` で開いて、上の URL クエリを付け替えながら見る。実装時に通した確認は次のとおり。
 
 ### 1. 3テーマ × 画面
 
@@ -418,8 +555,13 @@ grep -rni "accountid" src
   実装は新しい NFR-003 に従っている
 - **右サイドの記事は中身が無い。** リンクが付く想定だが、これは本文の URL 禁止
   （FR-MOD-021 / OUT-008）とは別の話という理解で進めている
-- **スタンプの絵柄は仮のもの。** 見た目は未定（DESIGN.md §11）なので、`components/BubbleBody.tsx` の
-  図形を差し替える前提。本文の文字数では画像1つ＝1文字として数えているが、正式な数え方は未確定
+- **本文の文字数では絵1つ＝1文字として数えている。** 正式な数え方は未確定（design_doc §7.1 の注記）
+- **スタンプの「気持ち」（`emotion`）は `GET /api/stamps` の応答に無い項目。**
+  一覧を気持ち別に分けるために、モックデータ（`public/data/stamps.json`）が持っている。
+  キーは `frontend/images/stamps/` のフォルダ名と揃えた。実 API では backend 側の追加が要る。**人間の確認が必要**
+- **せってい画面は画面一覧（S1〜S8）に無い。** 中身はテーマの切り替え（DESIGN.md §8.3 が実装契約まで
+  決めているもの）だけにして、おしらせ・なまえの変更は押せない「これから」の行にしてある。
+  テーマ見本は `tokens/theme.css` の各ブロックを入れ子の `[data-theme]` にも効かせて描いている
 - **あやす本文の文字数上限は設けていない。** 仕様に無いので勝手に決めていない
 - **文字数の数え方**はコードポイント単位（`data/constants.ts`）。正式な数え方は未確定
   （design_doc §7.1 の注記）
@@ -457,11 +599,6 @@ grep -rni "accountid" src
 - フロントの API ベース URL 用の環境変数は、接続しないので置いていない
 - **バブルカードの視線順を「本文 → 書いた人」に変えたのは実装側の判断**（上の食い違い表）。
   DESIGN.md §4 Cards は逆の順序を指定している。**人間の確認が必要**
-- **Intro を 375px の実機で見ると、モック操作帯（5段）のぶんだけページがスクロールする。**
-  製品の画面は viewport に対して収まる寸法（表紙 132px ＋ カード 560px ＋ 余白 48px ＝ 740px）で
-  組んであり、はみ出しているのはモックの足場のぶん。
-  「つぎへ の位置がページ送りで動かない」という要件（人間の指示 2026-08-26）は、
-  カードの高さが固定なので満たしたまま
 - **右サイドの名前が、登録直後に新しいニックネームへ変わらない。**
   `me` は起動時に `fetchMe()` で一度だけ読んでおり、モックの `createAccount` は
   固定の `ME` を返す。刷新の前からある挙動で、今回は触っていない

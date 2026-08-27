@@ -134,10 +134,37 @@ export type Me = {
   readonly mother: PublicPersona;
 };
 
+/*
+ * スタンプを置く棚（人間の指示 2026-08-27。絵柄の確定に合わせて改訂 2026-08-28）。
+ *
+ *   weak   … 弱音を出す（ないちゃう・あくび・ほしい）
+ *   glad   … うれしい（ばんざい・にこにこ・すき）
+ *   soothe … あやす側（わかる・がんばれ・ありがとう）
+ *   reply  … かるい返事（りょうかい・びっくり・ごめんね）
+ *
+ * ★ 素材フォルダ（frontend/images/stamps/<気持ち>/）の名前とは一致しない。
+ *   あちらは絵の分類、こちらは選ぶときの並び。
+ *   どの絵をどの id に割り当てたかは frontend/app/README.md の表にある。
+ */
+export type StampShelf = "weak" | "glad" | "soothe" | "reply";
+
 /** バブル本文に挿入できるスタンプ（FR-POST-005 / FR-STAMP-001） */
 export type Stamp = {
   readonly id: string;
   readonly name: string;
+  /**
+   * 絵柄の場所。設計書 §7 の `GET /api/stamps` の応答にある `imageUrl` と同じ項目。
+   * モックでは public/images/stamps/<id>.png（透過 PNG、128px）を指す。
+   */
+  readonly imageUrl: string;
+  /*
+   * どの棚に置くか。一覧を分けるために使う。
+   *
+   * ★ GET /api/stamps の応答（設計書 §7）には無い項目。実 API に差し替えるときは
+   *   backend 側の追加が要る。勝手に決められないので、ここではモックデータ
+   *   （public/data/stamps.json）が持っている前提にしている。
+   */
+  readonly shelf: StampShelf;
 };
 
 export type CreateBubbleInput = {
