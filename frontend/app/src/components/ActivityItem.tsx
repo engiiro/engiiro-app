@@ -1,6 +1,7 @@
 import type { ActivityEntry } from "../data/types";
 import { cx } from "../lib/cx";
 import { relativeTimeText } from "../lib/relativeTime";
+import { sootheCountText } from "../lib/sootheCountText";
 import { BubbleBody } from "./BubbleBody";
 import { PersonaAvatar } from "./PersonaAvatar";
 import { IconTrash } from "./icons";
@@ -37,8 +38,7 @@ const KIND_LABEL = { bubble: "バブル", soothe: "あやす" } as const;
 
 /** 何件ついているか。バブルは直接のあやす、あやすはそれへのあやす */
 function countTextOf(item: ActivityEntry): string {
-  const count = item.kind === "bubble" ? item.bubble.sootheCount : item.soothe.replyCount;
-  return count > 0 ? "あやす " + String(count) : "まだ あやされてない";
+  return sootheCountText(item.kind === "bubble" ? item.bubble.sootheCount : item.soothe.replyCount);
 }
 
 export function ActivityItem({

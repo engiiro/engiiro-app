@@ -751,11 +751,17 @@ export async function fetchPublicProfile(personaId: string): Promise<PublicProfi
     return null;
   }
   const status = await statusOf(textsFor(persona.id, persona.kind), persona.kind);
+  /*
+   * ★ 閲覧者ごとに変わる値は、ここで閲覧者に合わせて返す。
+   *   ゲストには「大好き済み」も「これは自分」も無い（asViewer と同じ立場）。
+   *   以前は画面側で落としていたが、境界の外に出た値を画面が作り直すのは、
+   *   落とし忘れが起きたときに気づけない形だった。
+   */
   return {
     persona,
     status,
-    liked: following.has(persona.id),
-    isMe: persona.id === ME.baby.id || persona.id === ME.mother.id,
+    liked: !viewerIsGuest && following.has(persona.id),
+    isMe: !viewerIsGuest && (persona.id === ME.baby.id || persona.id === ME.mother.id),
   };
 }
 

@@ -32,11 +32,14 @@ export function CharCounter({ text }: { readonly text: string }) {
     <div className={cx("eg-counter", over && "is-over", near && "is-near")}>
       <div className="eg-counter__row">
         <span className="eg-counter__gauge" style={gaugeStyle} aria-hidden="true" />
-        <span
-          className={cx("eg-counter__value", "t-counter")}
-          /* 数字の読み上げが騒がしくならないよう、超過の一行だけを live にする */
-          aria-hidden="true"
-        >
+        {/*
+          ★ 数は読み上げからも読めるようにする。
+            以前は aria-hidden で隠していたので、画面を見ない人には 150 を超えるまで
+            文字数がまったく分からなかった。live ではないので、打つたびに読まれることもない
+            （騒がしくしないために live にするのは、下の超過の一行だけ）。
+        */}
+        <span className={cx("eg-counter__value", "t-counter")}>
+          <span className="eg-sr-only">つかった文字 </span>
           {count} / {BUBBLE_MAX_LENGTH}
         </span>
       </div>

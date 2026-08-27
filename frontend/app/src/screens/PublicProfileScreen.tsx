@@ -1,10 +1,7 @@
-import { useState } from "react";
-
 import type { ActivityEntry, ActivityTab, PublicProfile } from "../data/types";
 import { cx } from "../lib/cx";
-import { ActivityItem } from "../components/ActivityItem";
-import { Button } from "../components/Button";
-import { EmptyState } from "../components/EmptyState";
+import { personaStatusCaption } from "../lib/personaStatusText";
+import { ActivityPanel } from "../components/ActivityPanel";
 import { LikeButton } from "../components/LikeButton";
 import { PersonaSummaryCard } from "../components/PersonaSummaryCard";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -43,9 +40,6 @@ const MOTHER_TABS: readonly SegmentedTab<ActivityTab>[] = [
   { value: "motherSoothes", label: "お母さんの あやす" },
 ];
 
-/** 一度に見せる件数。押すたびにこの数ずつ増える */
-const PAGE_SIZE = 5;
-
 type PublicProfileScreenProps = {
   readonly profile: PublicProfile | null;
   readonly activity: readonly ActivityEntry[];
@@ -74,8 +68,6 @@ export function PublicProfileScreen({
   onOpenSoothe,
   onBack,
 }: PublicProfileScreenProps) {
-  const [visible, setVisible] = useState(PAGE_SIZE);
-
   if (loading || profile === null) {
     return (
       <>
@@ -89,9 +81,6 @@ export function PublicProfileScreen({
 
   const isBaby = profile.persona.kind === "baby";
   const tabs = isBaby ? BABY_TABS : MOTHER_TABS;
-  const shown = activity.slice(0, visible);
-  const hasMore = activity.length > shown.length;
-  const isEmpty = !activityLoading && activity.length === 0;
 
   return (
     <>
@@ -100,7 +89,11 @@ export function PublicProfileScreen({
       <div className={cx("eg-column", "eg-pubprofile")}>
         <PersonaSummaryCard
           persona={profile.persona}
-          caption={captionOf(profile)}
+          caption={personaStatusCaption(
+            profile.status,
+            profile.persona.kind,
+            "まだ ことばが ありません",
+          )}
           note={axisNote(profile)}
           action={
             /* 自分のペルソナには出さない。付けられない操作を disabled で見せない */
@@ -120,77 +113,29 @@ export function PublicProfileScreen({
           <SegmentedTabs
             tabs={tabs}
             current={tab}
-            onChange={(next) => {
-              onTabChange(next);
-              setVisible(PAGE_SIZE);
-            }}
+            onChange={onTabChange}
             panelId="eg-pubprofile-list"
             label="表示する記録の切り替え"
           />
         </div>
 
-        <div
-          id="eg-pubprofile-list"
-          role="tabpanel"
-          aria-labelledby={"eg-pubprofile-list-tab-" + tab}
-          className="eg-pubprofile__panel"
-        >
-          {activityLoading ? <SkeletonFeed count={2} /> : null}
-
-          {isEmpty ? (
-            <EmptyState
-              lines={
-                isBaby
-                  ? ["この子の ことばは、まだ ありません。"]
-                  : ["この人が あやした ことばは、まだ ありません。"]
-              }
-            />
-          ) : null}
-
-          {!activityLoading && !isEmpty ? (
-            <>
-              <ul className="eg-pubprofile__list">
-                {shown.map((item) => (
-                  <ActivityItem
-                    key={item.kind === "bubble" ? item.bubble.id : item.soothe.id}
-                    item={item}
-                    onOpenBubble={onOpenBubble}
-                    onOpenSoothe={onOpenSoothe}
-                  />
-                ))}
-              </ul>
-              {hasMore ? (
-                <div className="eg-pubprofile__more">
-                  <Button variant="quiet" onClick={() => setVisible(visible + PAGE_SIZE)}>
-                    さらに よみこむ
-                  </Button>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </div>
+        <ActivityPanel
+          panelId="eg-pubprofile-list"
+          tab={tab}
+          items={activity}
+          loading={activityLoading}
+          emptyLines={
+            isBaby
+              ? ["この子の ことばは、まだ ありません。"]
+              : ["この人が あやした ことばは、まだ ありません。"]
+          }
+          /* 他人の画面では誘わない。この人の代わりに書くことはできない */
+          onOpenBubble={onOpenBubble}
+          onOpenSoothe={onOpenSoothe}
+        />
       </div>
     </>
   );
-}
-
-/**
- * 推定の一行。
- *   赤ちゃん … 「推定 1歳2か月」（FR-PROFILE-001。文章そのものの幼さ）
- *   お母さん … 「推定 1歳児を あやし中」（FR-PROFILE-002。向けている相手の年齢）
- * 評価が使えないときは、その旨に置き換える（NFR-002）。
- */
-function captionOf(profile: PublicProfile): string {
-  if (profile.status === null) {
-    return "いま はかれません";
-  }
-  if (profile.status.sampleCount === 0) {
-    return "まだ ことばが ありません";
-  }
-  if (profile.persona.kind === "baby") {
-    return "推定 " + profile.status.label;
-  }
-  return "推定 " + String(Math.floor(profile.status.months / 12)) + "歳児を あやし中";
 }
 
 /**

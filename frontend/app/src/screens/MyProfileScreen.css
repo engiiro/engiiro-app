@@ -50,23 +50,6 @@
   gap: var(--space-sm);
 }
 
-.eg-myprofile__panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.eg-myprofile__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.eg-myprofile__more {
-  display: flex;
-  justify-content: center;
-}
-
 /* 一段狭いところでは、横2枚を縦に折り返す（DESIGN.md §8.1） */
 @media (width < 560px) {
   .eg-myprofile__personas,

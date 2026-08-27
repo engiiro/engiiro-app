@@ -23,6 +23,20 @@ type EmptyStateProps = {
   readonly illustration?: IllustrationName;
 };
 
+/**
+ * あやすが1件も無いときの空状態。
+ *
+ * ★ バブル詳細（S4）と あやす詳細（S4b）で同じものを出す。
+ *   別々に書くと、片方だけ言い回しが変わる。
+ * ★ イラストは渡さない。どちらの画面でも入れ子の空状態なので、
+ *   1画面に主役のイラストを2つ置かないため（上の ★ 参照）。
+ */
+export function NoSootheState() {
+  return (
+    <EmptyState lines={["まだ だれも あやしていません。", "さいしょの ひとりに なってみる？"]} />
+  );
+}
+
 export function EmptyState({ lines, action, illustration }: EmptyStateProps) {
   return (
     <div className={cx("eg-empty", illustration && "has-art")}>

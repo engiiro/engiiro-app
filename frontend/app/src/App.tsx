@@ -18,7 +18,8 @@ import {
   setLiked,
   setSessionGuest,
 } from "./data/api";
-import type { FeedResult } from "./data/api";
+import type { AddReactionInput, FeedResult } from "./data/api";
+import { REACTION_MAX_PER_USER } from "./data/constants";
 import { reactionTargetOfSoothe } from "./data/reactions";
 import type {
   BubbleDetail,
@@ -38,8 +39,6 @@ import { LeftRail } from "./components/LeftRail";
 import type { CenterView } from "./components/LeftRail";
 import { LoginPrompt } from "./components/LoginPrompt";
 import type { GuestAction } from "./components/LoginPrompt";
-import { MockControls } from "./components/MockControls";
-import type { EntryStage, FeedMode } from "./components/MockControls";
 import { NoteBox } from "./components/NoteBox";
 import { RightRail } from "./components/RightRail";
 import { ScreenHeader } from "./components/ScreenHeader";
@@ -48,6 +47,8 @@ import { Toast } from "./components/Toast";
 import { IconPen } from "./components/icons";
 import type { SootheTarget } from "./lib/soothePersonaRule";
 import { cx } from "./lib/cx";
+import { readMockScenario } from "./lib/mockScenario";
+import type { EntryStage } from "./lib/mockScenario";
 import { useTheme } from "./lib/useTheme";
 import { BubbleDetailScreen } from "./screens/BubbleDetailScreen";
 import { ComposePanel } from "./screens/ComposePanel";
@@ -58,6 +59,7 @@ import { LoginScreen } from "./screens/LoginScreen";
 import { MyProfileScreen } from "./screens/MyProfileScreen";
 import { PlaceholderScreen } from "./screens/PlaceholderScreen";
 import { PublicProfileScreen } from "./screens/PublicProfileScreen";
+import { SettingsScreen } from "./screens/SettingsScreen";
 import { SignUpScreen } from "./screens/SignUpScreen";
 import { SootheDetailScreen } from "./screens/SootheDetailScreen";
 import { TimelineScreen } from "./screens/TimelineScreen";
@@ -111,14 +113,34 @@ function currentView(history: readonly Location[]): CenterView {
 
 export function App() {
   const { theme, setTheme } = useTheme();
+
+  /*
+   * モックの見え方は URL で決める（人間の決定、2026-08-28）。
+   * 読むのは起動時の1回だけ。あとから URL を書き換えても、この画面は追いかけない
+   * （追いかける仕組みを作ると、実 API に差し替えるときに外す量が増える）。
+   */
+  const [scenario] = useState(() => readMockScenario(window.location.search));
+
   /*
    * AI は「評価」と「生成」を別に扱う（PO 回答 2026-08-25、Issue #19）。
    *   評価が使えない … バブルもあやすもできない（NFR-003）
    *   生成が使えない … 投稿とあやすは続けられる（NFR-001）
    */
-  const [aiEvaluateAvailable, setAiEvaluateAvailable] = useState(true);
-  const [aiTransformAvailable, setAiTransformAvailable] = useState(true);
-  const [feedMode, setFeedMode] = useState<FeedMode>("normal");
+  const aiEvaluateAvailable = scenario.aiEvaluate;
+  const aiTransformAvailable = scenario.aiTransform;
+  const feedMode = scenario.feed;
+
+  /* サーバ側の評価も落ちている扱いにする（投稿の可否が評価に依存するため） */
+  useEffect(() => {
+    setAiEvaluateAvailability(scenario.aiEvaluate);
+  }, [scenario.aiEvaluate]);
+
+  /* ?theme= が付いていたら、その選択を1回だけ書き込む。以後は保存された選択が勝つ */
+  useEffect(() => {
+    if (scenario.theme !== null) {
+      setTheme(scenario.theme);
+    }
+  }, [scenario.theme, setTheme]);
 
   /*
    * 画面の入り口（人間の指示、2026-08-25）。
@@ -126,11 +148,11 @@ export function App() {
    *   signup … S1 アカウント登録
    *   app    … 本編
    *
-   * モックなので既定は本編。説明と登録は操作帯の「入り口」から見る。
+   * モックなので既定は本編。説明と登録は ?entry=intro などで見る。
    * 本物では、未登録なら intro から始まり、登録が済めば app にしか入らない
    * （認証は Issue #7 で未確定）。
    */
-  const [entry, setEntry] = useState<EntryStage>("app");
+  const [entry, setEntry] = useState<EntryStage>(scenario.entry);
 
   /*
    * ログインしているかどうか（人間の指示、2026-08-26）。
@@ -282,40 +304,61 @@ export function App() {
    */
   const detailRequestRef = useRef(0);
 
-  const loadDetail = useCallback(async (ref: Extract<Location, { kind: "bubble" | "soothe" }>) => {
-    const requestId = (detailRequestRef.current += 1);
-    setDetailLoading(true);
-    if (ref.kind === "bubble") {
-      const result = await fetchBubbleDetail(ref.id);
-      if (requestId !== detailRequestRef.current) {
-        return;
+  /*
+   * 詳細を引く。
+   *
+   * ★ quiet は「開いている画面を消さずに引き直す」ため（人間の指摘 2026-08-27）。
+   *   リアクションを押すたびに skeleton へ差し替えていたので、
+   *     - 画面が 520ms（モックの通信待ち）ぶん前の画面に戻ったように見える
+   *     - スクロール位置が頭に戻る
+   *     - 押したボタンごと外れるので、押した瞬間の演出が1フレームで消える
+   *   の3つが起きていた。着いたとき（enter）だけ skeleton を出し、
+   *   引き直し（refresh）では出さない。
+   */
+  const loadDetail = useCallback(
+    async (
+      ref: Extract<Location, { kind: "bubble" | "soothe" }>,
+      options?: { readonly quiet?: boolean },
+    ) => {
+      const requestId = (detailRequestRef.current += 1);
+      if (!options?.quiet) {
+        setDetailLoading(true);
       }
-      setDetail(result ? { kind: "bubble", value: result } : null);
-    } else {
-      const result = await fetchSootheDetail(ref.id);
-      if (requestId !== detailRequestRef.current) {
-        return;
+      if (ref.kind === "bubble") {
+        const result = await fetchBubbleDetail(ref.id);
+        if (requestId !== detailRequestRef.current) {
+          return;
+        }
+        setDetail(result ? { kind: "bubble", value: result } : null);
+      } else {
+        const result = await fetchSootheDetail(ref.id);
+        if (requestId !== detailRequestRef.current) {
+          return;
+        }
+        setDetail(result ? { kind: "soothe", value: result } : null);
       }
-      setDetail(result ? { kind: "soothe", value: result } : null);
-    }
-    setDetailLoading(false);
-  }, []);
+      setDetailLoading(false);
+    },
+    [],
+  );
 
-  const loadProfile = useCallback(async () => {
-    setProfileLoading(true);
+  /*
+   * 以下の読み込みは、どれも quiet を取る。
+   *
+   * ★ quiet ＝「開いている中身を skeleton に差し替えずに引き直す」。
+   *   着いたとき（enter）は skeleton を出す。まだ何も無いところに枠を出すのは正しい。
+   *   すでに読めているものを引き直すとき（refresh / 大好きの解除）に skeleton へ戻すと、
+   *   押した反応のはずが画面の入れ替わりに見え、スクロール位置も飛ぶ
+   *   （人間の指摘 2026-08-27。リアクションで詳細が一瞬前の画面に戻って見えた件と同じ）。
+   */
+  const loadProfile = useCallback(async (options?: { readonly quiet?: boolean }) => {
+    if (!options?.quiet) {
+      setProfileLoading(true);
+    }
     setProfile(await fetchMyProfile());
     setProfileLoading(false);
   }, []);
 
-  /**
-   * ゲストなら止めて、理由を出す。ログイン中ならそのまま通す。
-   *
-   * 止めた操作を覚えておいて、ログイン後に代わりに実行することはしない。
-   * 本人が押していない操作が、あとから勝手に起きるのを避ける
-   * （リアクションは取り消せない）。
-   *
-   * ここはあくまで画面側の入口。本物は backend が同じ判定をする（FR-AUTH-001）。
-   */
   /*
    * ログインの状態を切り替える。
    *
@@ -347,6 +390,15 @@ export function App() {
     await loadFeed();
   }, [applySession, loadFeed]);
 
+  /**
+   * ゲストなら止めて、理由を出す。ログイン中ならそのまま通す。
+   *
+   * 止めた操作を覚えておいて、ログイン後に代わりに実行することはしない。
+   * 本人が押していない操作が、あとから勝手に起きるのを避ける
+   * （リアクションは取り消せない）。
+   *
+   * ここはあくまで画面側の入口。本物は backend が同じ判定をする（FR-AUTH-001）。
+   */
   const guard = useCallback(
     (action: GuestAction, run: () => void) => {
       if (isGuest) {
@@ -358,8 +410,10 @@ export function App() {
     [isGuest],
   );
 
-  const loadLiked = useCallback(async () => {
-    setLikedLoading(true);
+  const loadLiked = useCallback(async (options?: { readonly quiet?: boolean }) => {
+    if (!options?.quiet) {
+      setLikedLoading(true);
+    }
     const result = await fetchLikedPersonas();
     setLikedBaby(result.baby);
     setLikedMother(result.mother);
@@ -371,16 +425,22 @@ export function App() {
       setUnlikingId(personaId);
       await setLiked(personaId, false);
       setUnlikingId(null);
-      await loadLiked();
+      /* 1行 外しただけで一覧ごと skeleton に戻さない */
+      await loadLiked({ quiet: true });
     },
     [loadLiked],
   );
 
-  const loadActivity = useCallback(async (tab: ActivityTab) => {
-    setActivityLoading(true);
-    setActivity(await fetchMyActivity(tab));
-    setActivityLoading(false);
-  }, []);
+  const loadActivity = useCallback(
+    async (tab: ActivityTab, options?: { readonly quiet?: boolean }) => {
+      if (!options?.quiet) {
+        setActivityLoading(true);
+      }
+      setActivity(await fetchMyActivity(tab));
+      setActivityLoading(false);
+    },
+    [],
+  );
 
   /**
    * S6 の中身を引く。
@@ -411,8 +471,10 @@ export function App() {
   );
 
   const loadPublicActivity = useCallback(
-    async (personaId: string, tab: ActivityTab) => {
-      setPublicActivityLoading(true);
+    async (personaId: string, tab: ActivityTab, options?: { readonly quiet?: boolean }) => {
+      if (!options?.quiet) {
+        setPublicActivityLoading(true);
+      }
       setPublicActivity(await fetchPublicActivity(personaId, tab));
       setPublicActivityLoading(false);
     },
@@ -530,23 +592,30 @@ export function App() {
     [push],
   );
 
-  /** いま居る場所だけを引き直す。移動はしない */
+  /**
+   * いま居る場所だけを引き直す。移動はしない。
+   * 開いている画面は消さない（skeleton に差し替えない）。引き直しは、
+   * 押した反応の続きとして起きるものなので、画面が入れ替わって見えてはいけない。
+   */
   const refresh = useCallback(async () => {
     if (here.kind === "bubble" || here.kind === "soothe") {
-      await loadDetail(here);
+      await loadDetail(here, { quiet: true });
       return;
     }
     if (here.kind === "public") {
       // 一覧の切り替えは そのまま。開いていたタブが勝手に戻らないようにする
-      await loadPublicActivity(here.personaId, publicTab);
+      await loadPublicActivity(here.personaId, publicTab, { quiet: true });
       return;
     }
     if (here.view === "profile") {
-      await Promise.all([loadProfile(), loadActivity(activityTab)]);
+      await Promise.all([
+        loadProfile({ quiet: true }),
+        loadActivity(activityTab, { quiet: true }),
+      ]);
       return;
     }
     if (here.view === "favorites") {
-      await loadLiked();
+      await loadLiked({ quiet: true });
       return;
     }
     if (feedMode !== "loading") {
@@ -572,31 +641,11 @@ export function App() {
    * サーバ側では正しく弾かれているのに画面には何も出ない状態になっていた
    * （人間の指摘）。ここで理由を拾って一言だけ出す。
    */
-  const reactToBubble = useCallback(
-    async (bubbleId: string, reaction: ReactionType) => {
-      const result = await addReaction({
-        target: { type: "bubble", id: bubbleId },
-        targetKind: "bubble",
-        reaction,
-      });
+  const react = useCallback(
+    async (input: AddReactionInput) => {
+      const result = await addReaction(input);
       if (!result.ok && result.reason === "max_reached") {
-        setToast("もう 5回 おくったよ");
-      }
-      await refresh();
-    },
-    [refresh],
-  );
-
-  const reactToSoothe = useCallback(
-    async (sootheId: string, authorKind: PersonaKind, reaction: ReactionType) => {
-      const result = await addReaction({
-        target: { type: "soothe", id: sootheId },
-        // 対象の種類は発信ペルソナから決まる。ここで種類を選び直さない
-        targetKind: reactionTargetOfSoothe(authorKind),
-        reaction,
-      });
-      if (!result.ok && result.reason === "max_reached") {
-        setToast("もう 5回 おくったよ");
+        setToast("もう " + String(REACTION_MAX_PER_USER) + "回 おくったよ");
       }
       await refresh();
     },
@@ -664,16 +713,25 @@ export function App() {
 
   const reactToBubbleGuarded = useCallback(
     (bubbleId: string, reaction: ReactionType) => {
-      guard("react", () => void reactToBubble(bubbleId, reaction));
+      guard("react", () => {
+        void react({ target: { type: "bubble", id: bubbleId }, targetKind: "bubble", reaction });
+      });
     },
-    [guard, reactToBubble],
+    [guard, react],
   );
 
   const reactToSootheGuarded = useCallback(
     (sootheId: string, authorKind: PersonaKind, reaction: ReactionType) => {
-      guard("react", () => void reactToSoothe(sootheId, authorKind, reaction));
+      guard("react", () => {
+        void react({
+          target: { type: "soothe", id: sootheId },
+          // 対象の種類は発信ペルソナから決まる。ここで種類を選び直さない
+          targetKind: reactionTargetOfSoothe(authorKind),
+          reaction,
+        });
+      });
     },
-    [guard, reactToSoothe],
+    [guard, react],
   );
 
   // 場所が変わったら中央を先頭へ戻す
@@ -688,25 +746,6 @@ export function App() {
   if (entry !== "app") {
     return (
       <div className="eg-app">
-        <MockControls
-          theme={theme}
-          onThemeChange={setTheme}
-          aiEvaluateAvailable={aiEvaluateAvailable}
-          onAiEvaluateChange={(available) => {
-            setAiEvaluateAvailable(available);
-            setAiEvaluateAvailability(available);
-          }}
-          aiTransformAvailable={aiTransformAvailable}
-          onAiTransformChange={setAiTransformAvailable}
-          feedMode={feedMode}
-          onFeedModeChange={(mode) => {
-            setFeedLoading(true);
-            setFeedMode(mode);
-          }}
-          entry={entry}
-          onEntryChange={setEntry}
-        />
-
         {entry === "intro" ? (
           <IntroScreen onStart={() => setEntry("signup")} onSkip={() => setEntry("signup")} />
         ) : null}
@@ -749,26 +788,6 @@ export function App() {
 
   return (
     <div className={cx("eg-app", "eg-app--shell", compose && "is-composing")}>
-      <MockControls
-        theme={theme}
-        onThemeChange={setTheme}
-        aiEvaluateAvailable={aiEvaluateAvailable}
-        onAiEvaluateChange={(available) => {
-          setAiEvaluateAvailable(available);
-          // サーバ側の評価も落ちている扱いにする（投稿の可否が評価に依存するため）
-          setAiEvaluateAvailability(available);
-        }}
-        aiTransformAvailable={aiTransformAvailable}
-        onAiTransformChange={setAiTransformAvailable}
-        feedMode={feedMode}
-        onFeedModeChange={(mode) => {
-          setFeedLoading(true);
-          setFeedMode(mode);
-        }}
-        entry={entry}
-        onEntryChange={setEntry}
-      />
-
       {/*
         起動時の読み込み失敗（人間の指摘、public/data/*.json が読めないときに
         画面全体が無反応の読み込み中のまま固まっていた）。
@@ -831,16 +850,8 @@ export function App() {
         <main className="eg-center">
           {here.kind === "public" ? (
             <PublicProfileScreen
-              /*
-                ゲストには「大好き済み」も「これは自分」も無い。
-                サーバは閲覧者ごとに違う値を返すが、モックは1人ぶんしか持っていないので、
-                ここで落としておく（本物では応答がそもそもこうなる）。
-              */
-              profile={
-                publicProfile && isGuest
-                  ? { ...publicProfile, liked: false, isMe: false }
-                  : publicProfile
-              }
+              /* ゲスト向けの落とし込みは data/api.ts が済ませている（FR-AUTH-001 の境界） */
+              profile={publicProfile}
               activity={publicActivity}
               loading={publicLoading}
               activityLoading={publicActivityLoading}
@@ -871,10 +882,15 @@ export function App() {
             />
           ) : null}
 
+          {here.kind === "view" && here.view === "settings" ? (
+            <SettingsScreen theme={theme} onThemeChange={setTheme} />
+          ) : null}
+
           {here.kind === "view" &&
           here.view !== "timeline" &&
           here.view !== "favorites" &&
-          here.view !== "profile" ? (
+          here.view !== "profile" &&
+          here.view !== "settings" ? (
             <PlaceholderScreen view={here.view} />
           ) : null}
 

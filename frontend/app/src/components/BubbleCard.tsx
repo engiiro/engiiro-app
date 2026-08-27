@@ -1,5 +1,6 @@
 import type { Bubble, ReactionType } from "../data/types";
 import { cx } from "../lib/cx";
+import { sootheCountText } from "../lib/sootheCountText";
 import { BubbleBody } from "./BubbleBody";
 import { PersonaChip } from "./PersonaChip";
 import { ReactionRow } from "./ReactionRow";
@@ -59,9 +60,7 @@ export function BubbleCard({
       <button type="button" className="eg-bubble__balloon" onClick={() => onOpen(bubble.id)}>
         <BubbleBody body={bubble.body} className="eg-bubble__body" as="span" />
         <span className={cx("eg-bubble__more", "t-caption")}>
-          {bubble.sootheCount > 0
-            ? "あやす " + String(bubble.sootheCount)
-            : "まだ あやされてない"}
+          {sootheCountText(bubble.sootheCount)}
         </span>
       </button>
 
