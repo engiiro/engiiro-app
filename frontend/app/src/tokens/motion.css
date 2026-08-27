@@ -104,6 +104,39 @@
   }
 }
 
+/* 満タン（5回目）の合図。アイコンが一度だけ跳ねる。
+ * 拡大の原資は --pop-scale なので、reduced motion では自動で無害になる（DESIGN.md §7.5）。 */
+@keyframes eg-reaction-cheer {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(calc(var(--distance-micro) * -1)) scale(var(--pop-scale));
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/*
+ * 満タンの粒。ボタンの上へ立ちのぼって消える（bubble-call の drift と同じ作り）。
+ * 上がる高さ（--spark-rise）は粒ごとに変える。移動の原資は --distance-medium なので、
+ * reduced motion では 0 に潰れる（DESIGN.md §7.5）。
+ */
+@keyframes eg-reaction-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.4);
+  }
+  30% {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, var(--spark-rise)) scale(1);
+  }
+}
+
 /* ── 3. toast：下から 400ms、消えるのは 350ms ─────────────────────────────── */
 @keyframes eg-toast-in {
   from {
@@ -276,8 +309,9 @@
     --ease-bounce: var(--ease-smooth-out);
   }
 
-  /* 粒子は等価物が無いので出さない */
-  .eg-burst {
+  /* 粒子は等価物が無いので出さない。満タンで立ちのぼる粒も同じ */
+  .eg-burst,
+  .eg-reaction__spark {
     display: none;
   }
 
