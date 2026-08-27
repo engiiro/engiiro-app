@@ -1,0 +1,79 @@
+/* DESIGN.md §4 Persona Badge / Avatar */
+
+.eg-persona {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+/*
+ * S6 への入り口。チップ全体が当たり判定になる（人間の指示、2026-08-25）。
+ * 押せることは、狙ったときの下線とアバターの縁で示す。
+ * ふだんから下線を引くと、フィードが読み物でなくリンクの列に見える。
+ */
+.eg-persona--link {
+  padding: var(--space-xxs);
+  margin: calc(var(--space-xxs) * -1);
+  border-radius: var(--rounded-md);
+  text-align: start;
+  transition: background-color var(--duration-quick) var(--ease-in-out);
+}
+
+.eg-persona--link:hover {
+  background: var(--card);
+}
+
+.eg-persona--link:hover .eg-persona__name,
+.eg-persona--link:focus-visible .eg-persona__name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.eg-persona--link:active {
+  transform: scale(var(--press-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-persona--link {
+    transition: none;
+  }
+}
+
+.eg-persona__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.eg-persona__name {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.eg-persona__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.eg-persona__role {
+  padding: 0 var(--space-xs);
+  border-radius: var(--rounded-pill);
+}
+
+.eg-persona__role.is-baby {
+  color: var(--baby);
+  background: var(--baby-soft);
+}
+
+.eg-persona__role.is-mother {
+  color: var(--mother);
+  background: var(--mother-soft);
+}
+
+.eg-persona__time {
+  color: var(--muted);
+}

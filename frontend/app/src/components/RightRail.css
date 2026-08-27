@@ -1,0 +1,77 @@
+/* 右サイド。後々エンジニア関連の記事が流れてくる場所（人間の決定、2026-08-25） */
+
+.eg-right-rail {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg) 0;
+}
+
+.eg-right-rail__card {
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  background: var(--surface);
+  box-shadow: var(--elevation-offset);
+}
+
+.eg-right-rail__title {
+  color: var(--ink);
+}
+
+.eg-right-rail__note {
+  margin-top: var(--space-xs);
+  color: var(--muted);
+}
+
+.eg-right-rail__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.eg-right-rail__skeleton {
+  height: var(--space-sm);
+  border-radius: var(--rounded-xs);
+  background: var(--skeleton);
+}
+
+.eg-right-rail__skeleton + .eg-right-rail__skeleton {
+  margin-top: var(--space-xxs);
+}
+
+.eg-right-rail__skeleton--short {
+  width: 64%;
+}
+
+/* よみものの上のログイン欄 */
+.eg-right-rail__session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.eg-right-rail__session-title {
+  color: var(--ink);
+}
+
+/* 出すのは赤ちゃんの顔だけ。両方を並べない（DESIGN.md §0.1-1） */
+.eg-right-rail__who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.eg-right-rail__nickname {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* この欄の中では、注記の上余白を詰める */
+.eg-right-rail__session .eg-right-rail__note {
+  margin-top: 0;
+}

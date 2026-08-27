@@ -1,0 +1,247 @@
+/*
+ * motion.css — 動きのトークンと、MVP で入れる5つの型（DESIGN.md §7）
+ *
+ * transitions.dev の共有スケールをそのまま採る。独自の数値を作らない。
+ * transition: all を書かない。動かすのは transform と opacity を基本にする。
+ */
+
+:root {
+  --duration-stagger: 40ms;
+  --duration-micro: 80ms;
+  --duration-quick: 150ms;
+  --duration-fast: 250ms;
+  --duration-medium: 350ms;
+  --duration-slow: 400ms;
+  --duration-very-slow: 500ms;
+
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: ease-in-out;
+  --ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --ease-linear: linear;
+
+  --distance-micro: 4px;
+  --distance-base: 8px;
+  --distance-medium: 12px;
+  --scale-modal: 0.96;
+  --blur-small: 2px;
+  --blur-medium: 3px;
+
+  /* 押した瞬間の反応（DESIGN.md §4 Press / §7.4）。reduced-motion で 1 に戻す */
+  --press-scale: 0.985;
+  --press-scale-strong: 0.97;
+  --pop-scale: 1.18;
+
+  /* テーマ切替そのものは長く動かさない（DESIGN.md §7.2） */
+  --duration-theme: 120ms;
+}
+
+/* ── 1. skeleton-reveal：脈動 → cross-blur で本体へ ───────────────────────── */
+@keyframes eg-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes eg-content-reveal {
+  from {
+    opacity: 0;
+    filter: blur(var(--blur-medium));
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* ── 2. like-button：pop + 粒子 ───────────────────────────────────────────── */
+@keyframes eg-like-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(var(--pop-scale));
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes eg-number-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-micro));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 5回目に一度だけ広がる波紋。到達したことを体で伝える */
+@keyframes eg-ring-out {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes eg-burst {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--burst-x), var(--burst-y)) scale(1);
+  }
+}
+
+/* ── 3. toast：下から 400ms、消えるのは 350ms ─────────────────────────────── */
+@keyframes eg-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-medium));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes eg-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--distance-medium));
+  }
+}
+
+/* ── 4. modal：scale(0.96) → 1、開 250ms / 閉 150ms。出た経路で帰す ────────── */
+@keyframes eg-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-medium)) scale(var(--scale-modal));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes eg-modal-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--distance-medium)) scale(var(--scale-modal));
+  }
+}
+
+/*
+ * 右から出て右へ帰るパネル（modal 型の使い回し）。
+ * 中央の列が左へ詰まる動きも同じ duration / easing にして、ひとつの運動として読ませる。
+ */
+@keyframes eg-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--distance-medium)) scale(var(--scale-modal));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes eg-panel-out {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(var(--distance-medium)) scale(var(--scale-modal));
+  }
+}
+
+/* 引き出しは下から。パネルの中の動きなので短く */
+@keyframes eg-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-medium));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes eg-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes eg-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ── 5. texts-reveal：12px + blur 3px を 40ms ずらし。合計 300ms 未満 ─────── */
+@keyframes eg-texts-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-medium));
+    filter: blur(var(--blur-medium));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/*
+ * Reduced Motion（DESIGN.md §7.5）
+ * 「動きを消す」ことではなく「前庭系に触らない等価物に置き換える」こと。
+ * 移動・拡大・跳ね・ぼかしの原資であるトークンを 0 / 1 に潰すと、
+ * 上の keyframes は opacity と色の変化だけを残したまま無害になる。
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --distance-micro: 0px;
+    --distance-base: 0px;
+    --distance-medium: 0px;
+    --scale-modal: 1;
+    --blur-small: 0px;
+    --blur-medium: 0px;
+    --press-scale: 1;
+    --press-scale-strong: 1;
+    --pop-scale: 1;
+    --ease-bounce: var(--ease-smooth-out);
+  }
+
+  /* 粒子は等価物が無いので出さない */
+  .eg-burst {
+    display: none;
+  }
+}

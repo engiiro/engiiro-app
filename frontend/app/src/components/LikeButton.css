@@ -1,0 +1,57 @@
+/* 「大好き」ボタン（＝フォロー。FR-FOLLOW-001/002） */
+
+.eg-like {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-pill);
+  background: var(--surface);
+  color: var(--muted);
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-quick) var(--ease-in-out),
+    color var(--duration-quick) var(--ease-in-out);
+}
+
+.eg-like:active {
+  transform: scale(var(--press-scale));
+}
+
+.eg-like:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 押した状態は 枠・地・文字の3つで示す。ハートの塗りだけに頼らない */
+.eg-like.is-liked {
+  font-weight: 700;
+}
+
+.eg-like.is-liked .eg-like__icon {
+  fill: currentColor;
+}
+
+.eg-like.is-baby.is-liked {
+  border-color: var(--baby);
+  background: var(--baby-soft);
+  color: var(--baby);
+}
+
+.eg-like.is-mother.is-liked {
+  border-color: var(--mother);
+  background: var(--mother-soft);
+  color: var(--mother);
+}
+
+.eg-like__icon {
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-like {
+    transition: none;
+  }
+}

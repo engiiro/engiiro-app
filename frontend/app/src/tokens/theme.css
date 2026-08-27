@@ -1,0 +1,181 @@
+/*
+ * theme.css — 色と、テーマごとに変わる装飾量のトークン
+ *
+ * 正本は DESIGN.md（frontmatter の themes.normal / themes.dark / themes.kid と §2）。
+ * ここ以外のファイルに生の hex を書かない。コンポーネントは必ず役割名を参照する。
+ *
+ * 実装契約（DESIGN.md §8.3）：
+ *   1. 素の :root にノーマルの全役割を置く（既定値）
+ *   2. OS のダークは、明示指定が無いときだけ効かせる
+ *   3. :root[data-theme="..."] の明示指定が常に勝つ
+ * メディアクエリや [data-theme] の中だけで定義される色は作らない。
+ */
+
+/* ── 1. 既定＝ノーマル（DESIGN.md §2.2。配色は検討中の暫定値） ───────────── */
+:root {
+  /* 面 */
+  --canvas: #fff8f1;
+  --surface: #fffdf9;
+  --card: #f1e7de;
+  --hairline: #e8ded6;
+
+  /* 文字 */
+  --ink: #312624;
+  --body: #4a3c37;
+  --muted: #6e615c;
+
+  /* 臙脂。線用と塗り用を分けるのがトークン契約の要（DESIGN.md §2.1） */
+  --accent-line: #9b3342;
+  --accent-fill: #9b3342;
+  --accent-fill-large: #8e2f3b;
+  --accent-press: #7d2633;
+  --accent-soft: #f2e4e6;
+  --on-accent: #fffdf9;
+
+  /* ペルソナ「役割」の色。利用者ごとに割り当てない（DESIGN.md §0.1-2） */
+  --baby: #9b3342;
+  --baby-soft: #f2e4e6;
+  --mother: #39704e;
+  --mother-fill: #4f8f69;
+  --mother-soft: #e3f1e9;
+
+  /*
+   * 意味色。園児UI 側の値は DESIGN.md に記載が無いため、3テーマともノーマルの値を
+   * 既定として持つ（= 園児UI は上書きしない）。現状どの画面でも未使用。README の
+   * 「既知の制限」に残してある。
+   */
+  --success: #39704e;
+  --warning: #8c5a0c;
+  --error: #8c2f1e;
+
+  /* 派生色。ink から作るので、テーマごとの再定義が要らない */
+  --scrim: color-mix(in srgb, var(--ink) 45%, transparent);
+  --skeleton: color-mix(in srgb, var(--ink) 9%, var(--surface));
+
+  /* ── テーマごとに変わる装飾量（DESIGN.md §1.3・§6）。色ではなく形の話 ── */
+  --border-width: 1px;
+  --input-border-style: solid;
+  --elevation-offset: none;
+  --elevation-modal: 0 12px 32px -12px color-mix(in srgb, var(--ink) 18%, transparent);
+  --tilt: 0deg;
+  --radius-blob: var(--rounded-lg);
+  --radius-control: var(--rounded-md);
+}
+
+/* ── 2. OS のダーク。明示指定が無いときだけ効かせる ─────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="normal"]):not([data-theme="kid"]) {
+    --canvas: #1a1513;
+    --surface: #221b18;
+    --card: #2b231f;
+    --hairline: #3a302a;
+
+    --ink: #f4ede4;
+    --body: #dcd1c6;
+    --muted: #a8998e;
+
+    /* 臙脂 #9B3342 は暗い地で 2.54:1。線用は明度を上げた薄紅、塗りは別値（DESIGN.md §2.3） */
+    --accent-line: #e28e9c;
+    --accent-fill: #b54254;
+    --accent-fill-large: #b54254;
+    --accent-press: #c85c6d;
+    --accent-soft: #3a2226;
+    --on-accent: #fffdf9;
+
+    --baby: #e28e9c;
+    --baby-soft: #3a2226;
+    --mother: #7fc79a;
+    --mother-fill: #6fb88c;
+    --mother-soft: #1f2e25;
+
+    --success: #7fc79a;
+    --warning: #e0b25c;
+    --error: #e88a78;
+
+    --scrim: color-mix(in srgb, var(--canvas) 82%, transparent);
+    --skeleton: color-mix(in srgb, var(--ink) 12%, var(--surface));
+
+    /* 暗い地の上の暗い影は見えない。階層は面色差で作る（DESIGN.md §6） */
+    --elevation-modal: none;
+  }
+}
+
+/* ── 3. 明示指定は常に勝つ ─────────────────────────────────────────────── */
+:root[data-theme="dark"] {
+  --canvas: #1a1513;
+  --surface: #221b18;
+  --card: #2b231f;
+  --hairline: #3a302a;
+
+  --ink: #f4ede4;
+  --body: #dcd1c6;
+  --muted: #a8998e;
+
+  --accent-line: #e28e9c;
+  --accent-fill: #b54254;
+  --accent-fill-large: #b54254;
+  --accent-press: #c85c6d;
+  --accent-soft: #3a2226;
+  --on-accent: #fffdf9;
+
+  --baby: #e28e9c;
+  --baby-soft: #3a2226;
+  --mother: #7fc79a;
+  --mother-fill: #6fb88c;
+  --mother-soft: #1f2e25;
+
+  --success: #7fc79a;
+  --warning: #e0b25c;
+  --error: #e88a78;
+
+  --scrim: color-mix(in srgb, var(--canvas) 82%, transparent);
+  --skeleton: color-mix(in srgb, var(--ink) 12%, var(--surface));
+
+  --elevation-modal: none;
+}
+
+/* 園児UI。OS 設定からは選ばれない、利用者が明示的に選ぶテーマ（DESIGN.md §8.3） */
+:root[data-theme="kid"] {
+  --canvas: #fff9e3;
+  --surface: #ffffff;
+  --card: #fff3c4;
+  --hairline: #e8c84a;
+
+  --ink: #2b211c;
+  --body: #5a4a40;
+  --muted: #7a675c;
+
+  --accent-line: #c22648;
+  --accent-fill: #c22648;
+  --accent-fill-large: #c22648;
+  --accent-press: #a31e3c;
+  --accent-soft: #ffe0e6;
+  --on-accent: #fffdf9;
+
+  --baby: #c22648;
+  --baby-soft: #ffe0e6;
+  --mother: #2e7a50;
+  --mother-fill: #7fb069;
+  --mother-soft: #e4f3dc;
+
+  /* 装飾はこのテーマの本体。削ると園児UI である意味がなくなる（DESIGN.md §1.3） */
+  --border-width: 2px;
+  --input-border-style: dashed;
+  --elevation-offset: 6px 6px 0 var(--hairline);
+  --elevation-modal: 6px 6px 0 var(--hairline);
+  --tilt: -2.5deg;
+  --radius-blob: 18px 24px 16px 22px / 22px 16px 24px 18px;
+  --radius-control: var(--rounded-pill);
+}
+
+/*
+ * prefers-contrast: more では hairline を body 寄りに、muted を body に寄せる（DESIGN.md §8.3）。
+ * カスタムプロパティは同一ブロック内の最終値で解決されるため、どちらも body に着地する。
+ * 高コントラスト側では枠線が強いほうが望ましいので、そのまま採る。
+ */
+@media (prefers-contrast: more) {
+  :root {
+    --hairline: var(--muted);
+    --muted: var(--body);
+  }
+}

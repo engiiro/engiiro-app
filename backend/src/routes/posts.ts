@@ -1,47 +1,268 @@
 // docs/design_doc.md 7章「API設計」の
-//   POST /api/posts
-//   GET  /api/posts/feed
-// に対応するスタブ実装。他のエンドポイント（comments, reactions, follows, ai/* など）も
-// 同じパターンで src/routes/ に追加していく想定。
+//   POST   /api/posts
+//   GET    /api/posts/feed
+//   GET    /api/posts/:id
+//   DELETE /api/posts/:id
+// に対応する。
 
-import { getKv } from "../lib/kv.ts";
-import type { Post } from "../models/types.ts";
+import { query, withTransaction } from "../lib/db.ts";
+import { resolveAccountId } from "../lib/auth.ts";
+import { checkPostable } from "../lib/contentGate.ts";
+import { recordPersonaAgeEstimate } from "../lib/personaEstimate.ts";
+import { error, errorWithReason, json, readJson } from "../lib/http.ts";
+import type { BabyPersonaRow, PostRow, PostStampRow } from "../models/types.ts";
+
+interface StampInput {
+  stampId: string;
+  position?: number;
+}
+
+interface IdRow {
+  id: string;
+}
+
+interface EstimatedAgeRow {
+  estimated_age: string | null;
+}
+
+interface PostFeedRow extends PostRow {
+  estimated_age: string | null;
+}
+
+interface ReactionCountRow {
+  type: string;
+  count: string;
+}
+
+interface AccountIdRow {
+  account_id: string;
+}
+
+interface DeletedAtRow {
+  deleted_at: string;
+}
 
 export async function handleCreatePost(req: Request): Promise<Response> {
-  const body = await req.json();
-  const kv = await getKv();
+  const accountId = await resolveAccountId(req);
+  if (!accountId) return error("認証が必要です。", 401);
 
-  const post: Post = {
-    id: crypto.randomUUID(),
-    babyPersonaId: body.babyPersonaId,
-    body: body.body ?? "",
-    stamps: body.stamps ?? [],
-    tags: body.tags ?? [],
-    mood: body.mood,
-    createdAt: new Date().toISOString(),
-  };
+  const body = await readJson(req);
+  if (!body) return error("リクエストの形式が正しくありません。", 400);
 
-  await kv.set(["posts", post.id], post);
-  await kv.set(["posts_by_persona", post.babyPersonaId, post.id], post.id);
+  const text = typeof body.body === "string" ? body.body : "";
+  const stamps: StampInput[] = Array.isArray(body.stamps) ? body.stamps : [];
 
-  return Response.json({ id: post.id, createdAt: post.createdAt }, {
-    status: 201,
+  const personaResult = await query<BabyPersonaRow>(
+    "select id from baby_personas where account_id = $1",
+    [accountId],
+  );
+  const babyPersona = personaResult.rows[0];
+  if (!babyPersona) return error("赤ちゃんペルソナが見つかりません。", 404);
+
+  const gate = await checkPostable(text, "baby");
+  if (!gate.ok) {
+    const status = gate.reason === "ai_unavailable" ? 503 : 422;
+    return errorWithReason(
+      gate.publicMessage ?? "保存できませんでした。",
+      status,
+      gate.reason ?? "moderation",
+    );
+  }
+
+  try {
+    const created = await withTransaction(async (client) => {
+      const postResult = await client.query<PostRow>(
+        `insert into posts (baby_persona_id, body)
+         values ($1, $2)
+         returning id, created_at`,
+        [babyPersona.id, text],
+      );
+      const post = postResult.rows[0];
+
+      for (const stamp of stamps) {
+        if (typeof stamp.stampId !== "string") continue;
+        await client.query(
+          `insert into post_stamps (post_id, stamp_id, position)
+           values ($1, $2, $3)`,
+          [post.id, stamp.stampId, stamp.position ?? null],
+        );
+      }
+
+      return post;
+    });
+
+    if (gate.estimatedAge !== undefined) {
+      await recordPersonaAgeEstimate("baby", babyPersona.id, gate.estimatedAge);
+    }
+
+    return json({ id: created.id, createdAt: created.created_at }, 201);
+  } catch (err) {
+    console.error("[posts] create failed:", err);
+    return error("投稿の保存に失敗しました。", 500);
+  }
+}
+
+export async function handleFeed(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const limitParam = Number(url.searchParams.get("limit"));
+  const limit = Number.isFinite(limitParam) && limitParam > 0
+    ? Math.min(limitParam, 50)
+    : 20;
+  const cursor = url.searchParams.get("cursor");
+
+  const accountId = await resolveAccountId(req);
+
+  // 閲覧者のペルソナの推定年齢に近い投稿を優先する（FR-FEED-003）。
+  // 未ログイン時は新着順のみ（FR-GUEST-004、4.4章）。
+  // 具体的なランキングロジックは実装フェーズで検討する項目のため、ここでは
+  // 「推定年齢の近さ」で単純に並べ替える最小実装にする。
+  let viewerEstimatedAge: number | null = null;
+  if (accountId) {
+    const babyResult = await query<IdRow>(
+      "select id from baby_personas where account_id = $1",
+      [accountId],
+    );
+    const babyId = babyResult.rows[0]?.id;
+    if (babyId) {
+      const estimateResult = await query<EstimatedAgeRow>(
+        "select estimated_age from persona_age_estimates where persona_type = 'baby' and persona_id = $1",
+        [babyId],
+      );
+      const value = estimateResult.rows[0]?.estimated_age;
+      viewerEstimatedAge = value !== null && value !== undefined
+        ? Number(value)
+        : null;
+    }
+  }
+
+  const params: unknown[] = [];
+  let cursorClause = "";
+  if (cursor) {
+    params.push(cursor);
+    cursorClause =
+      `and p.created_at < (select created_at from posts where id = $${params.length})`;
+  }
+  params.push(limit);
+
+  const result = await query<PostFeedRow>(
+    `select p.*, pae.estimated_age
+     from posts p
+     left join persona_age_estimates pae
+       on pae.persona_type = 'baby' and pae.persona_id = p.baby_persona_id
+     where p.deleted_at is null
+     ${cursorClause}
+     order by p.created_at desc
+     limit $${params.length}`,
+    params,
+  );
+
+  interface RankedRow {
+    row: PostFeedRow;
+    similarityScore: number | undefined;
+  }
+
+  const rows: RankedRow[] = result.rows.map((row: PostFeedRow) => {
+    const estimatedAge = row.estimated_age !== null
+      ? Number(row.estimated_age)
+      : null;
+    const similarityScore = viewerEstimatedAge !== null && estimatedAge !== null
+      ? 1 / (1 + Math.abs(viewerEstimatedAge - estimatedAge))
+      : undefined;
+    return { row, similarityScore };
+  });
+
+  if (viewerEstimatedAge !== null) {
+    rows.sort((a: RankedRow, b: RankedRow) =>
+      (b.similarityScore ?? 0) - (a.similarityScore ?? 0)
+    );
+  }
+
+  const posts = rows.map(({ row, similarityScore }: RankedRow) => ({
+    postId: row.id,
+    ...(similarityScore !== undefined ? { similarityScore } : {}),
+  }));
+
+  const nextCursor = result.rows.length === limit
+    ? result.rows[result.rows.length - 1].id
+    : undefined;
+
+  return json({ posts, ...(nextCursor ? { nextCursor } : {}) });
+}
+
+export async function handleGetPost(
+  _req: Request,
+  params: Record<string, string | undefined>,
+): Promise<Response> {
+  const id = params.id;
+  if (!id) return error("idを指定してください。", 400);
+
+  const postResult = await query<PostRow>(
+    "select * from posts where id = $1 and deleted_at is null",
+    [id],
+  );
+  const post = postResult.rows[0];
+  if (!post) return error("見つかりませんでした。", 404);
+
+  const stampsResult = await query<PostStampRow>(
+    "select stamp_id, position from post_stamps where post_id = $1",
+    [id],
+  );
+
+  const reactionResult = await query<ReactionCountRow>(
+    `select type, count(*) as count
+     from reactions
+     where target_type = 'post' and target_post_id = $1
+     group by type`,
+    [id],
+  );
+  const reactionCounts = { ogya: 0, yoshiyoshi: 0, manma: 0 } as Record<
+    string,
+    number
+  >;
+  for (const r of reactionResult.rows) {
+    if (r.type in reactionCounts) reactionCounts[r.type] = Number(r.count);
+  }
+
+  return json({
+    id: post.id,
+    babyPersonaId: post.baby_persona_id,
+    body: post.body,
+    stamps: stampsResult.rows.map((s: PostStampRow) => ({
+      stampId: s.stamp_id,
+      position: s.position,
+    })),
+    reactionCounts,
+    createdAt: post.created_at,
   });
 }
 
-export async function handleFeed(_req: Request): Promise<Response> {
-  const kv = await getKv();
-  const posts: Post[] = [];
+export async function handleDeletePost(
+  req: Request,
+  params: Record<string, string | undefined>,
+): Promise<Response> {
+  const accountId = await resolveAccountId(req);
+  if (!accountId) return error("認証が必要です。", 401);
 
-  for await (const entry of kv.list<Post>({ prefix: ["posts"] })) {
-    posts.push(entry.value);
+  const id = params.id;
+  if (!id) return error("idを指定してください。", 400);
+
+  const ownerResult = await query<AccountIdRow>(
+    `select bp.account_id
+     from posts p
+     join baby_personas bp on bp.id = p.baby_persona_id
+     where p.id = $1 and p.deleted_at is null`,
+    [id],
+  );
+  const owner = ownerResult.rows[0];
+  if (!owner) return error("見つかりませんでした。", 404);
+  if (owner.account_id !== accountId) {
+    return error("自分のバブルのみ削除できます。", 403);
   }
 
-  // TODO: 閲覧者の推定年齢・投稿傾向に近い投稿を優先表示するレコメンドロジックを実装する
-  // （docs/design_doc.md 7.1 の GET /api/posts/feed を参照。まずは新着順で返すだけの状態）
-  const ordered = posts
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    .map((p) => ({ postId: p.id }));
+  const result = await query<DeletedAtRow>(
+    "update posts set deleted_at = now() where id = $1 returning deleted_at",
+    [id],
+  );
 
-  return Response.json({ posts: ordered });
+  return json({ deletedAt: result.rows[0].deleted_at });
 }

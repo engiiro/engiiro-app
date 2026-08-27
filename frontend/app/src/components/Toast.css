@@ -1,0 +1,23 @@
+/* DESIGN.md §7.3 toast。影を使う数少ない場所のひとつ（§6） */
+
+.eg-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--space-xxl) + var(--space-lg) + env(safe-area-inset-bottom));
+  z-index: 40;
+  transform: translateX(-50%);
+  max-width: calc(var(--feed-max-width) - var(--space-xxl));
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-control);
+  border: var(--border-width) solid var(--accent-fill-large);
+  /* 面積の大きい塗りなので accent-fill-large（DESIGN.md §5.3-2） */
+  background: var(--accent-fill-large);
+  color: var(--on-accent);
+  box-shadow: var(--elevation-modal);
+  animation: eg-toast-in var(--duration-slow) var(--ease-smooth-out) both;
+}
+
+/* 閉じるほうが速い。閉じる動作に delay を入れない（DESIGN.md §7.2） */
+.eg-toast.is-leaving {
+  animation: eg-toast-out var(--duration-medium) var(--ease-smooth-out) both;
+}

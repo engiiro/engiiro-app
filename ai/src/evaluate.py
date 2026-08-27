@@ -1,7 +1,11 @@
 """
 docs/design_doc.md 7章の POST /api/ai/evaluate に対応する評価ロジック。
 
-最初はシンプルなルールベースのプレースホルダーとし、
+ここでは応答の `estimatedAge`（何歳児相当かの目安）のみを扱う。保存可否を決める
+`passesThreshold`（FR-AI-EVAL-007）は `src/style_classifier.py` のナイーブベイズ
+3クラス分類器が担当する（`app.py` 参照）。
+
+`estimatedAge` は最初はシンプルなルールベースのプレースホルダーとし、
 後からPyTorch/scikit-learnで学習したモデルに差し替える想定
 （design_doc.md 8章「開発の進め方」参照）。
 """

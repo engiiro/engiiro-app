@@ -1,8 +1,22 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/encoding@0.224.0": "0.224.0",
+    "jsr:@zaubrik/djwt@^3.0.2": "3.0.2",
+    "npm:bcryptjs@^2.4.3": "2.4.3",
     "npm:node-pg-migrate@9": "9.0.0_pg@8.23.0",
     "npm:pg@^8.23.0": "8.23.0"
+  },
+  "jsr": {
+    "@std/encoding@0.224.0": {
+      "integrity": "efb6dca97d3e9c31392bd5c8cfd9f9fc9decf5a1f4d1f78af7900a493bcf89b5"
+    },
+    "@zaubrik/djwt@3.0.2": {
+      "integrity": "8070adaa49cd9e5d2b8ae82fd461132c966ef2f8ff8378db4a4da8df4f17c664",
+      "dependencies": [
+        "jsr:@std/encoding"
+      ]
+    }
   },
   "npm": {
     "ansi-regex@6.3.0": {
@@ -13,6 +27,9 @@
     },
     "balanced-match@4.0.4": {
       "integrity": "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA=="
+    },
+    "bcryptjs@2.4.3": {
+      "integrity": "sha512-V/Hy/X9Vt7f3BbPJEi8BdVFMByHi+jNXrYkW3huaybV/kQ0KJg0Y6PkEMbn+zeT+i+SiKZ/HMqJGIIt4LZDqNQ=="
     },
     "brace-expansion@5.0.9": {
       "integrity": "sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==",
@@ -192,6 +209,8 @@
   "workspace": {
     "dependencies": [
       "jsr:@std/http@^1.0.20",
+      "jsr:@zaubrik/djwt@^3.0.2",
+      "npm:bcryptjs@^2.4.3",
       "npm:pg@^8.23.0"
     ]
   }

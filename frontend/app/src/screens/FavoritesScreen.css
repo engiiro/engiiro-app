@@ -1,0 +1,60 @@
+/* S7 おきにいり ＝ 大好きな人の一覧 */
+
+.eg-favorites {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding-top: var(--space-md);
+  padding-bottom: var(--space-xl);
+}
+
+.eg-favorites__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.eg-favorites__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.eg-favorites__title.is-baby {
+  color: var(--baby);
+}
+
+.eg-favorites__title.is-mother {
+  color: var(--mother);
+}
+
+/* 数が増えても幅が飛ばない */
+.eg-favorites__count {
+  font-variant-numeric: tabular-nums;
+}
+
+.eg-favorites__none {
+  color: var(--muted);
+}
+
+.eg-favorites__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.eg-favorites__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+}
+
+/* ニックネーム側が伸び、大好きボタンは右端に寄る */
+.eg-favorites__row > .eg-persona {
+  flex: 1;
+  min-width: 0;
+}

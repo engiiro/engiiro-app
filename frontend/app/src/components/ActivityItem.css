@@ -1,0 +1,104 @@
+/* プロフィールの一覧に並ぶ1件（S8 / S6） */
+
+.eg-activity {
+  /* 本文ボタンの当たり判定を1件の全面へ広げるための基準（下の __open::after） */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+}
+
+/* 広げた当たり判定より前に出す。ここを上げないと けす ボタンが押せない */
+.eg-activity__head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.eg-activity__name {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.eg-activity__kind {
+  flex: none;
+  padding: 0 var(--space-xs);
+  border-radius: var(--rounded-pill);
+}
+
+.eg-activity__kind.is-baby {
+  color: var(--baby);
+  background: var(--baby-soft);
+}
+
+.eg-activity__kind.is-mother {
+  color: var(--mother);
+  background: var(--mother-soft);
+}
+
+/* 時刻から右は端に寄せる */
+.eg-activity__time {
+  margin-inline-start: auto;
+  flex: none;
+  color: var(--muted);
+}
+
+.eg-activity__delete {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border-radius: var(--rounded-xs);
+}
+
+.eg-activity__delete:hover {
+  color: var(--accent-line);
+}
+
+/* あやす先の抜粋も本文の一部として、開くボタンの手前には出さない */
+.eg-activity__to {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* 当たり判定は1件の全面（人間の指示、2026-08-25）。理由は BubbleCard.css と同じ */
+.eg-activity__open {
+  display: block;
+  width: 100%;
+  text-align: start;
+  border-radius: var(--rounded-xs);
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-activity__open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-blob);
+}
+
+.eg-activity__open:active {
+  background: var(--card);
+}
+
+.eg-activity__open:focus-visible {
+  outline: none;
+}
+
+.eg-activity__open:focus-visible::after {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+
+/* button の中では span で描いているので、ブロックとして流す */
+.eg-activity__body {
+  display: block;
+  color: var(--body);
+}

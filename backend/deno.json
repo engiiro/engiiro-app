@@ -9,7 +9,9 @@
   },
   "imports": {
     "@std/http": "jsr:@std/http@^1.0.20",
-    "pg": "npm:pg@^8.23.0"
+    "pg": "npm:pg@^8.23.0",
+    "djwt": "jsr:@zaubrik/djwt@^3.0.2",
+    "bcrypt": "npm:bcryptjs@^2.4.3"
   },
   "fmt": {
     "proseWrap": "preserve"

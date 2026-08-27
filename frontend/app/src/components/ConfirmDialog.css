@@ -1,0 +1,54 @@
+/*
+ * 不可逆な操作にだけ出す確認（DESIGN.md §4 バブルの削除）。
+ * 取り消せる操作に confirm を出すと、押し流す癖がつく。
+ */
+
+.eg-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gutter);
+  background: var(--scrim);
+  animation: eg-fade-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+.eg-scrim.is-leaving {
+  animation: eg-fade-out var(--duration-quick) var(--ease-smooth-out) both;
+}
+
+.eg-confirm {
+  width: 100%;
+  max-width: calc(var(--feed-max-width) - var(--space-xxl) * 2);
+  padding: var(--space-lg);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+  box-shadow: var(--elevation-modal);
+  animation: eg-modal-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+.eg-scrim.is-leaving .eg-confirm {
+  animation: eg-modal-out var(--duration-quick) var(--ease-smooth-out) both;
+}
+
+.eg-confirm__title {
+  color: var(--ink);
+}
+
+.eg-confirm__body {
+  margin-top: var(--space-sm);
+  color: var(--body);
+}
+
+.eg-confirm__actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.eg-confirm__actions > * {
+  flex: 1;
+}

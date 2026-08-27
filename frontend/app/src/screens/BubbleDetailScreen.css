@@ -1,0 +1,75 @@
+/* S4 バブル詳細 */
+
+.eg-detail {
+  padding-top: var(--space-md);
+}
+
+.eg-detail__bubble {
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  background: var(--surface);
+  box-shadow: var(--elevation-offset);
+}
+
+.eg-detail__body {
+  margin-top: var(--space-sm);
+  color: var(--body);
+}
+
+.eg-detail__reactions {
+  margin-top: var(--space-md);
+}
+
+.eg-detail__own {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: var(--border-width) solid var(--hairline);
+}
+
+.eg-detail__delete {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-control);
+  color: var(--accent-line);
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-detail__delete:hover,
+.eg-detail__delete:active {
+  background: var(--accent-soft);
+}
+
+.eg-detail__soothes {
+  margin-top: var(--space-lg);
+}
+
+.eg-detail__soothes-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+  color: var(--ink);
+}
+
+.eg-detail__soothes-count {
+  color: var(--muted);
+}
+
+.eg-detail__soothe-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* あやすボタン。中央の列の下に貼りつく（画面全体に固定しない） */
+.eg-detail__action {
+  position: sticky;
+  bottom: 0;
+  margin-top: var(--space-lg);
+  padding: var(--space-sm) 0 var(--space-lg);
+  background: var(--canvas);
+  border-top: var(--border-width) solid var(--hairline);
+}
