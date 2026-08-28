@@ -741,3 +741,79 @@ export async function fetchLikedPersonas(): Promise<{
     throw err;
   }
 }
+
+/*
+ * ────────────── AI文章変換・評価(コンポーズ画面の「変換」「はかる」) ──────────────
+ *
+ * 以前はComposePanel.tsxが ../lib/mockAiTransform / mockAiEvaluate を直接呼んでおり、
+ * 実backendの POST /api/ai/transform・evaluate へ全く繋がっていなかった
+ * (人間の指摘、2026-08-28)。ここに実装を足し、ComposePanel.tsx側の
+ * importをこちらへ差し替える。
+ */
+
+/** AIが止まっているときに投げる。投稿とあやすは止めない（NFR-001） */
+export class AiUnavailableError extends Error {
+  constructor() {
+    super("ai unavailable");
+    this.name = "AiUnavailableError";
+  }
+}
+
+export type AiTransformResult =
+  | { readonly action: "allow"; readonly transformedText: string }
+  | { readonly action: "rewrite_required" }
+  | { readonly action: "block" };
+
+export async function transformText(
+  text: string,
+  style: PersonaKind,
+): Promise<AiTransformResult> {
+  try {
+    const data = await api.post<{
+      action: "allow" | "rewrite_required" | "block";
+      transformedText: string | null;
+    }>("/api/ai/transform", { body: text, style });
+    if (data.action === "allow" && data.transformedText !== null) {
+      return { action: "allow", transformedText: data.transformedText };
+    }
+    return { action: data.action === "allow" ? "block" : data.action };
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 503) {
+      throw new AiUnavailableError();
+    }
+    throw err;
+  }
+}
+
+export type AiEvaluateResult = {
+  readonly months: number;
+  readonly label: string;
+  readonly axis: string;
+};
+
+/**
+ * 「はかる」ボタン用。POST /api/ai/evaluate を呼び、月齢相当の指標だけを返す
+ * （合否はここでは使わない。保存時の合否はcreateBubble/createSoothe側でbackendが判定する）。
+ */
+export async function evaluateText(
+  text: string,
+  personaKind: PersonaKind,
+): Promise<AiEvaluateResult> {
+  try {
+    const data = await api.post<{ estimatedAge: number; passesThreshold: boolean }>(
+      "/api/ai/evaluate",
+      { body: text, personaType: personaKind },
+    );
+    const months = Math.max(0, Math.min(72, Math.round(data.estimatedAge * 12)));
+    return {
+      months,
+      label: monthsToLabel(months),
+      axis: personaKind === "baby" ? "赤ちゃん度（文章の幼さ）" : "お母さん度（向けている相手の年齢）",
+    };
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 503) {
+      throw new AiUnavailableError();
+    }
+    throw err;
+  }
+}
