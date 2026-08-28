@@ -305,6 +305,11 @@ export async function fetchMyProfile(): Promise<MyProfile> {
  * PersonaStatus（何か月相当か・ラベル）へ変換する。
  * サンプル件数はサーバが返さないため、推定値が無ければ0件・あれば1件以上とみなす
  * （NFR-002：使えないときはnullにする、の判定にだけ使う）。
+ *
+ * ★ ラベルは「1歳2か月」のような具体的な月齢表示（人間の指摘 2026-08-28）。
+ *   一時「あかちゃん/よちよち/こども/おとな」の大まかな区分を返す実装に
+ *   なっていたことがあり、以前の月齢表示に戻した。区分ラベルは
+ *   evaluateText（「はかる」ボタン、押した直後の粗い目安でよい場面）だけで使う。
  */
 function statusFromEstimate(
   estimatedAge: number | null,
@@ -315,9 +320,18 @@ function statusFromEstimate(
     return { months: 0, label: "まだ わからない", axis, sampleCount: 0 };
   }
   const months = Math.round(estimatedAge * 12);
-  return { months, label: monthsToLabel(months), axis, sampleCount: 1 };
+  return { months, label: monthsToAgeText(months), axis, sampleCount: 1 };
 }
 
+/** 「1歳2か月」「3か月」のような具体的な月齢表示。0〜72か月を年+月に分ける */
+function monthsToAgeText(months: number): string {
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  if (years === 0) return String(rest) + "か月";
+  return rest === 0 ? String(years) + "歳" : String(years) + "歳" + String(rest) + "か月";
+}
+
+/** 「はかる」ボタン（evaluateText）用の粗い区分ラベル */
 function monthsToLabel(months: number): string {
   if (months <= 6) return "あかちゃん";
   if (months <= 18) return "よちよち";
