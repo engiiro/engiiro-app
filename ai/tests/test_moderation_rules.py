@@ -91,6 +91,18 @@ def test_NG語をblockする():
         assert "ng_word" in result["reasonCodes"]
 
 
+def test_赤ちゃんの身体語は単体で弾かない():
+    for sample in ["おっぱいほしい", "おしっこしたい", "ちんちんかゆい", "おむつかえて"]:
+        assert check_rules(sample)["action"] == "allow", sample
+
+
+def test_性的文脈との組み合わせはblockする():
+    for sample in ["おっぱいを吸う性的な行為", "性器を触って快感を得る"]:
+        result = check_rules(sample)
+        assert result["action"] == "block", (sample, result)
+        assert "sexual_context" in result["reasonCodes"]
+
+
 def test_マサカリ寄りの語をrewrite_requiredにする():
     result = check_rules("あの人は無能だと思う。")
     assert result["action"] == "rewrite_required"
