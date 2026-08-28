@@ -11,7 +11,10 @@ import {
 import { handleCreateAccount } from "./src/routes/accounts.ts";
 import { handleLogin, handleLogout } from "./src/routes/sessions.ts";
 import { handleListStamps } from "./src/routes/stamps.ts";
-import { handleGetMyProfile } from "./src/routes/profile.ts";
+import {
+  handleGetMyProfile,
+  handleUpdateMyProfile,
+} from "./src/routes/profile.ts";
 import {
   handleGetBabyPersona,
   handleGetMotherPersona,
@@ -71,6 +74,12 @@ const routes: Route[] = [
     method: "GET",
     pattern: new URLPattern({ pathname: "/api/profile/me" }),
     handler: handleGetMyProfile,
+  },
+  {
+    // ニックネームの変更（人間の指示 2026-08-28）。本人のペルソナだけを更新する
+    method: "PATCH",
+    pattern: new URLPattern({ pathname: "/api/profile/me" }),
+    handler: handleUpdateMyProfile,
   },
 
   {

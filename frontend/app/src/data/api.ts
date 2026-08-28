@@ -22,6 +22,9 @@ import type {
   Soothe,
   SootheDetail,
   Stamp,
+  StampShelf,
+  UpdateNicknamesInput,
+  UpdateNicknamesResult,
 } from "./types";
 
 /*
@@ -409,6 +412,123 @@ export const NICKNAME_MAX_LENGTH = 20;
 export const ACCOUNT_ID_RULE_TEXT = "半角の 英小文字・数字・_ で 3〜20 文字";
 export const BIRTHDAY_MIN = "1900-01-01";
 
+/*
+ * パスワードの規則（人間の決定、2026-08-28）。
+ *
+ * ★ 使えるのは半角の英字・数字・記号。全角文字とスペースは使えない。
+ *   判定は「印字できる ASCII（U+0021〜U+007E）だけで出来ているか」の1本にする。
+ *   この範囲はスペース（U+0020）を含まないので、「記号は使える／空白は使えない」を
+ *   1つの正規表現で両方いえる。全角は範囲の外なので自動的に落ちる。
+ *
+ * ★ 同じ規則を3か所が見る：入力欄の補足文・画面の判定・backend の判定
+ *   （backend/src/routes/accounts.ts の PASSWORD_PATTERN と同じ形）。
+ *   片方だけ直すと、画面は通すのにサーバが弾く（またはその逆）状態になる。
+ *
+ * ★ 上限は決めない（仕様に無い）。
+ */
+const PASSWORD_ALLOWED = /^[!-~]+$/;
+
+export const PASSWORD_RULE_TEXT = String(PASSWORD_MIN_LENGTH) +
+  " 文字以上。半角の 英字・数字・記号が つかえます（全角と スペースは つかえません）";
+
+/** パスワードとして使えない理由。使えるときは null */
+export type PasswordProblem = "too_short" | "charset";
+
+export function passwordProblem(password: string): PasswordProblem | null {
+  /* 空欄は「まだ入れていない」なので、ここでは理由を出さない（呼び出し側が先に見る） */
+  if (password === "") return null;
+  if (!PASSWORD_ALLOWED.test(password)) return "charset";
+  if (password.length < PASSWORD_MIN_LENGTH) return "too_short";
+  return null;
+}
+
+/** 登録に出せる形か。空欄も「まだ出せない」に含める */
+export function isValidPassword(password: string): boolean {
+  return password !== "" && passwordProblem(password) === null;
+}
+
+/*
+ * ニックネームの規則（人間の指示 2026-08-28 のニックネーム変更に伴って明文化）。
+ *
+ * 仕様書に文字数・使用可能文字の規定は無い。決めたのは「画面がすでに約束していること」：
+ *   - 登録画面が入力欄に maxLength=20 を掛けている → 上限 20 文字
+ *   - 登録画面が「ふたつの ニックネームを 同じに できません」と書いている
+ *     → 赤ちゃんとお母さんで同じ名前にはできない（判定はサーバ側。FR-PERSONA-003）
+ *   - 表示は1行のチップ（PersonaChip） → 改行・タブ・制御文字は入れない
+ *
+ * 同じ規則を backend/src/lib/nickname.ts が持っている。片方だけ直さない。
+ */
+export type NicknameProblem = "empty" | "too_long" | "charset";
+
+/** 保存する形。前後の空白は落とす（全角スペースも JS の trim が落とす） */
+export function normalizeNickname(nickname: string): string {
+  return nickname.trim();
+}
+
+function hasControlChar(value: string): boolean {
+  for (const ch of value) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code < 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
+
+/** 使えない理由。使えるときは null。空欄は「まだ入れていない」なので empty */
+export function nicknameProblem(nickname: string): NicknameProblem | null {
+  const value = normalizeNickname(nickname);
+  if (value === "") return "empty";
+  if (hasControlChar(value)) return "charset";
+  /* サロゲートペアを2文字と数えない。data/constants.ts の countChars と同じ数え方 */
+  if ([...value].length > NICKNAME_MAX_LENGTH) return "too_long";
+  return null;
+}
+
+export const NICKNAME_RULE_TEXT = String(NICKNAME_MAX_LENGTH) +
+  " 文字まで。赤ちゃんと お母さんで 同じ名前には できません";
+
+/**
+ * ニックネームを変える（PATCH /api/profile/me）。
+ *
+ * ★ 送るのは新しい名前だけ。どのペルソナかを id で指定しない。
+ *   サーバがトークンから持ち主を引いて、その人の赤ちゃん／お母さんだけを更新する。
+ *   ＝ 他人のニックネームを変える経路が、そもそも API に無い。
+ * ★ 片方だけ送れる。送らなかった側はサーバでも触らない（FR-PERSONA-002）。
+ * ★ 戻り値は**サーバが返した保存後の値**から作る。送った文字列で画面を書き換えない
+ *   （前後の空白の落とし方などがずれると、画面とサーバで別のものが出る）。
+ */
+export async function updateNicknames(
+  input: UpdateNicknamesInput,
+): Promise<UpdateNicknamesResult> {
+  const payload: Record<string, string> = {};
+  if (input.baby !== undefined) payload.babyNickname = normalizeNickname(input.baby);
+  if (input.mother !== undefined) payload.motherNickname = normalizeNickname(input.mother);
+
+  try {
+    const data = await api.patch<AuthMeResponse>("/api/profile/me", payload);
+    const result = meFromAuthResponse(data);
+    me = result;
+    return { ok: true, me: result };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      if (err.status === 401) return { ok: false, reason: "unauthorized" };
+      switch (err.reason) {
+        case "nickname_empty":
+          return { ok: false, reason: "empty" };
+        case "nickname_too_long":
+          return { ok: false, reason: "too_long" };
+        case "nickname_charset":
+          return { ok: false, reason: "charset" };
+        case "nickname_same":
+          return { ok: false, reason: "same" };
+        default:
+          return { ok: false, reason: "failed" };
+      }
+    }
+    /* 通信そのものの失敗。画面は「もう一度」を出せる形にする */
+    return { ok: false, reason: "failed" };
+  }
+}
+
 export function todayIsoDate(): string {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -432,6 +552,19 @@ export async function createAccount(input: CreateAccountInput): Promise<CreateAc
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.status === 409) return { ok: false, reason: "account_id_taken" };
+      // パスワードだけは理由を分けて受ける。画面と同じ規則を backend も持っているので、
+      // ここに来るのは画面の判定をすり抜けたときだけだが、そのとき ID の文言を出すと
+      // 直しようがない（人間の指摘 2026-08-28）。
+      if (err.reason === "password_weak") return { ok: false, reason: "password_weak" };
+      /*
+       * ニックネームも backend が理由を返すようになった（2026-08-28、
+       * lib/nickname.ts を登録と変更で共有したときから）。
+       * ここで拾わないと「ID は…」という無関係な文が出る。
+       */
+      if (err.reason === "nickname_empty") return { ok: false, reason: "nickname_empty" };
+      if (err.reason === "nickname_too_long") return { ok: false, reason: "nickname_too_long" };
+      if (err.reason === "nickname_charset") return { ok: false, reason: "nickname_too_long" };
+      if (err.reason === "nickname_same") return { ok: false, reason: "nickname_same" };
       // それ以外のバリデーション不備は、画面の入力チェックで既に弾いている前提の
       // 粗い区分に丸める（サーバのメッセージそのものは表示側の契約に無い）。
       return { ok: false, reason: "account_id_invalid" };
@@ -569,17 +702,31 @@ export async function createSoothe(input: CreateSootheInput): Promise<CreateSoot
   }
 }
 
+/**
+ * 応答の shelf を型の中に落とす。
+ *
+ * backend が古い（shelf を返さない）ときでもスタンプ自体は出したいので、
+ * 知らない値は「へんじ」に寄せる。棚が1つに潰れるだけで、絵は消えない。
+ */
+const KNOWN_SHELVES: readonly string[] = ["weak", "glad", "soothe", "reply"];
+
+function toShelf(raw: unknown): StampShelf {
+  return typeof raw === "string" && KNOWN_SHELVES.includes(raw) ? (raw as StampShelf) : "reply";
+}
+
 export async function fetchStamps(): Promise<readonly Stamp[]> {
-  const data = await api.get<{ stamps: { id: string; name: string; imageUrl: string }[] }>(
-    "/api/stamps",
-  );
-  // GET /api/stamps の応答（設計書§7）には shelf が無い。backend側の追加が要るため、
-  // 決まるまでは全部「そのほか」として扱う（stampGroups側のフォールバック棚に入る）。
+  const data = await api.get<
+    { stamps: { id: string; name: string; imageUrl: string; shelf?: string }[] }
+  >("/api/stamps");
+  /*
+   * 並びは backend（stamps.sort_order）が正本。ここで並べ直さない。
+   * 棚への振り分けは data/stampCatalog.ts の stampGroups がやる。
+   */
   const stamps: Stamp[] = data.stamps.map((s) => ({
     id: s.id,
     name: s.name,
     imageUrl: s.imageUrl,
-    shelf: "reply",
+    shelf: toShelf(s.shelf),
   }));
   registerStamps(stamps);
   return STAMP_CATALOG;

@@ -5,7 +5,9 @@
 // 本番でのオリジン制限方針は未確定（design_doc.md 10章のオープンイシュー）。
 
 const ALLOWED_HEADERS = "content-type, authorization";
-const ALLOWED_METHODS = "GET, POST, DELETE, OPTIONS";
+// PATCHはPATCH /api/profile/me（ニックネーム変更）で使う。
+// ここに載せないとブラウザがプリフライトで落とす。
+const ALLOWED_METHODS = "GET, POST, PATCH, DELETE, OPTIONS";
 
 function allowedOrigin(): string {
   return Deno.env.get("CORS_ORIGIN") ?? "*";

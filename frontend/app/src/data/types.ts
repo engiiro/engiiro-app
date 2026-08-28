@@ -160,12 +160,40 @@ export type Stamp = {
   /*
    * どの棚に置くか。一覧を分けるために使う。
    *
-   * ★ GET /api/stamps の応答（設計書 §7）には無い項目。実 API に差し替えるときは
-   *   backend 側の追加が要る。勝手に決められないので、ここではモックデータ
-   *   （public/data/stamps.json）が持っている前提にしている。
+   * ★ GET /api/stamps の応答に足してもらった項目（2026-08-28）。設計書 §7 の
+   *   表にはまだ無い。無い応答（古い backend）が来たときは data/api.ts の
+   *   toShelf が「へんじ」に寄せるので、棚が潰れるだけで絵は出る。
    */
   readonly shelf: StampShelf;
 };
+
+/**
+ * ニックネームの変更（人間の指示、2026-08-28）。
+ *
+ * ★ 変えられるのは自分のペルソナだけ。どのペルソナを変えるかを id で指定しない。
+ *   サーバはトークンから持ち主を引いて、その赤ちゃん／お母さんだけを更新する。
+ * ★ 片方だけ送れる。送らなかった側は変わらない（FR-PERSONA-002）。
+ */
+export type UpdateNicknamesInput = {
+  readonly baby?: string;
+  readonly mother?: string;
+};
+
+export type UpdateNicknamesResult =
+  | { readonly ok: true; readonly me: Me }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "empty"
+        | "too_long"
+        | "charset"
+        /** 赤ちゃんとお母さんが同じ名前になる（FR-PERSONA-003） */
+        | "same"
+        /** ログインしていない／期限切れ */
+        | "unauthorized"
+        /** 通信や保存の失敗。もう一度やり直せる */
+        | "failed";
+    };
 
 export type CreateBubbleInput = {
   readonly body: string;

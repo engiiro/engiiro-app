@@ -22,6 +22,64 @@
   color: var(--muted);
 }
 
+/* ── なまえ（人間の指示 2026-08-28）───────────────────
+ *
+ * 赤ちゃんとお母さんを同時に出さない（DESIGN.md §0.1-1）。
+ * 出ているのは、切り替えで選んだほう1つだけ。
+ */
+
+.eg-nickname {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--card-padding-top) var(--card-padding) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  /* 中身が入れ替わって高さが伸び縮みする面なので、伸びる箱の角（DESIGN.md §4） */
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+}
+
+/* いまの なまえ。読むだけの状態 */
+.eg-nickname__current {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.eg-nickname__name {
+  color: var(--ink);
+  /* 20文字が入る。狭い幅では折り返して読ませる（切らない） */
+  overflow-wrap: anywhere;
+}
+
+/*
+ * 保存できた合図。トーストは消えるので、この場にも残す。
+ * 色だけで伝えないよう、チェックの形と文字を並べる（DESIGN.md §2.5）。
+ */
+.eg-nickname__saved {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  color: var(--success);
+}
+
+.eg-nickname__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.eg-nickname__actions {
+  display: flex;
+  /* 狭い幅では2つが縦に落ちる。押す面は縮めない */
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.eg-nickname__note {
+  color: var(--muted);
+}
+
 /* ── みため：テーマの札 ─────────────────────────────────────────── */
 
 .eg-theme-list {

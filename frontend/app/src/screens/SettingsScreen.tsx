@@ -1,12 +1,22 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
+import {
+  NICKNAME_RULE_TEXT,
+  nicknameProblem,
+  updateNicknames,
+} from "../data/api";
+import type { Me, PersonaKind, UpdateNicknamesResult } from "../data/types";
 import { cx } from "../lib/cx";
 import { THEME_CHOICES, THEME_LABEL } from "../lib/useTheme";
 import type { ThemeChoice } from "../lib/useTheme";
 import { useResolvedTheme } from "../lib/useResolvedTheme";
+import { Button } from "../components/Button";
 import { IconCheck, IconChevronRight } from "../components/icons";
 import { NoteBox } from "../components/NoteBox";
+import { PersonaAvatar } from "../components/PersonaAvatar";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { SegmentedTabs } from "../components/SegmentedTabs";
+import { TextField } from "../components/TextField";
 import "./SettingsScreen.css";
 
 /*
@@ -17,7 +27,11 @@ import "./SettingsScreen.css";
  *   置いたのはテーマの切り替え。DESIGN.md §8.3 が実装契約まで決めている、
  *   この画面で唯一「利用者が選ぶ」と決まっている設定だから。
  *
- * ★ 仕様が決まっていないもの（おしらせの置き場所・なまえの変更）は、
+ * ★ なまえの変更を置いた（人間の指示、2026-08-28）。
+ *   FR-PERSONA-002 の受入条件「一方のニックネーム変更が他方に反映されない」が、
+ *   変更できることを前提にしている。サーバの口は PATCH /api/profile/me。
+ *
+ * ★ それ以外で仕様が決まっていないもの（おしらせの置き場所）は、
  *   押せる行にしない。押せる形にすると「あるのに動かない」に見える。
  *
  * ★ 通報・DM・フォロワー数の項目は作らない。0 を返すのではなく存在させない（16章 非スコープ）。
@@ -61,15 +75,22 @@ const ABOUT: readonly { readonly title: string; readonly lines: readonly string[
 /** まだ決まっていないもの。押せる行にしない */
 const SOON: readonly { readonly title: string; readonly note: string }[] = [
   { title: "おしらせ", note: "どこに 出すか まだ 決めていません" },
-  { title: "なまえの 変更", note: "これから つくります" },
 ];
 
 export function SettingsScreen({
   theme,
   onThemeChange,
+  me,
+  isGuest,
+  onRenamed,
 }: {
   readonly theme: ThemeChoice;
   readonly onThemeChange: (next: ThemeChoice) => void;
+  /** 起動時の読み込みが終わるまで null */
+  readonly me: Me | null;
+  readonly isGuest: boolean;
+  /** 保存できたとき。App が自分の情報と、いま開いている画面を引き直す */
+  readonly onRenamed: (next: Me) => void;
 }) {
   /*
    * 「OSに従う」の見本だけは、選択そのものでは色が決まらない。
@@ -150,6 +171,8 @@ export function SettingsScreen({
           </p>
         </section>
 
+        <NicknameSection me={me} isGuest={isGuest} onRenamed={onRenamed} />
+
         <section className="eg-settings__section">
           <h2 className={cx("eg-settings__title", "t-heading")}>このアプリの こと</h2>
           {ABOUT.map((item) => (
@@ -212,5 +235,260 @@ function Disclosure({
         ))}
       </ul>
     </div>
+  );
+}
+
+/*
+ * なまえの変更（人間の指示、2026-08-28）。
+ *
+ * ★ 赤ちゃんとお母さんを同時に出さない（DESIGN.md §0.1-1
+ *   「同じ画面に自分の両ペルソナを並べない。S8 だけが例外」）。
+ *   切り替えて、選んだほう1つだけを出す。両方を並べた入力欄にすると、
+ *   S1（登録）と S8 に続く3つめの例外を作ることになる。
+ *   切り替えの部品は SegmentedTabs を使う（画面ごとに似て非なるタブを作らない）。
+ *
+ * ★ 保存中は二重に送らない。後から届いたほうが勝つ形になり、画面とサーバがずれる。
+ *
+ *   ★★ 止め方が2段ある。ボタンの disabled **だけでは足りない**。
+ *      disabled が付くのは React が描き直したあと。同じフレームのうちに
+ *      2回・3回と押されると（連打、Enter と クリックの重なり）、
+ *      描き直しより先に onClick が全部走る。
+ *      実際、ブラウザで3回連打したら 3回とも PATCH がサーバに届いた（2026-08-28 の確認）。
+ *      そこで savingRef（描き直しを待たずにその場で立つ印）で入口を閉じ、
+ *      disabled は「押せないことを目で見せる」ほうの役目に置いている。
+ *
+ * ★ 成功しても、送った文字列で画面を書き換えない。
+ *   サーバが返した保存後の値（updateNicknames の me）を App に渡し、
+ *   App がそれで自分の情報と いま開いている画面を引き直す。
+ *   画面だけ変わったように見える状態を作らないため。
+ *
+ * ★ 同じ名前にできないことは、押す前から補足文に書いてある（NICKNAME_RULE_TEXT）。
+ *   判定そのものはサーバが持つ。もう一方のニックネームをこの画面に出さずに
+ *   突き合わせるには、サーバに聞くしかない。
+ */
+
+const PERSONA_TABS: readonly { readonly value: PersonaKind; readonly label: string }[] = [
+  { value: "baby", label: "赤ちゃんの なまえ" },
+  { value: "mother", label: "お母さんの なまえ" },
+];
+
+/** 失敗の理由を、直せる形の文にする */
+const RENAME_ERROR_TEXT: Readonly<
+  Record<Extract<UpdateNicknamesResult, { ok: false }>["reason"], string>
+> = {
+  empty: "なまえを 入れてください。",
+  too_long: NICKNAME_RULE_TEXT + "。",
+  charset: "改行や とくしゅな文字は つかえません。",
+  same: "もう ひとつの なまえと 同じには できません。同じだと、同じ人だと 分かってしまいます。",
+  unauthorized: "ログインしなおしてから、もう一度 ためしてください。",
+  failed: "保存できませんでした。もう一度 ためしてください。",
+};
+
+/** 入力中に出す一行。空欄のあいだは出さない（まだ入れていないだけなので） */
+const NICKNAME_PROBLEM_TEXT = {
+  empty: "",
+  too_long: NICKNAME_RULE_TEXT + "。",
+  charset: "改行や とくしゅな文字は つかえません。",
+} as const;
+
+function NicknameSection({
+  me,
+  isGuest,
+  onRenamed,
+}: {
+  readonly me: Me | null;
+  readonly isGuest: boolean;
+  readonly onRenamed: (next: Me) => void;
+}) {
+  const [kind, setKind] = useState<PersonaKind>("baby");
+  /** 編集中の文字列。null なら「いまは読むだけ」 */
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  /*
+   * 送信中かどうかを、描き直しを待たずに持つ印（上の ★★）。
+   * state は次の描画までしか効かないので、連打の入口はこちらで閉じる。
+   */
+  const savingRef = useRef(false);
+
+  const persona = me === null ? null : kind === "baby" ? me.baby : me.mother;
+
+  function switchKind(next: PersonaKind) {
+    /* 切り替えたら書きかけを持ち越さない。別のペルソナの名前になってしまう */
+    setKind(next);
+    setDraft(null);
+    setError(null);
+    setSaved(false);
+  }
+
+  async function save() {
+    /* 送信中の2回目以降は、ここで捨てる。ボタンの見た目より先に効く */
+    if (draft === null || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    const result = await updateNicknames(
+      kind === "baby" ? { baby: draft } : { mother: draft },
+    );
+    savingRef.current = false;
+    setSaving(false);
+    if (!result.ok) {
+      setError(RENAME_ERROR_TEXT[result.reason]);
+      return;
+    }
+    /* 読むだけの状態に戻す。出す名前はサーバが返したほう */
+    setDraft(null);
+    setSaved(true);
+    onRenamed(result.me);
+  }
+
+  return (
+    <section className="eg-settings__section">
+      <h2 className={cx("eg-settings__title", "t-heading")}>なまえ</h2>
+
+      {isGuest || me === null ? (
+        <NoteBox title="なまえを かえるには">
+          アカウントが いります。いまは よむだけの じょうたいです。
+        </NoteBox>
+      ) : (
+        <>
+          <p className={cx("eg-settings__lead", "t-caption")}>
+            かえられるのは あなたの なまえだけです。ふたつの なまえは
+            いちどに ひとつずつ かえます。
+          </p>
+
+          <SegmentedTabs
+            tabs={PERSONA_TABS}
+            current={kind}
+            onChange={switchKind}
+            panelId="eg-nickname-panel"
+            label="どちらの なまえを かえるか"
+          />
+
+          <div
+            id="eg-nickname-panel"
+            role="tabpanel"
+            aria-labelledby={"eg-nickname-panel-tab-" + kind}
+            className="eg-nickname"
+          >
+            {draft === null ? (
+              <>
+                <div className="eg-nickname__current">
+                  <PersonaAvatar kind={kind} size="md" />
+                  <span className={cx("eg-nickname__name", "t-card-title")}>
+                    {persona?.nickname}
+                  </span>
+                </div>
+
+                {/* 成功したことを、消えるトーストだけに頼らない。この場にも残す */}
+                {saved ? (
+                  <p className={cx("eg-nickname__saved", "t-caption")} role="status">
+                    <IconCheck />
+                    なまえを かえました
+                  </p>
+                ) : null}
+
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setDraft(persona?.nickname ?? "");
+                    setSaved(false);
+                    setError(null);
+                  }}
+                >
+                  なまえを かえる
+                </Button>
+              </>
+            ) : (
+              <RenameForm
+                kind={kind}
+                draft={draft}
+                saving={saving}
+                error={error}
+                onChange={(next) => {
+                  setDraft(next);
+                  setError(null);
+                }}
+                onSave={() => void save()}
+                onCancel={() => {
+                  /* 送信中に割り込ませない（ボタンの disabled と同じ理由。上の ★★） */
+                  if (savingRef.current) return;
+                  setDraft(null);
+                  setError(null);
+                }}
+              />
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function RenameForm({
+  kind,
+  draft,
+  saving,
+  error,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  readonly kind: PersonaKind;
+  readonly draft: string;
+  readonly saving: boolean;
+  readonly error: string | null;
+  readonly onChange: (next: string) => void;
+  readonly onSave: () => void;
+  readonly onCancel: () => void;
+}) {
+  const issue = nicknameProblem(draft);
+  /* 空欄は「まだ入れていない」。ここで理由を出さず、保存だけ止める */
+  const inlineError =
+    issue === null || issue === "empty" ? undefined : NICKNAME_PROBLEM_TEXT[issue];
+  const canSave = !saving && issue === null;
+
+  return (
+    <form
+      className="eg-nickname__form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (canSave) onSave();
+      }}
+    >
+      <TextField
+        label={kind === "baby" ? "赤ちゃんの ニックネーム" : "お母さんの ニックネーム"}
+        hint={NICKNAME_RULE_TEXT}
+        error={inlineError}
+        value={draft}
+        /* 上限そのものは nicknameProblem が見る。ここは入れすぎを軽く止めるだけ */
+        maxLength={40}
+        disabled={saving}
+        autoComplete="off"
+        onChange={(event) => onChange(event.target.value)}
+      />
+
+      {error ? (
+        <NoteBox variant="reject" role="alert">
+          {error}
+        </NoteBox>
+      ) : null}
+
+      <div className="eg-nickname__actions">
+        {/* 保存中はどちらも押せない。二重に送らせない */}
+        <Button type="submit" disabled={!canSave}>
+          {saving ? "ほぞんしています…" : "ほぞん"}
+        </Button>
+        <Button type="button" variant="quiet" disabled={saving} onClick={onCancel}>
+          やめる
+        </Button>
+      </div>
+
+      <p className={cx("eg-nickname__note", "t-caption")}>
+        かえた なまえは、あなたの バブル・あやす・プロフィールの ぜんぶに 出ます。
+      </p>
+    </form>
   );
 }
