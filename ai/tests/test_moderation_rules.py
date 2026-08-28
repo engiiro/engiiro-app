@@ -97,10 +97,27 @@ def test_赤ちゃんの身体語は単体で弾かない():
 
 
 def test_性的文脈との組み合わせはblockする():
-    for sample in ["おっぱいを吸う性的な行為", "性器を触って快感を得る"]:
+    for sample in [
+        "おっぱいを吸う性的な行為",
+        "性器を触って快感を得る",
+        "ｵｯﾊﾟｲを いやらしく 触る",
+        "お っ ぱ いをアダルトな意味で吸う",
+        "全裸で性行為をする",
+    ]:
         result = check_rules(sample)
         assert result["action"] == "block", (sample, result)
         assert "sexual_context" in result["reasonCodes"]
+
+
+def test_生活文脈の身体語は誤検知しない():
+    for sample in [
+        "おっぱいが張っているので授乳した",
+        "おしっこしたいからおむつを替えて",
+        "ちんちんがかゆいのでお風呂で洗う",
+        "裸で寝ると涼しくて気持ちいい",
+        "赤ちゃんプレイという言葉の意味を辞書で調べた",
+    ]:
+        assert check_rules(sample)["action"] == "allow", sample
 
 
 def test_マサカリ寄りの語をrewrite_requiredにする():
