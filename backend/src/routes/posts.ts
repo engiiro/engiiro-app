@@ -8,7 +8,6 @@
 import { query, withTransaction } from "../lib/db.ts";
 import { resolveAccountId } from "../lib/auth.ts";
 import { checkPostable } from "../lib/contentGate.ts";
-import { recordPersonaAgeEstimate } from "../lib/personaEstimate.ts";
 import { error, errorWithReason, json, readJson } from "../lib/http.ts";
 import type { BabyPersonaRow, PostRow, PostStampRow } from "../models/types.ts";
 
@@ -135,10 +134,10 @@ export async function handleCreatePost(req: Request): Promise<Response> {
   try {
     const created = await withTransaction(async (client) => {
       const postResult = await client.query<PostRow>(
-        `insert into posts (baby_persona_id, body)
-         values ($1, $2)
+        `insert into posts (baby_persona_id, body, estimated_age)
+         values ($1, $2, $3)
          returning id, created_at`,
-        [babyPersona.id, text],
+        [babyPersona.id, text, gate.estimatedAge ?? null],
       );
       const post = postResult.rows[0];
 
@@ -153,10 +152,6 @@ export async function handleCreatePost(req: Request): Promise<Response> {
 
       return post;
     });
-
-    if (gate.estimatedAge !== undefined) {
-      await recordPersonaAgeEstimate("baby", babyPersona.id, gate.estimatedAge);
-    }
 
     return json({ id: created.id, createdAt: created.created_at }, 201);
   } catch (err) {

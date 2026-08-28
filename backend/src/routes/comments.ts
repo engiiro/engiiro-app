@@ -8,7 +8,6 @@
 import { query, withTransaction } from "../lib/db.ts";
 import { resolveAccountId } from "../lib/auth.ts";
 import { checkPostable } from "../lib/contentGate.ts";
-import { recordPersonaAgeEstimate } from "../lib/personaEstimate.ts";
 import { error, errorWithReason, json, readJson } from "../lib/http.ts";
 import type {
   BabyPersonaRow,
@@ -195,7 +194,6 @@ export async function handleCreateComment(
 
   let babyPersonaId: string | null = null;
   let motherPersonaId: string | null = null;
-  let selfPersonaId: string;
 
   if (personaType === "baby") {
     const result = await query<BabyPersonaRow>(
@@ -205,8 +203,7 @@ export async function handleCreateComment(
     if (!result.rows[0]) {
       return error("赤ちゃんペルソナが見つかりません。", 404);
     }
-    selfPersonaId = result.rows[0].id;
-    babyPersonaId = selfPersonaId;
+    babyPersonaId = result.rows[0].id;
   } else {
     const result = await query<MotherPersonaRow>(
       "select id from mother_personas where account_id = $1",
@@ -215,15 +212,14 @@ export async function handleCreateComment(
     if (!result.rows[0]) {
       return error("お母さんペルソナが見つかりません。", 404);
     }
-    selfPersonaId = result.rows[0].id;
-    motherPersonaId = selfPersonaId;
+    motherPersonaId = result.rows[0].id;
   }
 
   try {
     const created = await withTransaction(async (client) => {
       return await client.query<CommentRow>(
-        `insert into comments (post_id, persona_type, baby_persona_id, mother_persona_id, reply_to_comment_id, body)
-         values ($1, $2, $3, $4, $5, $6)
+        `insert into comments (post_id, persona_type, baby_persona_id, mother_persona_id, reply_to_comment_id, body, estimated_age)
+         values ($1, $2, $3, $4, $5, $6, $7)
          returning id, created_at`,
         [
           postId,
@@ -232,18 +228,11 @@ export async function handleCreateComment(
           motherPersonaId,
           replyToCommentId,
           text,
+          gate.estimatedAge ?? null,
         ],
       );
     });
     const comment = created.rows[0];
-
-    if (gate.estimatedAge !== undefined) {
-      await recordPersonaAgeEstimate(
-        personaType,
-        selfPersonaId,
-        gate.estimatedAge,
-      );
-    }
 
     return json({ id: comment.id, createdAt: comment.created_at }, 201);
   } catch (err) {
