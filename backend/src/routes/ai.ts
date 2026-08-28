@@ -34,11 +34,12 @@ export async function handleAiEvaluate(req: Request): Promise<Response> {
 
   // 「はかる」ボタンでは合否を出さず指標だけを見せる想定（feat-ui-profileブランチの
   // CLAUDE.md記載の運用方針）だが、design_doc.md 7.1章のレスポンス例はpassesThresholdを
-  // 含む形なので契約通り返す。閾値の具体的な初期値は未確定のため、常にtrueを返す仮実装
-  // （backend/src/lib/contentGate.tsのpassesThresholdと同じ仮ルール）。
+  // 含む形なので契約通り返す。合否はcontentGate.tsの保存ゲートと同じ、
+  // ai/src/style_classifier.pyのナイーブベイズ判定結果をそのまま使う
+  // （以前はここだけ常にtrueを返す仮実装のまま取り残されていた）。
   return json({
     estimatedAge: result.estimatedAge,
-    passesThreshold: true,
+    passesThreshold: result.passesThreshold,
   });
 }
 

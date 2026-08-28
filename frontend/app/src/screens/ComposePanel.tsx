@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { createBubble, createSoothe } from "../data/api";
+import {
+  AiUnavailableError,
+  createBubble,
+  createSoothe,
+  evaluateText,
+  transformText,
+} from "../data/api";
+import type { AiEvaluateResult } from "../data/api";
 import { BUBBLE_MAX_LENGTH, containsStamp, countChars, isOverLimit } from "../data/constants";
 import { stampGroups } from "../data/stampCatalog";
 import type { Me, PersonaKind } from "../data/types";
 import { cx } from "../lib/cx";
-import { AiUnavailableError, mockAiTransform } from "../lib/mockAiTransform";
-import { mockAiEvaluate, MAX_MONTHS } from "../lib/mockAiEvaluate";
-import type { AiEvaluateResult } from "../lib/mockAiEvaluate";
+import { MAX_MONTHS } from "../lib/mockAiEvaluate";
 import { soothePersonaRule } from "../lib/soothePersonaRule";
 import type { SootheTarget } from "../lib/soothePersonaRule";
 import { AiTransformPanel } from "../components/AiTransformPanel";
@@ -198,7 +203,12 @@ export function ComposePanel({
     setRejected(false);
     setAi({ kind: "working" });
     try {
-      const result = await mockAiTransform(body, persona, { available: aiTransformAvailable });
+      // ?ai-transform=off はデバッグ用の強制オフ（URL退避したモック操作の名残）。
+      // 実際の生死はbackend/aiサービスの応答（503→AiUnavailableError）で決まる。
+      if (!aiTransformAvailable) {
+        throw new AiUnavailableError();
+      }
+      const result = await transformText(body, persona);
       setAi(result.action === "allow" ? { kind: "allow", transformedText: result.transformedText } : { kind: result.action });
     } catch (error) {
       if (error instanceof AiUnavailableError) {
@@ -213,7 +223,10 @@ export function ComposePanel({
     setEvaluating(true);
     setEvaluateFailed(false);
     try {
-      setEvaluation(await mockAiEvaluate(body, persona, { available: aiEvaluateAvailable }));
+      if (!aiEvaluateAvailable) {
+        throw new AiUnavailableError();
+      }
+      setEvaluation(await evaluateText(body, persona));
     } catch (error) {
       if (error instanceof AiUnavailableError) {
         // 評価が使えないときは投稿もできない（NFR-003、2026-08-25 の PO 改訂）

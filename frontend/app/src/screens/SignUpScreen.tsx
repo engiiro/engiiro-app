@@ -8,7 +8,7 @@ import {
   createAccount,
   todayIsoDate,
 } from "../data/api";
-import type { CreateAccountResult } from "../data/types";
+import type { CreateAccountResult, Me } from "../data/types";
 import { cx } from "../lib/cx";
 import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/Button";
@@ -59,8 +59,8 @@ const ERROR_TEXT: Readonly<Record<Extract<CreateAccountResult, { ok: false }>["r
   };
 
 type SignUpScreenProps = {
-  /** 登録できたら、決まったニックネームを渡して本編へ */
-  readonly onDone: (babyNickname: string) => void;
+  /** 登録できたら、決まった両ペルソナの情報を渡して本編へ */
+  readonly onDone: (me: Me) => void;
   readonly onBack: () => void;
   readonly onLogin: () => void;
   /** ログインせずに読むのに戻る（人間の指示、2026-08-26） */
@@ -101,7 +101,7 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
     }
     /* 認証情報を画面に残さない（FR-ACCOUNT-003） */
     setPassword("");
-    onDone(result.me.baby.nickname);
+    onDone(result.me);
   }
 
   return (
