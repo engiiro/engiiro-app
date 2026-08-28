@@ -10,6 +10,10 @@
 import { query, withTransaction } from "../lib/db.ts";
 import { resolveAccountId } from "../lib/auth.ts";
 import {
+  computeBabyDegree,
+  computeMotherDegree,
+} from "../lib/personaEstimate.ts";
+import {
   error,
   errorWithReason,
   json,
@@ -25,7 +29,6 @@ import type {
   AccountRow,
   BabyPersonaRow,
   MotherPersonaRow,
-  PersonaAgeEstimateRow,
 } from "../models/types.ts";
 
 export async function handleGetMyProfile(req: Request): Promise<Response> {
@@ -52,35 +55,22 @@ export async function handleGetMyProfile(req: Request): Promise<Response> {
   const baby = babyResult.rows[0];
   const mother = motherResult.rows[0];
 
-  const estimateResult = await query<PersonaAgeEstimateRow>(
-    `select persona_type, persona_id, estimated_age
-     from persona_age_estimates
-     where (persona_type = 'baby' and persona_id = $1)
-        or (persona_type = 'mother' and persona_id = $2)`,
-    [baby.id, mother.id],
-  );
-  const babyEstimate = estimateResult.rows.find(
-    (r: PersonaAgeEstimateRow) => r.persona_type === "baby",
-  );
-  const motherEstimate = estimateResult.rows.find(
-    (r: PersonaAgeEstimateRow) => r.persona_type === "mother",
-  );
+  const [babyDegree, motherDegree] = await Promise.all([
+    computeBabyDegree(baby.id),
+    computeMotherDegree(mother.id),
+  ]);
 
   return json({
     birthDate: account.birth_date,
     babyPersona: {
       id: baby.id,
       nickname: baby.nickname,
-      estimatedAge: babyEstimate?.estimated_age
-        ? Number(babyEstimate.estimated_age)
-        : null,
+      estimatedAge: babyDegree?.estimatedAge ?? null,
     },
     motherPersona: {
       id: mother.id,
       nickname: mother.nickname,
-      estimatedAge: motherEstimate?.estimated_age
-        ? Number(motherEstimate.estimated_age)
-        : null,
+      estimatedAge: motherDegree?.estimatedAge ?? null,
     },
   });
 }

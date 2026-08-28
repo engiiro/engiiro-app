@@ -154,13 +154,26 @@ def get_classifier() -> NaiveBayesClassifier:
     return _classifier
 
 
-def passes_threshold(body: str, persona_type: str) -> bool:
+MAX_MONTHS = 72  # 6歳(72ヶ月)を上限として扱う。estimatedAge算出との共有定数。
+
+
+def degree_of(body: str, persona_type: str) -> float:
     """
-    personaTypeに対応するクラスの度合いがTHRESHOLDを超えているか判定する
-    (FR-AI-EVAL-007)。対応するクラスが無いpersonaTypeはFalseを返す。
+    personaTypeに対応するクラスの度合い(0〜100)を返す。
+    対応するクラスが無いpersonaTypeは0を返す(passes_thresholdと同じ立場)。
+    passesThresholdの判定にも、estimatedAgeの算出（ai/src/evaluate.py）にも
+    ここを共有して使う。
     """
     class_name = PERSONA_TYPE_TO_CLASS.get(persona_type)
     if class_name is None:
-        return False
+        return 0.0
     probabilities = get_classifier().predict_proba(body)
-    return probabilities[class_name] > THRESHOLD
+    return probabilities[class_name]
+
+
+def passes_threshold(body: str, persona_type: str) -> bool:
+    """
+    personaTypeに対応するクラスの度合いがTHRESHOLDを超えているか判定する
+    (FR-AI-EVAL-007)。
+    """
+    return degree_of(body, persona_type) > THRESHOLD
