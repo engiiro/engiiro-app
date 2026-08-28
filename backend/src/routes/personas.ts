@@ -3,6 +3,10 @@
 // accountIdやもう一方のペルソナの情報は一切含めない（3.2章、3.4章、FR-PERSONA-003〜004）。
 
 import { query } from "../lib/db.ts";
+import {
+  computeBabyDegree,
+  computeMotherDegree,
+} from "../lib/personaEstimate.ts";
 import { error, json } from "../lib/http.ts";
 import type { BabyPersonaRow, MotherPersonaRow } from "../models/types.ts";
 
@@ -26,7 +30,7 @@ export async function handleGetBabyPersona(
 
   // babyAllタブ（人間の指示、2026-08-25）は「赤ちゃんとしてのバブルとあやすの両方」を
   // 含むため、投稿だけでなく赤ちゃんペルソナとして書いたあやすのidも合わせて返す。
-  const [postsResult, commentsResult] = await Promise.all([
+  const [postsResult, commentsResult, degree] = await Promise.all([
     query<IdRow>(
       `select id from posts
        where baby_persona_id = $1 and deleted_at is null
@@ -39,6 +43,7 @@ export async function handleGetBabyPersona(
        order by created_at desc`,
       [id],
     ),
+    computeBabyDegree(id),
   ]);
 
   return json({
@@ -47,6 +52,7 @@ export async function handleGetBabyPersona(
     bio: persona.bio,
     postIds: postsResult.rows.map((r: IdRow) => r.id),
     commentIds: commentsResult.rows.map((r: IdRow) => r.id),
+    estimatedAge: degree?.estimatedAge ?? null,
   });
 }
 
@@ -64,17 +70,21 @@ export async function handleGetMotherPersona(
   const persona = personaResult.rows[0];
   if (!persona) return error("見つかりませんでした。", 404);
 
-  const commentsResult = await query<IdRow>(
-    `select id from comments
-     where mother_persona_id = $1 and deleted_at is null
-     order by created_at desc`,
-    [id],
-  );
+  const [commentsResult, degree] = await Promise.all([
+    query<IdRow>(
+      `select id from comments
+       where mother_persona_id = $1 and deleted_at is null
+       order by created_at desc`,
+      [id],
+    ),
+    computeMotherDegree(id),
+  ]);
 
   return json({
     id: persona.id,
     nickname: persona.nickname,
     bio: persona.bio,
     commentIds: commentsResult.rows.map((r: IdRow) => r.id),
+    estimatedAge: degree?.estimatedAge ?? null,
   });
 }

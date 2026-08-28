@@ -657,21 +657,18 @@ export async function fetchPublicProfile(personaId: string): Promise<PublicProfi
   const kind = await resolvePersonaKind(personaId);
   if (!kind) return null;
 
-  const [personaData, likedResult, estimateData] = await Promise.all([
-    api.get<{ id: string; nickname: string; bio: string | null }>(
+  const [personaData, likedResult] = await Promise.all([
+    api.get<{ id: string; nickname: string; bio: string | null; estimatedAge: number | null }>(
       `/api/personas/${kind}/${personaId}`,
     ),
     fetchLikedPersonas(),
-    // 推定年齢は本人専用の口にしか無いため、他人の分は出せない状態がサーバ側の現状。
-    // 決まるまではnull（NFR-002と同じ立場：使える材料が無ければnullのまま）。
-    Promise.resolve<number | null>(null),
   ]);
 
   const likedSet = kind === "baby" ? likedResult.baby : likedResult.mother;
   const self = currentMe();
   return {
     persona: toPersona(kind, personaData),
-    status: statusFromEstimate(estimateData, kind),
+    status: statusFromEstimate(personaData.estimatedAge, kind),
     liked: likedSet.some((p) => p.id === personaId),
     isMe: personaId === self.baby.id || personaId === self.mother.id,
   };
