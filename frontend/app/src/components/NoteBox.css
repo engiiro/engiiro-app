@@ -1,0 +1,31 @@
+/* DESIGN.md §4 Note Box / 拒否バナー */
+
+.eg-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  /* 返事と同じ形。画面から出る「ことば」は、どれも同じ形にそろえる */
+  border-radius: var(--radius-reply);
+  background: var(--accent-soft);
+  color: var(--accent-line);
+}
+
+/* error と accent は色相が近い。必ずアイコンと文言を添える（DESIGN.md §2.5） */
+.eg-note__icon {
+  flex: none;
+  margin-top: var(--space-xxs);
+}
+
+.eg-note__text {
+  min-width: 0;
+}
+
+.eg-note__title {
+  display: block;
+  color: var(--accent-line);
+}
+
+.eg-note__title + .eg-note__body {
+  margin-top: var(--space-xxs);
+}

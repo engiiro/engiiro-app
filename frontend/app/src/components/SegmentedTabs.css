@@ -1,0 +1,81 @@
+/* 横並びの切り替えボタン（S8 ほか） */
+
+.eg-segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--space-xs);
+}
+
+/*
+ * 横に流す変種。中身の幅のままにして、はみ出したぶんは横スクロールで見せる
+ * （スタンプ一覧の気持ちの棚のように、4つ以上並ぶとき）。
+ */
+.eg-segmented--scroll {
+  display: flex;
+  overflow-x: auto;
+  /* 端が切れていることが分かるように、右端に少しだけ余白を残す */
+  padding-right: var(--space-xxs);
+  scrollbar-width: thin;
+}
+
+.eg-segmented--scroll .eg-segmented__item {
+  flex: 0 0 auto;
+  /* 等分ではないので、文字の長さぶんだけ横に取る */
+  padding-inline: var(--space-sm);
+  border-radius: var(--rounded-pill);
+}
+
+.eg-segmented__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xs) var(--space-xs);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+  transition:
+    background-color var(--duration-quick) var(--ease-in-out),
+    color var(--duration-quick) var(--ease-in-out);
+}
+
+.eg-segmented__item:hover {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--surface));
+  color: var(--body);
+}
+
+/* 選択中の地は accent-soft。混ぜる先をそちらに合わせる */
+.eg-segmented__item.is-current:hover {
+  background: color-mix(in srgb, var(--ink) var(--hover-veil), var(--accent-soft));
+  color: var(--accent-line);
+}
+
+.eg-segmented__item:active {
+  transform: scale(var(--press-scale));
+}
+
+/* 選択中は 色・地・太さの3つで示す。色だけに意味を持たせない（DESIGN.md §2.5） */
+.eg-segmented__item.is-current {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-line);
+  font-weight: 700;
+}
+
+.eg-segmented__icon {
+  flex: none;
+}
+
+.eg-segmented__label {
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-segmented__item {
+    transition: none;
+  }
+}

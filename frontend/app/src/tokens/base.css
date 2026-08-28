@@ -1,0 +1,215 @@
+/*
+ * base.css — 余白・レイアウト・共通の地ならし（DESIGN.md §5・§8）
+ *
+ * DESIGN.md の spacing / rounded / layout をトークンにし、
+ * §4 のコンポーネント仕様に出てくる寸法（48px の最小高さ、カード padding 14px など）も
+ * 名前付きで置く。コンポーネント側に素の px を書かないための土台。
+ */
+
+:root {
+  /* spacing（DESIGN.md §5.1） */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+
+  /* rounded */
+  --rounded-xs: 4px;
+  --rounded-sm: 6px;
+  --rounded-md: 10px;
+  --rounded-lg: 16px;
+  --rounded-pill: 999px;
+
+  /* layout */
+  --feed-max-width: 600px;
+  --gutter: 16px;
+  --touch-target-min: 44px;
+
+  /*
+   * PC 3カラム（人間の決定、2026-08-25）。
+   * 中央はフィード 600px のまま広げない（DESIGN.md §5.2）。
+   * DESIGN.md §5.2「カラムを増やさない」・§8.1「モバイルファースト」とは食い違う。
+   * 改訂案は別途出す。
+   */
+  --rail-left-width: 220px;
+  --rail-left-narrow: 72px;
+  --rail-right-width: 320px;
+  --compose-width: 440px;
+  --column-gap: 24px;
+
+  /*
+   * 下端に貼りつくものの寸法。
+   *
+   * ★ スクロールする列（.eg-center）に padding-bottom を置かない。
+   *   position: sticky の要素は親の content box より下へは行けないので、
+   *   親に padding-bottom があると、いちばん下まで送りきった瞬間に
+   *   そのぶんだけボタンが跳ね上がる（人間の指摘、2026-08-26）。
+   *   下の余白は「実体のある最後の要素」の高さで確保する。
+   *
+   * --fab-height      … 「バブる」だけ、ふつうのボタン（48px）より一段大きい。
+   *                     このサービスでいちばん押してほしいボタンなので、
+   *                     色と位置だけでなく **大きさでも** 主役だと分かるようにする
+   *                     （人間の指示、2026-08-27）。
+   * --fab-slot-height … 「バブる」を置くスロット。ボタンの上下に 24px ずつ。
+   * --bottom-nav-*    … 767px 未満で下端に出るナビ（LeftRail）。両者が同じ値を見るため
+   *                     ここに置く。片方だけ直すと、ボタンがバーに潜る。
+   */
+  --fab-height: calc(var(--control-min-height) + var(--space-xs));
+  --fab-slot-height: calc(var(--fab-height) + var(--space-lg) * 2);
+  --bottom-nav-bar-height: calc(var(--touch-target-min) + var(--space-sm));
+  --bottom-nav-height: calc(var(--bottom-nav-bar-height) + env(safe-area-inset-bottom));
+
+  /* §4 の各コンポーネント仕様に書かれている寸法 */
+  --control-min-height: 48px;
+  --control-padding-y: 13px;
+  --control-padding-x: 20px;
+  --card-padding: 14px;
+  /*
+   * 光学的中央（DESIGN.md §5.3-1）。上下同値だと要素が下寄りに見えるので、
+   * 上 padding を 1.07 倍にする（14px → 15px。トークン値から ±2px 以内）。
+   */
+  --card-padding-top: 15px;
+  /*
+   * 画面見出しも同じ原則。ただし 12px 基準では 1.05〜1.08 倍の中に整数が無い
+   * （12.6〜12.96px）。整数で収まる 14 / 13 を採って 1.077 倍にする。
+   * どちらも --space-sm から ±2px 以内（DESIGN.md §5.3-1）。
+   */
+  --head-padding-top: 14px;
+  --head-padding-bottom: 13px;
+  --input-padding: 12px;
+  --avatar-size: 34px;
+  --avatar-size-sm: 26px;
+  /*
+   * スタンプ（DESIGN.md §11 で未定だった「本文中でのインライン表示サイズ」）。
+   * 本文は 16px / 行間 1.9（＝行の高さ 30.4px）。そこに 32px の絵を沈めると、
+   * 1行ぶんの高さをほとんど超えずに「貼ってある」と読める。
+   * 一覧は指で押す的なので、大きめに出す。
+   */
+  --stamp-size: 32px;
+  --stamp-size-picker: 52px;
+  /* プロフィールの見出しに置く大きいアバター（S8 / S6） */
+  --avatar-size-lg: 64px;
+  --meter-height: 9px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* iOS で横向きにしたときのフォント自動拡大を止める */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--body);
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+  /* 明暗の急変は避けるが、長い cross-fade は「壊れた」ように見える（DESIGN.md §7.2） */
+  transition:
+    background-color var(--duration-theme) var(--ease-in-out),
+    color var(--duration-theme) var(--ease-in-out);
+}
+
+h1,
+h2,
+h3,
+p,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/*
+ * フォーカスは常に見える形にする。枠色だけを変えない（色覚に依存させない）。
+ * DESIGN.md §4 Inputs の Focus 規則を全ての操作可能要素に広げている。
+ */
+:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+  border-radius: var(--rounded-xs);
+}
+
+/* 本文の折り返し（DESIGN.md §3.6）。break-all は当てない */
+.eg-prose {
+  word-break: normal;
+  overflow-wrap: anywhere;
+  line-break: strict;
+  white-space: pre-wrap;
+}
+
+/* 読み上げにだけ渡す文字 */
+.eg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * フィードは 600px のまま広げない。デスクトップでも余白を広げるだけで、
+ * カラムを増やさない（DESIGN.md §5.2）。
+ */
+.eg-column {
+  width: 100%;
+  max-width: var(--feed-max-width);
+  margin: 0 auto;
+  padding-inline: var(--gutter);
+}
+
+/*
+ * カーソルがそこにあることを示す量（人間の決定 2026-08-26、
+ * docs/color_and_ui_findings.md §0-4 / §4）。
+ *
+ * ★ 新しい色を作らず、--ink を重ねて1段持ち上げるだけにする。
+ *   ink を混ぜる形なら、ダークでは明るく、ライトでは暗くなるので、
+ *   どのテーマでも同じ規則で「乗っている」と読める。テーマごとの分岐が要らない。
+ *
+ * ★ 混ぜる先は要素ごとに選ぶ。
+ *   自分の面を持つもの（ボタン・リアクション）は自分の面色に混ぜる。
+ *   面を持たないもの（あやすの本文・行）は透かしを重ねる。
+ *   逆にすると、面が消えて地が透ける／役割色の地が消える。
+ */
+:root {
+  --hover-veil: 8%;
+}
+
+/* タッチターゲットは見た目が小さくても 44px を確保する（DESIGN.md §8.2） */
+.eg-touch {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+}

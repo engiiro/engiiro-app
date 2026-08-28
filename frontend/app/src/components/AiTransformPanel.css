@@ -1,0 +1,66 @@
+/* DESIGN.md §4 AI 文章変換の3状態。同じ場所に、状態ごとに違うものを出す */
+
+.eg-ai {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.eg-ai__working {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--rounded-xs);
+  background: var(--card);
+  color: var(--body);
+}
+
+/*
+ * 変換案。これは「まだ保存されていないバブル」なので、バブルと同じ形で出す。
+ * ただし枠は臙脂の破線／実線（テーマ依存）で、確定した本文と見分けがつくようにする。
+ */
+.eg-ai__preview {
+  position: relative;
+  margin-bottom: calc(var(--balloon-tail-size) / 2);
+  padding: var(--space-md);
+  border: var(--border-width) var(--input-border-style) var(--accent-line);
+  border-radius: var(--radius-balloon);
+  background: var(--surface);
+}
+
+.eg-ai__preview::after {
+  content: "";
+  position: absolute;
+  left: var(--space-md);
+  bottom: calc(var(--balloon-tail-size) / -2);
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: var(--surface);
+  border-right: var(--border-width) var(--input-border-style) var(--accent-line);
+  border-bottom: var(--border-width) var(--input-border-style) var(--accent-line);
+  transform: rotate(45deg);
+}
+
+.eg-ai__preview-label {
+  display: block;
+  color: var(--muted);
+}
+
+.eg-ai__preview-text {
+  margin-top: var(--space-xs);
+  color: var(--body);
+}
+
+.eg-ai__actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+/* 変換しただけでは保存しない、を文字でも書く（FR-AI-TRANS-006） */
+.eg-ai__caveat {
+  margin-top: var(--space-xs);
+  color: var(--muted);
+}

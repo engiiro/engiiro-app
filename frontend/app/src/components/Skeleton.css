@@ -1,0 +1,72 @@
+/* DESIGN.md §7.3 skeleton-reveal。空白より不安が少ない */
+
+/*
+ * 読み込み中の1枚も、来るものと同じ吹き出しの形にする（UI刷新 2026-08-26）。
+ * 形が変わると、入れ替わった瞬間にレイアウトが跳ねて「読み込み直した」ように見える。
+ */
+.eg-skeleton-card {
+  position: relative;
+  margin-bottom: calc(var(--balloon-tail-size) / 2);
+  padding: var(--card-padding-top) var(--space-md) var(--card-padding);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-balloon);
+  background: var(--surface);
+}
+
+/* しっぽ。作りは BubbleCard.css と同じ */
+.eg-skeleton-card::after {
+  content: "";
+  position: absolute;
+  left: var(--balloon-tail-inset);
+  bottom: calc(var(--balloon-tail-size) / -2);
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  background: var(--surface);
+  border-right: var(--border-width) solid var(--hairline);
+  border-bottom: var(--border-width) solid var(--hairline);
+  border-bottom-right-radius: var(--rounded-xs);
+  transform: rotate(45deg);
+}
+
+.eg-skeleton-line {
+  height: var(--space-sm);
+  border-radius: var(--rounded-xs);
+  background: var(--skeleton);
+  animation: eg-skeleton-pulse var(--duration-very-slow) var(--ease-linear) infinite;
+}
+
+.eg-skeleton-line + .eg-skeleton-line {
+  margin-top: var(--space-xs);
+}
+
+.eg-skeleton-line--head {
+  width: 45%;
+  height: var(--space-md);
+}
+
+.eg-skeleton-line--short {
+  width: 62%;
+}
+
+.eg-skeleton-row {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.eg-skeleton-stack {
+  flex: 1;
+}
+
+.eg-skeleton-pill {
+  width: calc(var(--space-xxl) * 2);
+  height: var(--touch-target-min);
+  border-radius: var(--radius-control);
+  background: var(--skeleton);
+  animation: eg-skeleton-pulse var(--duration-very-slow) var(--ease-linear) infinite;
+}
+
+/* 本体は cross-blur で立ち上げる */
+.eg-revealed {
+  animation: eg-content-reveal var(--duration-slow) var(--ease-smooth-out) both;
+}

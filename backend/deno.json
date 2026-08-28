@@ -1,7 +1,19 @@
 {
   "tasks": {
-    "dev": "deno run --watch --allow-net --allow-env --unstable-kv main.ts",
-    "start": "deno run --allow-net --allow-env --unstable-kv main.ts"
+    "dev": "deno run --watch --allow-net --allow-read --allow-env --allow-sys main.ts",
+    "start": "deno run --allow-net --allow-read --allow-env --allow-sys main.ts",
+    "migrate": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys npm:node-pg-migrate@9 up",
+    "migrate:down": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys npm:node-pg-migrate@9 down",
+    "migrate:new": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys npm:node-pg-migrate@9 create -j sql",
+    "check": "deno check main.ts && deno lint && deno fmt --check"
   },
-  "imports": {}
+  "imports": {
+    "@std/http": "jsr:@std/http@^1.0.20",
+    "pg": "npm:pg@^8.23.0",
+    "djwt": "jsr:@zaubrik/djwt@^3.0.2",
+    "bcrypt": "npm:bcryptjs@^2.4.3"
+  },
+  "fmt": {
+    "proseWrap": "preserve"
+  }
 }

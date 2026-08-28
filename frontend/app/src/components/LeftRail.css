@@ -1,0 +1,171 @@
+/* 左サイド。中央の列を差し替えるだけで、右サイドには触らない */
+
+/*
+ * ★ 縦の仕切り線をやめ、島（浮いた面）にした（UI刷新 2026-08-26）。
+ *   左に線、中央に列、右に線 という形が、いちばん強く既視感を出していた。
+ *   面として浮かせると、中央のフィードが「その中を流れているもの」に見える。
+ */
+.eg-rail {
+  position: sticky;
+  top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  /* viewport ではなく、列の高さから取る。上に何が積まれていても はみ出さない */
+  height: calc(100% - var(--space-md) * 2);
+  margin: var(--space-md) 0;
+  padding: var(--space-lg) var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+  box-shadow: var(--elevation-offset);
+}
+
+.eg-rail__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-sm);
+}
+
+.eg-rail__mark {
+  --brandmark-size: 26px;
+}
+
+.eg-rail__logo {
+  color: var(--accent-line);
+}
+
+.eg-rail__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.eg-rail__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-control);
+  color: var(--body);
+  text-align: start;
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-rail__item:hover {
+  background: var(--card);
+}
+
+/* 現在地は色・太さ・形の三重化で示す（DESIGN.md §2.5） */
+.eg-rail__item.is-current {
+  background: var(--accent-soft);
+  color: var(--accent-line);
+  font-weight: 700;
+}
+
+.eg-rail__item.is-current::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: calc(var(--border-width) * 2);
+  height: var(--space-lg);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-line);
+  transform: translateY(-50%);
+}
+
+.eg-rail__icon {
+  flex: none;
+}
+
+.eg-rail__label {
+  flex: 1;
+}
+
+.eg-rail__soon {
+  flex: none;
+  padding: 0 var(--space-xs);
+  border-radius: var(--rounded-pill);
+  background: var(--card);
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* 狭い幅ではアイコンだけの細い列にする。名乗りは印だけ残す */
+@media (max-width: 1199px) {
+  .eg-rail {
+    gap: var(--space-md);
+    padding: var(--space-lg) var(--space-xs);
+  }
+
+  .eg-rail__brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .eg-rail__logo,
+  .eg-rail__label,
+  .eg-rail__soon {
+    display: none;
+  }
+
+  .eg-rail__item {
+    justify-content: center;
+    padding: var(--space-sm);
+  }
+}
+
+/* さらに狭いと下部のバーへ畳む */
+@media (max-width: 767px) {
+  .eg-rail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 30;
+    flex-direction: row;
+    height: auto;
+    margin: 0;
+    padding: 0 0 env(safe-area-inset-bottom);
+    border: none;
+    border-top: var(--border-width) solid var(--hairline);
+    border-radius: 0;
+    background: var(--surface);
+    box-shadow: none;
+  }
+
+  /* 下端のバーには名乗りを置かない。押せるものだけを並べる */
+  .eg-rail__brand {
+    display: none;
+  }
+
+  .eg-rail__list {
+    flex-direction: row;
+    width: 100%;
+  }
+
+  .eg-rail__list > li {
+    flex: 1;
+  }
+
+  /* 高さは base.css のトークン。中央の列の下余白が同じ値を見ている */
+  .eg-rail__item {
+    height: var(--bottom-nav-bar-height);
+    border-radius: 0;
+  }
+
+  .eg-rail__item.is-current::before {
+    top: 0;
+    left: 50%;
+    width: var(--space-lg);
+    height: calc(var(--border-width) * 2);
+    transform: translateX(-50%);
+  }
+}

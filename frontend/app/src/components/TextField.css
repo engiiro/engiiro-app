@@ -1,0 +1,51 @@
+/* DESIGN.md §4 Inputs */
+
+.eg-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.eg-field__label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.eg-field__hint {
+  color: var(--muted);
+}
+
+.eg-field__input {
+  width: 100%;
+  min-height: var(--control-min-height);
+  padding: var(--input-padding);
+  border: var(--border-width) var(--input-border-style) var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  /* iOS で focus 時に拡大されないよう 16px を割らない（DESIGN.md §4 Inputs） */
+  font-size: var(--size-input);
+  font-family: inherit;
+}
+
+.eg-field__input {
+  transition: border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* 触れる場所であることを、focus の前に枠で返す */
+.eg-field__input:hover {
+  border-color: var(--accent-line);
+}
+
+.eg-field__input::placeholder {
+  color: var(--muted);
+}
+
+/* 誤りは 枠の色だけでなく、下の文字でも伝える（DESIGN.md §2.5） */
+.eg-field__input.is-error {
+  border-color: var(--error);
+}
+
+.eg-field__error {
+  color: var(--error);
+}

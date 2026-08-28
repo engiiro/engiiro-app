@@ -1,0 +1,5 @@
+{
+  "baby": { "id": "bp_me", "kind": "baby", "nickname": "よわねだいおう" },
+  "mother": { "id": "mp_me", "kind": "mother", "nickname": "そっとみまもり係" },
+  "birthday": "2023-04-15"
+}

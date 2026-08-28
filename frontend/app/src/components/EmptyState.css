@@ -1,0 +1,40 @@
+/* DESIGN.md §4 Empty State。園児UI はここが一番装飾を効かせる場所 */
+
+.eg-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xxl) var(--space-md);
+  border: 2px dashed var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+  text-align: center;
+  transform: rotate(var(--tilt));
+  box-shadow: var(--elevation-offset);
+}
+
+/*
+ * イラストを置くときは、絵が主役になるように上の余白を詰め、
+ * 絵と文字のあいだにだけ余白を残す。文字を絵の説明にしない。
+ */
+.eg-empty.has-art {
+  padding-top: var(--space-lg);
+  gap: var(--space-xs);
+}
+
+.eg-empty__art {
+  width: min(240px, 72%);
+  margin-bottom: var(--space-xs);
+}
+
+.eg-empty__line {
+  color: var(--body);
+  animation: eg-texts-reveal var(--duration-slow) var(--ease-smooth-out) both;
+}
+
+.eg-empty__action {
+  margin-top: var(--space-sm);
+  /* 傾いた面の中でボタンだけ水平に戻す */
+  transform: rotate(calc(var(--tilt) * -1));
+}

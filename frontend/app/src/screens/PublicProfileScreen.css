@@ -1,0 +1,10 @@
+/* S6 他人の公開プロフィール */
+
+.eg-pubprofile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-top: var(--space-md);
+  padding-bottom: var(--space-xl);
+}
+

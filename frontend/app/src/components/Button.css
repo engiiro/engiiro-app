@@ -1,0 +1,75 @@
+/* DESIGN.md §4 Buttons */
+
+.eg-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: var(--control-min-height);
+  padding: var(--control-padding-y) var(--control-padding-x);
+  border-radius: var(--radius-control);
+  border: var(--border-width) solid transparent;
+  box-shadow: var(--elevation-offset);
+  /* transition: all を書かない。動かすものだけ並べる（DESIGN.md §7.4） */
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-micro) var(--ease-smooth-out);
+}
+
+.eg-button--full {
+  display: flex;
+  width: 100%;
+}
+
+/* 押した瞬間に反応する（DESIGN.md §7.4） */
+.eg-button:not(:disabled):active {
+  transform: scale(var(--press-scale));
+}
+
+.eg-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.eg-button--primary {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  border-color: var(--accent-fill);
+}
+
+/* 面積の大きい塗りには、少し暗い値（DESIGN.md §5.3-2 面積効果） */
+.eg-button--primary.eg-button--full {
+  background: var(--accent-fill-large);
+  border-color: var(--accent-fill-large);
+}
+
+.eg-button--primary:not(:disabled):hover,
+.eg-button--primary:not(:disabled):active {
+  background: var(--accent-press);
+  border-color: var(--accent-press);
+}
+
+.eg-button--ghost {
+  background: transparent;
+  color: var(--accent-line);
+  border-color: var(--accent-line);
+}
+
+.eg-button--ghost:not(:disabled):hover,
+.eg-button--ghost:not(:disabled):active {
+  background: var(--accent-soft);
+}
+
+.eg-button--quiet {
+  background: var(--surface);
+  color: var(--muted);
+  border-color: var(--hairline);
+}
+
+.eg-button--quiet:not(:disabled):hover,
+.eg-button--quiet:not(:disabled):active {
+  color: var(--body);
+}

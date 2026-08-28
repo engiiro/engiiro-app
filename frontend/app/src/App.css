@@ -1,0 +1,489 @@
+/*
+ * 3カラムの骨組み（人間の決定、2026-08-25）＋ 背景の層（UI刷新 2026-08-26）。
+ *
+ * 中央は 600px のまま広げない（DESIGN.md §5.2 のフィード幅は守る）。
+ * ただし §5.2 の「カラムを増やさない」と §8.1 の「モバイルファースト」には
+ * 反している。改訂案は別途出す。
+ *
+ * バブるボタンを押すと右の列が投稿パネルに入れ替わり、中央が左へ詰まる。
+ * 中央のスクロールは生きたまま（画面を塞ぐモーダルにはしない）。
+ *
+ * ★ 列を縦線で仕切るのをやめた（UI刷新 2026-08-26）。
+ *   仕切り線は「どこかで見た SNS」の形そのもので、いちばん強く既視感を出していた。
+ *   代わりに、地・光・輪の3層を敷いて、中央をその中に浮かぶ場として見せる。
+ *   仕切りが無くても列が読めるのは、左が島（面）、中央が余白、右が島 になるから。
+ */
+
+/*
+ * ★ 背景の2層は position: fixed で viewport ぴったりに敷く。
+ *   ここに overflow を足さない。overflow: clip は fixed の子の切り取り方が
+ *   ブラウザによって変わるので、光の層が消える環境を作りかねない。
+ *   viewport と同じ大きさしか無いので、そもそも横スクロールは生まれない。
+ *
+ * ★ 高さを viewport ちょうどにして、ページそのものを送れなくする
+ *   （人間の指摘、2026-08-27「バブるボタンが最下部にあり、一度下までスクロール
+ *   しないと確認できない」）。
+ *
+ *   原因はこの外側にあった。当時は上にモックの操作帯が積まれていて（2026-08-28 に
+ *   URL クエリへ退避して削除）、その高さぶんページ全体が下へずれていた。
+ *   中央の列は 100vh で作られているので、列の下端 ＝ viewport の下端 + 操作帯の高さ に
+ *   なり、そこに貼りついている「バブる」が最初から画面の外に居た
+ *   （1440px で 807px、viewport は 800px）。
+ *   帯が無くなっても、この形（ページを送れなくする）はそのまま残す。
+ *   下端に貼りつくものが増えたときに同じことが起きるので、原因を構造で消しておく。
+ *
+ *   縦に積む箱にして、余った高さを .eg-layout に配れば、送れるのは中央の列だけになる。
+ *   ページが動かないので、左右の列も「バブる」も、どこを読んでいても必ず見えている。
+ *
+ *   ★ この形にするのは本編（3カラム）のときだけ（--shell）。
+ *     入口の画面（説明・登録・ログイン）は1枚の紙が縦に伸びる作りで、
+ *     長い紙はページごと送れたほうがいい。高さを固定すると、
+ *     背の低い画面で下が読めなくなる。
+ */
+.eg-app {
+  position: relative;
+  background: var(--canvas);
+}
+
+.eg-app--shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+/*
+ * 背景・第2層：光。
+ *
+ * ★ 動かさない。常時動く背景は目を疲れさせるし、深夜に読む場には向かない。
+ *   位置と大きさは固定で、スクロールしても付いてこない（position: fixed）。
+ * ★ 色はテーマトークンから作った --aura-*。ダークでは夜の光、
+ *   園児UI では紙の上のクレヨンの跡くらいの弱さになる。
+ */
+.eg-app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(62% 46% at 8% 2%, var(--aura-warm), transparent 68%),
+    radial-gradient(48% 38% at 96% 26%, var(--aura-cool), transparent 70%),
+    radial-gradient(72% 52% at 46% 112%, var(--aura-warm), transparent 66%);
+}
+
+/*
+ * 背景・第3層：輪。
+ *
+ * 大小4つの細い円。円は「バブル」そのものの形で、これがあるだけで
+ * 画面が「タイムライン」ではなく「バブルが浮かぶ場」に見える。
+ * 塗りではなく線なので、上に載る文字のコントラストを落とさない。
+ */
+.eg-app::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0 calc(50% - var(--field-ring-width)),
+      var(--field-ring) calc(50% - var(--field-ring-width)) 50%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0 calc(50% - var(--field-ring-width)),
+      var(--field-ring) calc(50% - var(--field-ring-width)) 50%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0 calc(50% - var(--field-ring-width)),
+      var(--field-ring) calc(50% - var(--field-ring-width)) 50%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0 calc(50% - var(--field-ring-width)),
+      var(--field-ring) calc(50% - var(--field-ring-width)) 50%,
+      transparent 50%
+    );
+  background-size:
+    440px 440px,
+    240px 240px,
+    120px 120px,
+    320px 320px;
+  background-position:
+    -8% 6%,
+    97% 14%,
+    88% 74%,
+    4% 92%;
+}
+
+/* 中身は必ず背景の層より前。ここを忘れると光が本文の上に来る */
+.eg-layout {
+  position: relative;
+  z-index: 1;
+  /* 操作帯を除いた残り全部。min-height: 0 が無いと中身の高さで押し広げられる */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns:
+    var(--rail-left-width)
+    minmax(0, var(--feed-max-width))
+    var(--rail-right-width);
+  /*
+   * 行の高さを1つに決める。
+   * 既定（auto）のままだと中身の高さで決まる ＝ 高さが「決まっていない」ので、
+   * 中の .eg-center が書いている min-height / max-height: 100% が auto に化ける。
+   * その結果、中央の列が親をはみ出してページ全体が送れるようになっていた。
+   * minmax(0, 1fr) なら、親の高さが決まっているとき（PC）はそれいっぱい、
+   * 決まっていないとき（767px 未満）は中身なりになる。
+   */
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--column-gap);
+  justify-content: center;
+  align-items: start;
+  max-width: calc(
+    var(--rail-left-width) + var(--feed-max-width) + var(--rail-right-width) +
+      var(--column-gap) * 2
+  );
+  margin: 0 auto;
+  /* 列の入れ替えを1つの運動として読ませる。パネルの開閉と同じ長さ・同じ緩急 */
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+
+/*
+ * ★ 4つの子に、入る列と行を明示する。
+ *   「バブる」を中央の列より **前** に置いた（＝キーボードで先に届く）ので、
+ *   並べる順に任せる自動配置では、中央の列が3列目へ押し出される。
+ *   見た目の並びは DOM の順ではなく、ここに書いた列番号で決める。
+ */
+
+/*
+ * 左右の列は、行の高さいっぱいを持つ。
+ * 中の島（.eg-rail / .eg-compose）が 100% で高さを取れるようにするため。
+ * これを書かないと、島が「viewport の高さ」を見にいって操作帯のぶんはみ出す。
+ */
+.eg-layout__left {
+  grid-column: 1;
+  grid-row: 1;
+  position: sticky;
+  top: 0;
+  height: 100%;
+}
+
+.eg-center {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  /*
+   * 縦に flex で積む。中身が短くても「バブる」を下端に置くため
+   * （下のスロットが margin-top: auto で余りを吸う）。
+   */
+  display: flex;
+  flex-direction: column;
+  /* 親（.eg-layout）が viewport から操作帯を引いた高さを持っている。それにぴったり合わせる */
+  min-height: 100%;
+  max-height: 100%;
+  /*
+   * ★ padding-bottom を持たせない（人間の指摘、2026-08-26）。
+   *   下端に貼りつく sticky（バブる／あやす）は親の content box より下へ行けないため、
+   *   ここに padding があると、いちばん下まで送りきった瞬間にそのぶん跳ね上がる。
+   *   下の余白は最後の子（.eg-fab-slot / .eg-bottom-action）の高さで確保する。
+   */
+  padding: 0 var(--space-sm);
+  /* 左に詰まっても中央はスクロールできる */
+  overflow-y: auto;
+  /* 縦線で仕切らない。列の切れ目は余白と面で読ませる（このファイル冒頭の注記） */
+}
+
+/* flex の子が中身より縮まないようにする（画面はそれぞれ自分の高さで積む） */
+.eg-center > * {
+  flex: none;
+}
+
+.eg-center__loading {
+  padding-top: var(--space-md);
+}
+
+.eg-layout__right {
+  grid-column: 3;
+  grid-row: 1;
+  position: sticky;
+  top: 0;
+  height: 100%;
+}
+
+/*
+ * 「バブる」の場所取り。中央の列のいちばん最後に置く、中身の無い箱。
+ *
+ * ボタン自体はこの中に居ない（列の外の .eg-fab-dock に居る）。
+ * これはボタンぶんの高さを列の末尾に確保するだけのもので、
+ * これが無いと、いちばん下まで送りきったとき最後のカードがボタンの下に隠れる。
+ *
+ * ★ 親（.eg-center）に padding-bottom を戻さないための実体でもある（前の注記）。
+ *   親に padding があると、下端に貼りつく .eg-bottom-action がそのぶん跳ねる。
+ */
+.eg-fab-slot {
+  height: var(--fab-slot-height);
+  pointer-events: none;
+}
+
+/*
+ * 「バブる」の置き場所（人間の決定、2026-08-27「常に表示されている状態を優先」）。
+ *
+ * ★ 中央の列（.eg-center）の **外** に置く。
+ *   以前は列の中に sticky で貼りつけていたが、列の中に居るということは
+ *   「読みものの流れの一部」ということでもあり、キーボードだけで操作する人には
+ *   カードを全部通り過ぎたあとにしか届かなかった。
+ *   列の外に出して、DOM 上は左サイドの直後（＝フィードより前）に置いた。
+ *   ずっと画面にあるものは、送っても動かないし、読みものの順にも並ばない。
+ *
+ * ★ 見た目の位置は変えていない。grid で「2列目・下端・右寄せ」と決めるので、
+ *   中央の列の右下、以前とまったく同じところに出る。
+ *   逃げ幅は 中央の列の内側の余白（--space-sm）＋ 以前の right（--space-md）。
+ *   これだけあれば、列にスクロールバーが出ている環境でも、その上に乗らない。
+ */
+.eg-fab-dock {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+  justify-self: end;
+  /* 中央の列より前に書いてあるので、z-index を持たないと列の下に潜る */
+  position: relative;
+  z-index: 3;
+  margin: 0 calc(var(--space-sm) + var(--space-md)) var(--space-lg) 0;
+  /* 箱そのものが本文のクリックを奪わないように。ボタンだけ拾う */
+  pointer-events: none;
+}
+
+/*
+ * 中央の右下。視線の帰る先に置く。
+ *
+ * これはこのサービスの主操作なので、丸い「バブル」の形にして、
+ * ほかのボタン（角丸の長方形）と形でも区別する（DESIGN.md §2.5 の二重化）。
+ *
+ * ★ ここは「みんなに一番押してほしいボタン」（人間の指示、2026-08-27）。
+ *   それが分かるように、4つを重ねている。どれも常時は動かない。
+ *     1. 大きさ … ふつうのボタン 48px に対して --fab-height（56px）
+ *     2. 登場   … 着いたときに一度だけ、下から浮かび上がる
+ *     3. 誘い   … そのあと輪が2回ひろがって、止まる
+ *     4. 反応   … カーソル／フォーカスで小さなバブルが立ちのぼる。押すと縮む
+ */
+.eg-bubble-fab {
+  /* 位置は親（.eg-fab-dock）が持つ。ここが持つのは形と反応だけ */
+  position: relative;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--fab-height);
+  /* 大きくしたぶん、左右の余白も広げる。文字が枠に貼りつかないように */
+  padding: var(--control-padding-y) var(--space-lg);
+  border: var(--border-width) solid var(--accent-fill-large);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-fill-large);
+  color: var(--on-accent);
+  box-shadow: var(--elevation-modal);
+  /* 2. 登場。画面に着いたとき（＝投稿パネルを閉じて帰ってきたとき）に一度だけ */
+  animation: eg-fab-in var(--duration-slow) var(--ease-smooth-out) both;
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-micro) var(--ease-smooth-out);
+}
+
+/*
+ * 3. 誘い。登場のすぐあと、輪が2回ひろがって止まる。
+ *
+ * ★ 繰り返さない。常時ふくらんでいる背景は、深夜に読む場では単に落ち着かない（§7.2）。
+ *   ここが「押す前の誘い」の置き場所で、同じ画面にもう1つ置かない。
+ *   投稿パネルの送信ボタンの pop とは、同時に出ない（パネルが開くと このボタンは消える）。
+ */
+.eg-bubble-fab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: var(--border-width) solid var(--accent-fill-large);
+  pointer-events: none;
+  animation: eg-ring-out var(--duration-very-slow) var(--ease-smooth-out) var(--duration-slow) 2
+    both;
+}
+
+.eg-bubble-fab:hover {
+  background: var(--accent-press);
+}
+
+/*
+ * ★ 押した反応を、明度の変化だけにしない（人間の決定 2026-08-26 §0-3）。
+ *   このサービスでいちばん押してほしいボタンなのに、いちばん反応が薄かった。
+ *   ふつうのボタンより一段強い --press-scale-strong を当てる。
+ *   reduced motion では 1 に潰れる（motion.css）。
+ */
+.eg-bubble-fab:active {
+  transform: scale(var(--press-scale-strong));
+}
+
+/* 押す場所であることを、しっぽでも示す（吹き出し＝書く） */
+.eg-bubble-fab::after {
+  content: "";
+  position: absolute;
+  left: var(--space-lg);
+  bottom: calc(var(--balloon-tail-size) / -2 + var(--border-width));
+  width: var(--balloon-tail-size);
+  height: var(--balloon-tail-size);
+  border-right: var(--border-width) solid var(--accent-fill-large);
+  border-bottom: var(--border-width) solid var(--accent-fill-large);
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+/*
+ * 4. 乗ったときの反応。ボタンの上から小さなバブルが3つ立ちのぼる。
+ *
+ * ★ 浮かせない（DESIGN.md §4 Hover）。持ち上げる代わりに、
+ *   このボタンが何をするものか（＝バブルを出す）を、動きそのもので言う。
+ * ★ キーボードでも同じものが見える（:focus-visible）。
+ *   マウスを持っている人にだけ反応する UI にしない。
+ */
+.eg-bubble-fab__drift {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: 0;
+  pointer-events: none;
+}
+
+.eg-bubble-fab__drop {
+  position: absolute;
+  bottom: 0;
+  width: var(--space-xs);
+  height: var(--space-xs);
+  border-radius: var(--rounded-pill);
+  background: var(--accent-line);
+  opacity: 0;
+}
+
+.eg-bubble-fab__drop:nth-child(1) {
+  left: 24%;
+  --drift-rise: calc(var(--distance-medium) * -1.6);
+  --drift-delay: 0ms;
+}
+
+.eg-bubble-fab__drop:nth-child(2) {
+  left: 48%;
+  --drift-rise: calc(var(--distance-medium) * -2.6);
+  --drift-delay: var(--duration-micro);
+}
+
+.eg-bubble-fab__drop:nth-child(3) {
+  left: 70%;
+  --drift-rise: calc(var(--distance-medium) * -2);
+  --drift-delay: calc(var(--duration-micro) * 2);
+}
+
+.eg-bubble-fab:hover .eg-bubble-fab__drop,
+.eg-bubble-fab:focus-visible .eg-bubble-fab__drop {
+  animation: eg-fab-drift var(--duration-very-slow) var(--ease-smooth-out) var(--drift-delay) both;
+}
+
+/*
+ * 投稿パネルが開いているあいだ。
+ * 右の列がパネルの幅になり、その結果として中央が左へ詰まる。
+ */
+.eg-app.is-composing .eg-layout {
+  grid-template-columns:
+    var(--rail-left-width)
+    minmax(0, var(--feed-max-width))
+    var(--compose-width);
+  max-width: calc(
+    var(--rail-left-width) + var(--feed-max-width) + var(--compose-width) +
+      var(--column-gap) * 2
+  );
+}
+
+/* 1200px 未満：右の列を畳む。パネルは画面に重ねる（ComposePanel.css 側） */
+@media (max-width: 1199px) {
+  .eg-layout,
+  .eg-app.is-composing .eg-layout {
+    grid-template-columns: var(--rail-left-narrow) minmax(0, var(--feed-max-width));
+    max-width: calc(var(--rail-left-narrow) + var(--feed-max-width) + var(--column-gap));
+  }
+
+  /*
+   * 列が2つになるので、右の列は2行目へ落とす。
+   * 3列目に置いたままにすると、幅 0 の3列目とその手前の gap ぶんだけ
+   * 中央の列が細くなる（列の割り当てを明示したことの副作用）。
+   */
+  .eg-layout__right {
+    grid-column: 1;
+    grid-row: 2;
+    position: static;
+  }
+
+  .eg-right-rail {
+    display: none;
+  }
+}
+
+/* 768px 未満：左サイドが下部のバーになる（LeftRail.css 側） */
+@media (max-width: 767px) {
+  /*
+   * ここではページそのものを送る。片手で持つ画面で内側の列だけを送る形にすると、
+   * 端末側のアドレスバーの出入りと噛み合わなくなる。
+   * 「バブる」は下で fixed にするので、ページが動いても付いてくる。
+   */
+  .eg-app--shell {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .eg-layout,
+  .eg-app.is-composing .eg-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    max-width: none;
+  }
+
+  .eg-layout__left {
+    position: static;
+  }
+
+  .eg-center {
+    min-height: 0;
+    max-height: none;
+  }
+
+  /* 下端のバーのぶんも、この場所取りの高さで確保する（親に padding を戻さない） */
+  .eg-fab-slot {
+    height: calc(var(--fab-slot-height) + var(--bottom-nav-height));
+  }
+
+  /*
+   * 列が1つになるので、ドックも1列目。
+   * ここではページ全体が送れるので、ボタンは grid の位置ではなく画面に貼りつける
+   * （下端のバーの上）。ドック自身は高さ 0 の入れ物になる。
+   */
+  .eg-fab-dock {
+    grid-column: 1;
+    margin: 0;
+  }
+
+  .eg-bubble-fab {
+    position: fixed;
+    right: var(--gutter);
+    bottom: calc(var(--bottom-nav-height) + var(--space-lg));
+  }
+
+  /* 狭い画面では輪を減らす。文字の後ろが賑やかになりすぎる */
+  .eg-app::after {
+    background-size:
+      300px 300px,
+      160px 160px,
+      0 0,
+      0 0;
+  }
+}

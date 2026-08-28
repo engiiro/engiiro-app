@@ -1,0 +1,20 @@
+# ローカル開発用のPostgres。
+# Deno Deploy上ではこのファイルは使われない（Deploy側がDBを用意する）。
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: engiiro
+      POSTGRES_PASSWORD: engiiro
+      POSTGRES_DB: engiiro
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U engiiro -d engiiro"]
+      interval: 3s
+      retries: 20
+
+volumes:
+  pgdata:

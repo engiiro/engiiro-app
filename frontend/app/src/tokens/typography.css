@@ -1,0 +1,150 @@
+/*
+ * typography.css — 書体階層（DESIGN.md §3）
+ *
+ * 3テーマで共通。テーマで変わるのは色だけ。
+ * サイズ・行間・字間は DESIGN.md §3.4 の表そのまま。生の値をコンポーネントに書かない。
+ */
+
+:root {
+  --font-display: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", Meiryo,
+    sans-serif;
+  --font-body: -apple-system, "system-ui", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI", Meiryo, sans-serif;
+  --font-mono: SFMono-Regular, Consolas, Menlo, monospace;
+
+  --size-display: 24px;
+  --size-display-mobile: 20px;
+  --size-heading: 18px;
+  --size-card-title: 15px;
+  --size-bubble-body: 16px;
+  --size-body: 15px;
+  --size-label: 12px;
+  --size-caption: 12px;
+  --size-button: 15px;
+  --size-metric: 19px;
+  --size-counter: 12px;
+  --size-code: 14px;
+  --size-input: 16px;
+
+  --leading-display: 1.4;
+  --leading-heading: 1.5;
+  --leading-bubble-body: 1.9;
+  --leading-body: 1.75;
+  --leading-label: 1.7;
+  --leading-caption: 1.6;
+  --leading-button: 1;
+  --leading-metric: 1.3;
+  --leading-input: 1.8;
+
+  --tracking-display: 0.02em;
+  --tracking-label: 0.04em;
+  --tracking-button: 0.06em;
+}
+
+/* 見出し・ボタン・数値のみ。本文に palt を当てると行ごとに字送りが揺れる（DESIGN.md §3.7） */
+.t-display,
+.t-heading,
+.t-card-title,
+.t-button {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-feature-settings: "palt" 1, "kern" 1;
+}
+
+.t-display {
+  font-size: var(--size-display-mobile);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+}
+
+@media (min-width: 600px) {
+  .t-display {
+    font-size: var(--size-display);
+  }
+}
+
+.t-heading {
+  font-size: var(--size-heading);
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-display);
+}
+
+.t-card-title {
+  font-size: var(--size-card-title);
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-display);
+}
+
+.t-button {
+  font-size: var(--size-button);
+  line-height: var(--leading-button);
+  letter-spacing: var(--tracking-button);
+}
+
+/* このサービスで一番重要な数値。行間 1.9（DESIGN.md §3.5） */
+.t-bubble-body {
+  font-family: var(--font-body);
+  font-size: var(--size-bubble-body);
+  font-weight: 400;
+  line-height: var(--leading-bubble-body);
+  letter-spacing: normal;
+}
+
+.t-body {
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  font-weight: 400;
+  line-height: var(--leading-body);
+  letter-spacing: normal;
+}
+
+/* 小さい字は少し空けたほうが読める。0.04em を許すのはこの 12px のラベルだけ */
+.t-label {
+  font-family: var(--font-body);
+  font-size: var(--size-label);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  letter-spacing: var(--tracking-label);
+}
+
+.t-caption {
+  font-family: var(--font-body);
+  font-size: var(--size-caption);
+  font-weight: 400;
+  line-height: var(--leading-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.t-metric {
+  font-family: var(--font-display);
+  font-size: var(--size-metric);
+  font-weight: 700;
+  line-height: var(--leading-metric);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 数字が増えても幅が飛ばないように tabular-nums（DESIGN.md §4） */
+.t-counter {
+  font-family: var(--font-body);
+  font-size: var(--size-counter);
+  font-weight: 700;
+  line-height: var(--leading-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.t-code {
+  font-family: var(--font-mono);
+  font-size: var(--size-code);
+  line-height: var(--leading-heading);
+  /* 本文には当てない。愚痴に混ざる英単語が途中で切れる（DESIGN.md §3.6） */
+  word-break: break-all;
+}
+
+/* 16px 未満にすると iOS Safari が自動拡大してレイアウトが崩れる（DESIGN.md §8.2） */
+.t-input {
+  font-family: var(--font-body);
+  font-size: var(--size-input);
+  font-weight: 400;
+  line-height: var(--leading-input);
+  letter-spacing: normal;
+}

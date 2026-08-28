@@ -1,0 +1,82 @@
+/* S4b あやす詳細。骨格はバブル詳細（S4）と同じ。差し替わるのは主役だけ */
+
+.eg-soothe-detail {
+  padding-top: var(--space-md);
+}
+
+/* もとのバブルへ戻る道。抜粋だけを出す（発信者は出さない） */
+.eg-soothe-detail__source {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--border-width) dashed var(--hairline);
+  border-radius: var(--radius-control);
+  color: var(--muted);
+  text-align: start;
+  overflow-wrap: anywhere;
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.eg-soothe-detail__source:hover,
+.eg-soothe-detail__source:active {
+  background: var(--card);
+  color: var(--ink);
+}
+
+/* 主役のあやす。バブル詳細の主役カードと同じ厚み・同じ影 */
+.eg-soothe-detail__main {
+  padding: var(--space-md);
+  border: var(--border-width) solid var(--hairline);
+  /* 一覧の1件と同じ形。開いても形が変わらない */
+  border-radius: var(--radius-reply);
+  background: var(--surface);
+  box-shadow: var(--elevation-offset);
+}
+
+/*
+ * ★ 一覧の1件と同じく、お母さんでも地を塗らない
+ *   （人間の決定 2026-08-26 §0-2。理由は SootheItem.css の注記）。
+ *   役割はチップ（アバターの「母」＋「お母さん」のバッジ）が示す。
+ */
+
+.eg-soothe-detail__quote {
+  margin-top: var(--space-sm);
+  padding-left: var(--space-xs);
+  border-left: var(--border-width) solid var(--hairline);
+  color: var(--muted);
+}
+
+.eg-soothe-detail__body {
+  margin-top: var(--space-sm);
+  color: var(--body);
+}
+
+.eg-soothe-detail__reactions {
+  margin-top: var(--space-md);
+}
+
+.eg-soothe-detail__replies {
+  margin-top: var(--space-xl);
+}
+
+.eg-soothe-detail__replies-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+  color: var(--ink);
+}
+
+.eg-soothe-detail__count {
+  color: var(--muted);
+}
+
+.eg-soothe-detail__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}

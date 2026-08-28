@@ -13,6 +13,14 @@
 限界: 文脈、皮肉、方言、話者ごとの個人差、明示されていない宛先は推定できない。
 値は医学的な年齢判定ではなく、文章同士を比較するための暫定的な目安である。
 本番の保存可否を決める閾値は、このモジュールでは扱わない。
+
+ここでは応答の `estimatedAge`（何歳児相当かの目安）のみを扱う。保存可否を決める
+`passesThreshold`（FR-AI-EVAL-007）は `src/style_classifier.py` のナイーブベイズ
+3クラス分類器が担当する（`app.py` 参照）。
+
+`estimatedAge` は最初はシンプルなルールベースのプレースホルダーとし、
+後からPyTorch/scikit-learnで学習したモデルに差し替える想定
+（design_doc.md 8章「開発の進め方」参照）。
 """
 
 from __future__ import annotations

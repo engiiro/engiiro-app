@@ -1,0 +1,24 @@
+/* 本文とスタンプ。URL の自動リンク化は行わない（FR-MOD-021 / OUT-008） */
+
+/*
+ * 本文に埋まるスタンプ（絵は透過 PNG）。
+ *
+ * ★ 下地を敷かない（BubbleBody.tsx の ★ 参照）。
+ * ★ 素材は正方の中に絵が入っている。object-fit で潰さないようにしておく。
+ */
+.eg-stamp {
+  display: inline-block;
+  width: var(--stamp-size);
+  height: var(--stamp-size);
+  margin: 0 var(--space-xxs);
+  object-fit: contain;
+  /* 文字の並びに対して沈める量。ベースラインに乗せると絵が浮いて見える */
+  vertical-align: -0.4em;
+}
+
+.eg-stamp--picker {
+  width: var(--stamp-size-picker);
+  height: var(--stamp-size-picker);
+  margin: 0;
+  vertical-align: middle;
+}

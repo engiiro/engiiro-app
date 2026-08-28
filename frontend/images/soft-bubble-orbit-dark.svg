@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-labelledby="title desc">
+  <!--
+    えんじいろ / soft-bubble-orbit / dark
+    Illustration palette: normal #F4C7B8 / #A95757 / #E7A24B
+    Theme candidates: dark #FFD27D fill / #FF9F88 line / #A7D6C1 accent, kid #FFE28A / #E34D67 / #4FA4C8
+    Bright complementary hues keep the orbit visible on a dark UI canvas.
+  -->
+  <title id="title">めぐるバブル</title>
+  <desc id="desc">小さな色のかたまりがそっとめぐる、文字のないバブルイラスト</desc>
+  <style>
+    .orbit-fill { fill: var(--illustration-fill, #FFD27D); }
+    .orbit-line { fill: none; stroke: var(--illustration-line, #FF9F88); }
+    .orbit-accent { fill: var(--illustration-accent, #A7D6C1); }
+  </style>
+
+  <path class="orbit-accent" d="M69 126 C53 104 58 78 80 61 C69 84 71 104 87 119 C92 124 92 131 88 136 C83 141 75 135 69 126 Z" />
+  <path class="orbit-accent" d="M245 94 C264 111 267 137 251 158 C260 135 256 116 240 102 C235 98 239 90 245 94 Z" />
+  <path
+    class="orbit-fill orbit-line"
+    d="M100 122 C96 95 114 74 142 69 C162 52 191 55 207 76 C233 79 251 99 247 123 C243 147 221 160 198 153 C181 168 155 169 138 154 C122 158 104 145 100 122 Z"
+    stroke-width="3"
+    stroke-linejoin="round"
+  />
+  <path
+    class="orbit-fill orbit-line"
+    d="M138 151 C131 161 120 169 107 172 C114 163 116 155 113 147"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

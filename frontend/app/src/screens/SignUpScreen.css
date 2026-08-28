@@ -1,0 +1,160 @@
+/* S1 アカウント登録 */
+
+/* 入口も本編と同じ地の上に置く。光の層は Intro と同じ作り */
+.eg-signup {
+  position: relative;
+  display: flex;
+  /*
+   * ★ align-items: center にしない。
+   *   紙が画面より高いとき、中央ぞろえは紙の上端を画面の外へ押し出し、
+   *   そこはスクロールでも取り返せない（生年月日を足して紙が伸び、
+   *   「はじめまして」が読めなくなって気づいた。2026-08-27）。
+   *   代わりに紙側の margin-block: auto で中央に寄せる。
+   *   余白があるときだけ中央に来て、足りないときは上端から素直に始まる。
+   */
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-lg) var(--gutter);
+  background: var(--canvas);
+  overflow-x: clip;
+}
+
+.eg-signup::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(58% 44% at 6% 0%, var(--aura-warm), transparent 68%),
+    radial-gradient(52% 42% at 98% 92%, var(--aura-cool), transparent 70%);
+}
+
+.eg-signup__sheet {
+  position: relative;
+  /* 余白が余っているときだけ中央へ。足りないときは上端に付く（上の注記） */
+  margin-block: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 520px;
+  padding: var(--space-lg);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+  box-shadow: var(--elevation-modal);
+}
+
+.eg-signup__mark {
+  --brandmark-size: 30px;
+}
+
+.eg-signup__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.eg-signup__brand {
+  color: var(--accent-line);
+}
+
+.eg-signup__back {
+  margin-inline-start: auto;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-pill);
+  color: var(--muted);
+}
+
+.eg-signup__back:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
+/* パスワード欄と「みる」を横に並べる。ボタンは入力欄の高さに合わせる */
+.eg-signup__password {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-xs);
+}
+
+.eg-signup__password > .eg-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.eg-signup__peek {
+  flex: none;
+  min-height: var(--control-min-height);
+  padding: 0 var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.eg-signup__peek:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.eg-signup__names {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: var(--space-sm);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+}
+
+.eg-signup__legend {
+  padding: 0 var(--space-xxs);
+  color: var(--ink);
+}
+
+.eg-signup__legend-note {
+  color: var(--muted);
+}
+
+/* ログインとの行き来。行き止まりに見せない */
+.eg-signup__switch {
+  align-self: center;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-pill);
+  color: var(--accent-line);
+}
+
+.eg-signup__switch:hover {
+  background: var(--accent-soft);
+}
+
+/* アカウントを作らずに読むほうへ。押しやすくはするが、主役にはしない */
+.eg-signup__stay {
+  align-self: center;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-pill);
+  color: var(--muted);
+}
+
+.eg-signup__stay:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
+/* アバターを左に置いて、どちらの顔の名前かを色でも示す */
+.eg-signup__name {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.eg-signup__name > .eg-avatar {
+  margin-top: var(--space-lg);
+}
+
+.eg-signup__name > .eg-field {
+  flex: 1;
+  min-width: 0;
+}
