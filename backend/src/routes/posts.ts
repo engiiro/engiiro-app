@@ -8,6 +8,7 @@
 import { query, withTransaction } from "../lib/db.ts";
 import { resolveAccountId } from "../lib/auth.ts";
 import { checkPostable } from "../lib/contentGate.ts";
+import { computeBabyDegree } from "../lib/personaEstimate.ts";
 import { error, errorWithReason, json, readJson } from "../lib/http.ts";
 import type { BabyPersonaRow, PostRow, PostStampRow } from "../models/types.ts";
 
@@ -18,10 +19,6 @@ interface StampInput {
 
 interface IdRow {
   id: string;
-}
-
-interface EstimatedAgeRow {
-  estimated_age: string | null;
 }
 
 interface PostFeedRow extends PostRow {
@@ -174,6 +171,11 @@ export async function handleFeed(req: Request): Promise<Response> {
   // 未ログイン時は新着順のみ（FR-GUEST-004、4.4章）。
   // 具体的なランキングロジックは実装フェーズで検討する項目のため、ここでは
   // 「推定年齢の近さ」で単純に並べ替える最小実装にする。
+  //
+  // 閲覧者側の推定年齢は、プロフィール画面と同じ算出（直近15件＋上位リアクション
+  // 15件の1:1平均、lib/personaEstimate.ts）を使う。以前はpersona_age_estimates
+  // テーブル（廃止済み）を読んでいたため、書き込まれなくなって以来ずっとnullになり
+  // パーソナライズが無効化されていた（人間の指摘 2026-08-28）。
   let viewerEstimatedAge: number | null = null;
   let viewerBabyPersonaId: string | null = null;
   if (accountId) {
@@ -183,14 +185,8 @@ export async function handleFeed(req: Request): Promise<Response> {
     );
     viewerBabyPersonaId = babyResult.rows[0]?.id ?? null;
     if (viewerBabyPersonaId) {
-      const estimateResult = await query<EstimatedAgeRow>(
-        "select estimated_age from persona_age_estimates where persona_type = 'baby' and persona_id = $1",
-        [viewerBabyPersonaId],
-      );
-      const value = estimateResult.rows[0]?.estimated_age;
-      viewerEstimatedAge = value !== null && value !== undefined
-        ? Number(value)
-        : null;
+      const degree = await computeBabyDegree(viewerBabyPersonaId);
+      viewerEstimatedAge = degree?.estimatedAge ?? null;
     }
   }
 
@@ -204,11 +200,9 @@ export async function handleFeed(req: Request): Promise<Response> {
   params.push(limit);
 
   const result = await query<PostFeedRow>(
-    `select p.*, pae.estimated_age, bp.nickname as author_nickname
+    `select p.*, bp.nickname as author_nickname
      from posts p
      join baby_personas bp on bp.id = p.baby_persona_id
-     left join persona_age_estimates pae
-       on pae.persona_type = 'baby' and pae.persona_id = p.baby_persona_id
      where p.deleted_at is null
      ${cursorClause}
      order by p.created_at desc
