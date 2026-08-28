@@ -122,6 +122,13 @@
 .eg-soothe__reply {
   display: inline-flex;
   align-items: center;
+  /*
+   * 狭い画面ではリアクション行と並びきらず、この1つだけが2段目に落ちる
+   * （リアクション行の側は折り返さない。ReactionRow.css の 479px の項）。
+   * 落ちたときに左端へ寄ると、行が途中で切れたように見える。
+   * auto マージンで右端に寄せて、1段でも2段でも右下に居る形にそろえる。
+   */
+  margin-left: auto;
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-control);
   color: var(--accent-line);

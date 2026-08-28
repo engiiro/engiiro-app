@@ -1,12 +1,13 @@
 import { reactionTargetOfSoothe } from "../data/reactions";
 import type { ReactionType, Soothe, SootheDetail } from "../data/types";
 import { cx } from "../lib/cx";
+import { REPLY_WORDING, replyKindOfSoothe } from "../lib/replyWording";
 import type { SootheTarget } from "../lib/soothePersonaRule";
 import { BottomAction, BottomActionNote } from "../components/BottomAction";
 import { BubbleBody } from "../components/BubbleBody";
 import { Button } from "../components/Button";
 import { NoSootheState } from "../components/EmptyState";
-import { IconSoothe } from "../components/icons";
+import { IconPen, IconSoothe } from "../components/icons";
 import { PersonaChip } from "../components/PersonaChip";
 import { ReactionRow } from "../components/ReactionRow";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -26,6 +27,10 @@ import "./SootheDetailScreen.css";
  * ★ 返信できるペルソナの規則は変わらない（FR-COMMENT-005/006）。
  *   お母さんとしてのあやすへ返すときは赤ちゃんだけ。判定は soothePersonaRule が持っていて、
  *   この画面は SootheTarget を組み立てて渡すだけ。ここで選び直さない。
+ *
+ * ★ その場合、下端の操作は「あやす」ではなく「バブる」になる（人間の決定 2026-08-28）。
+ *   赤ちゃんしか返せない場面で「あやす」と書くのは、操作の主体と意味が合っていなかった。
+ *   見出し・空状態・ボタン・アイコンが lib/replyWording.ts の同じ1行から決まる。
  *
  * ★ 元のバブルは「抜粋」だけ出す。発信者は出さない。
  *   この画面の主役はあやすで、バブルの発信者まで並べると、1画面に載る人が増える。
@@ -59,6 +64,10 @@ export function SootheDetailScreen({
   onReply,
 }: SootheDetailScreenProps) {
   const { soothe, replies, bubbleIsMine } = detail;
+
+  /* この主役のあやすへ「返す」操作の呼び名。発信ペルソナだけで決まる */
+  const replyKind = replyKindOfSoothe(soothe.author.kind);
+  const wording = REPLY_WORDING[replyKind];
 
   /** 一覧の1件、または主役のあやすを返信先にする */
   function targetOf(item: Soothe): SootheTarget {
@@ -113,14 +122,14 @@ export function SootheDetailScreen({
 
         <section className="eg-soothe-detail__replies" aria-labelledby="eg-replies-title">
           <h2 id="eg-replies-title" className={cx("eg-soothe-detail__replies-title", "t-heading")}>
-            この あやすに あやしている人
+            {wording.listTitle}
             {replies.length > 0 ? (
               <span className={cx("eg-soothe-detail__count", "t-counter")}>{replies.length}</span>
             ) : null}
           </h2>
 
           {replies.length === 0 ? (
-            <NoSootheState />
+            <NoSootheState kind={replyKind} />
           ) : (
             <ul className="eg-soothe-detail__list">
               {replies.map((reply) => (
@@ -140,13 +149,18 @@ export function SootheDetailScreen({
 
       <BottomAction>
         {/*
-          誰へ返すのかを先に書く。お母さんへのあやすには赤ちゃんとしてしか返せないので
-          （FR-COMMENT-005）、押してから選択肢が減っている理由が分かる状態にしない
+          誰へ、どの顔で返すのかを先に書く。お母さんへのあやすには赤ちゃんとしてしか
+          返せないので（FR-COMMENT-005）、押してから選択肢が減っている理由が分かる
+          状態にしない。呼び名も「バブる」に変わるので、それもここで先に見せる。
         */}
-        <BottomActionNote>{soothe.author.nickname} の あやすへ 返します</BottomActionNote>
+        <BottomActionNote>
+          {replyKind === "bubble"
+            ? soothe.author.nickname + " の あやすへ 赤ちゃんとして バブります"
+            : soothe.author.nickname + " の あやすへ あやします"}
+        </BottomActionNote>
         <Button fullWidth onClick={() => onReply(targetOf(soothe))}>
-          <IconSoothe />
-          あやす
+          {replyKind === "bubble" ? <IconPen /> : <IconSoothe />}
+          {wording.action}
         </Button>
       </BottomAction>
     </>

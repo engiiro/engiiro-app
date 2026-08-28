@@ -55,8 +55,26 @@
 
 .eg-ai__actions {
   display: flex;
+  /* 変換後は「これで書く／もう一度／やめる」の3つ。狭い幅では折り返して受ける */
+  flex-wrap: wrap;
   gap: var(--space-xs);
   margin-top: var(--space-sm);
+}
+
+/*
+ * 押す前の案内（人間の指摘 2026-08-28「変換が分かりにくい」）。
+ *
+ * 引き出しを開いた直後と、本文を直して変換結果を捨てたあとに出る。
+ * 変換文（__preview）とは別のものなので、吹き出しの形にしない。面も持たせない。
+ * ここが吹き出しだと「もう変換された文」に見える。
+ */
+.eg-ai__intro {
+  display: flex;
+  flex-direction: column;
+}
+
+.eg-ai__intro-text {
+  color: var(--body);
 }
 
 /* 変換しただけでは保存しない、を文字でも書く（FR-AI-TRANS-006） */

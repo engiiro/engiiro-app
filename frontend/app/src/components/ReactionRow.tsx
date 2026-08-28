@@ -92,6 +92,12 @@ type ReactionRowProps = {
 /**
  * ボタンの中身（アイコン・ラベル・数）。
  * 水面の上と下で同じものを2枚重ねるので、並びは1か所にまとめておく。
+ *
+ * ★ アイコンとラベルを __main でくくってある（人間の指摘 2026-08-28）。
+ *   狭い画面では数だけを2段目に降ろすので、「1段目になるもの」を
+ *   1つの箱にしておく必要がある。flex-wrap ＋ flex-basis:100% で折り返す手も
+ *   あるが、__face は shrink-to-fit（幅が未定）なので % の basis が
+ *   content に落ちて折り返らないことがある。段は入れ子で作るほうが確実。
  */
 function ReactionFace({
   reaction,
@@ -103,8 +109,10 @@ function ReactionFace({
   const Icon = REACTION_ICON[reaction];
   return (
     <>
-      <Icon className="eg-reaction__icon" />
-      <span className={cx("eg-reaction__label", "t-label")}>{REACTION_LABEL[reaction]}</span>
+      <span className="eg-reaction__main">
+        <Icon className="eg-reaction__icon" />
+        <span className={cx("eg-reaction__label", "t-label")}>{REACTION_LABEL[reaction]}</span>
+      </span>
       {count > 0 ? <span className={cx("eg-reaction__count", "t-counter")}>{count}</span> : null}
     </>
   );

@@ -13,6 +13,7 @@ import { stampGroups } from "../data/stampCatalog";
 import type { Me, PersonaKind } from "../data/types";
 import { cx } from "../lib/cx";
 import { MAX_MONTHS } from "../lib/mockAiEvaluate";
+import { REPLY_WORDING, replyKindOfSoothe } from "../lib/replyWording";
 import { soothePersonaRule } from "../lib/soothePersonaRule";
 import type { SootheTarget } from "../lib/soothePersonaRule";
 import { AiTransformPanel } from "../components/AiTransformPanel";
@@ -52,6 +53,13 @@ import "./ComposePanel.css";
  *   ふつうの返信         … 押せる
  *   お母さんへの返信     … ボタンを出さない（FR-COMMENT-005、人間の決定 2026-08-25）
  *
+ * 見出し・送信ボタン・トーストのことば（人間の決定 2026-08-28）：
+ *   バブル投稿                     … 「バブルを かく」／「バブる」
+ *   バブル・赤ちゃんのあやすへ返す … 「あやす」／「あやす」
+ *   お母さんのあやすへ返す         … 「バブルを かく」／「バブる」
+ *   最後のものは赤ちゃんしか返せない場面なので、「あやす」では操作の主体と合わない。
+ *   表は lib/replyWording.ts。ここに文を書かない。
+ *
  * タグは外した。FR-POST-004 が 2026-08-25 の PO レビューでコメントアウトされたため。
  * 投稿ガイドライン（FR-PRIV-001）は仕様に残っているので置いている。
  */
@@ -83,6 +91,19 @@ export function ComposePanel({
 }: ComposePanelProps) {
   const rule = mode.kind === "reply" ? soothePersonaRule(mode.target) : { allowed: ["baby"] as const };
   const canSwapPersona = mode.kind === "reply" && rule.allowed.length > 1;
+
+  /*
+   * いま書いているものの呼び名。
+   * バブル投稿はそのまま「バブる」。返信のときは返信先で決まる
+   * （お母さんのあやすへ返すのは赤ちゃんのバブルなので「バブる」）。
+   */
+  const wording = REPLY_WORDING[
+    mode.kind === "reply" && mode.target.kind === "soothe"
+      ? replyKindOfSoothe(mode.target.authorKind)
+      : mode.kind === "reply"
+        ? "soothe"
+        : "bubble"
+  ];
 
   const [persona, setPersona] = useState<PersonaKind>("baby");
   const [body, setBody] = useState("");
@@ -161,12 +182,20 @@ export function ComposePanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [close, onClose]);
 
-  /** 本文を変えたら、前の評価は当てにならないので捨てる */
+  /**
+   * 本文を変えたら、前の評価も前の変換も当てにならないので捨てる。
+   *
+   * ★ 変換の結果を消すのは 2026-08-28 に足した（人間の指摘「変換が分かりにくい」）。
+   *   直したあとの本文に対して、直す前の変換文が「こんな かんじ？」として
+   *   残り続けていた。捨てると引き出しは idle に戻り、「変換する」がまた出るので、
+   *   直した本文で押し直せる。
+   */
   function changeBody(next: string) {
     setBody(next);
     setEvaluation(null);
     setEvaluateFailed(false);
     setGateRejected(false);
+    setAi({ kind: "idle" });
   }
 
   /*
@@ -255,7 +284,7 @@ export function ComposePanel({
         });
     setSubmitting(false);
     if (result.ok) {
-      close(() => onPosted(isBubble ? "ぽいっと できました" : "あやしました"));
+      close(() => onPosted(wording.done));
       return;
     }
     if (result.reason === "moderation") {
@@ -297,7 +326,7 @@ export function ComposePanel({
         </span>
         <span className="eg-compose__who">
           <span id="eg-compose-title" className={cx("eg-compose__title", "t-card-title")}>
-            {isBubble ? "バブルを かく" : "あやす"}
+            {wording.title}
           </span>
           <span className={cx("eg-compose__nickname", "t-caption")}>
             {activePersona.nickname}
@@ -320,7 +349,7 @@ export function ComposePanel({
           onClick={() => void submit()}
           onAnimationEnd={() => setJustSendable(false)}
         >
-          {submitting ? "おくっています…" : isBubble ? "バブる" : "あやす"}
+          {submitting ? "おくっています…" : wording.send}
         </Button>
       </header>
 
@@ -353,7 +382,7 @@ export function ComposePanel({
         <p className={cx("eg-compose__target", "t-caption")}>
           {mode.target.kind === "bubble"
             ? mode.target.authorNickname + " の バブルへ"
-            : mode.target.authorNickname + " の あやすへ 返信"}
+            : mode.target.authorNickname + " の あやすへ"}
         </p>
       ) : null}
 
@@ -459,7 +488,8 @@ export function ComposePanel({
         <div className="eg-drawer">
           <div className="eg-drawer__head">
             <span className={cx("eg-drawer__title", "t-label")}>
-              {drawer === "stamp" ? "スタンプ" : drawer === "evaluate" ? "ことばを はかる" : "ことばの お手伝い"}
+              {/* 見出しは下の道具ボタンと同じことばにする（「変換」を押して「お手伝い」が開かない） */}
+              {drawer === "stamp" ? "スタンプ" : drawer === "evaluate" ? "ことばを はかる" : "ことばの 変換"}
             </span>
             <button
               type="button"
@@ -498,6 +528,9 @@ export function ComposePanel({
             {drawer === "transform" ? (
               <AiTransformPanel
                 state={aiTransformAvailable ? ai : { kind: "unavailable" }}
+                personaKind={persona}
+                canRun={body.trim().length > 0}
+                onRun={() => void runTransform()}
                 onUseTransformed={(text) => {
                   // 本文欄に入るだけ。保存はしない（FR-AI-TRANS-006/007）
                   changeBody(text);

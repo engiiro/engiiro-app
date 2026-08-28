@@ -88,8 +88,21 @@
   flex: none;
 }
 
+/* ラベルは1語。狭い幅で「おぎゃ／ー」に割らない */
+.eg-reaction__label {
+  white-space: nowrap;
+}
+
+/*
+ * 数の場所（人間の指摘 2026-08-28「999 になるとレイアウトが崩れる」）。
+ *
+ * ★ 3桁ぶんの幅を最初から取っておく。t-counter は tabular-nums なので、
+ *   3ch はどの数字でもちょうど3桁ぶんになる。1 → 12 → 999 とふえても
+ *   ボタンの幅が1pxも動かない ＝ 行の折り返し方が数で変わらない。
+ *   以前は --space-sm（12px ≒ 1.8桁）で、3桁で 8px ずつ伸びていた。
+ */
 .eg-reaction__count {
-  min-width: var(--space-sm);
+  min-width: 3ch;
   text-align: right;
 }
 
@@ -112,6 +125,13 @@
 
 .eg-reaction__face,
 .eg-reaction__flood {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+/* 1段目（アイコン＋ラベル）。狭い画面で数を2段目へ落とすための入れ物 */
+.eg-reaction__main {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xxs);
@@ -351,6 +371,60 @@
 
 .eg-reaction[data-step="5"] .eg-reaction__spark span:nth-child(5) {
   animation-delay: calc(var(--duration-stagger) * 4);
+}
+
+/* ── 狭い画面（〜479px）─────────────────────────────────────────────
+ *
+ * 3種のボタンを1行に収める（人間の指摘 2026-08-28）。
+ *
+ * 375px のとき、リアクション行に使える幅は
+ *   フィード   375 − 24（.eg-center）− 32（.eg-column）− 8（.eg-bubble__foot）＝ 311px
+ *   あやすの中 375 − 24 − 32 − 28（.eg-soothe の padding）＝ 291px
+ * これに対し、アイコン＋ラベル＋3桁の数を横一列に並べると 1つ 112px、
+ * 3つで 352px。**どう詰めても1行に入らない**（ラベルは全角4文字＝48px で、
+ * ここは削れない）。
+ *
+ * ★ そこで数だけを2段目に降ろす。ラベルは残す。
+ *   1行に必要な幅は 88px × 3 ＋ すきま 16px ＝ 280px になり、
+ *   291px の側でも収まる。数は3桁でも4桁でもラベルより狭いので、
+ *   数が増えても幅は動かない。
+ * ★ 高さは 2段になっても 44px を割らない（padding 4 + 20.4 + 19.2 + 4 + 枠 2 ≒ 50px）。
+ *   タップ領域は縮まない。
+ *
+ * ★ 水面（__flood）は __face と同じ折り返し方をさせる。
+ *   align-content を center で固定するのが要点で、既定の stretch のままだと
+ *   高さいっぱいの __flood 側だけ2行が上下に散り、__face とずれる。
+ * ★ 数が 0 のときは数の要素そのものが出ない（1段のまま）。
+ *   li を flex にして、行の中で高さをそろえる。
+ */
+@media (max-width: 479px) {
+  .eg-reaction {
+    /* 3つを1行に収めるぶん、左右を詰める。上下は 2段になるので最小に */
+    padding: var(--space-xxs) var(--space-xs);
+  }
+
+  /* 数が 0 のボタンは1段のまま。行の中で高さをそろえる */
+  .eg-reactions > li {
+    display: flex;
+  }
+
+  /*
+   * 縦に積む。__face（幅なり）も __flood（inset:0 で全面）も同じ積み方になり、
+   * どちらも中央そろえなので、2枚が1pxもずれない。
+   * justify-content は base で center。縦方向の中央そろえとして効く。
+   */
+  .eg-reaction__face,
+  .eg-reaction__flood {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .eg-reaction__count {
+    /* 2段目。幅は1段目（ラベル）が決めるので、3桁ぶんの確保は要らない */
+    min-width: 0;
+    text-align: center;
+  }
 }
 
 /* 自分のものに付いたリアクション。押せる形にしない */

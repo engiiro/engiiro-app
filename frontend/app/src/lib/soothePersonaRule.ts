@@ -37,7 +37,12 @@ export function soothePersonaRule(target: SootheTarget): PersonaChoiceRule {
   if (target.kind === "soothe" && target.authorKind === "mother") {
     return {
       allowed: ["baby"],
-      reason: "お母さんへのあやすには、赤ちゃんとしてだけ 返せます。",
+      /*
+       * ことばは「あやす」ではなく「バブる」（人間の決定 2026-08-28）。
+       * ここで返せるのは赤ちゃんだけで、出てくることばは受け止めではなく弱音そのもの。
+       * 呼び名の表は lib/replyWording.ts。
+       */
+      reason: "お母さんの あやすには、赤ちゃんとして バブります。",
     };
   }
 
