@@ -3,7 +3,7 @@ import type { Stamp, StampShelf } from "./types";
 /*
  * スタンプのカタログ（GET /api/stamps 相当。FR-STAMP-001）。
  *
- * 中身は public/data/stamps.json から入る（PO の指示、2026-08-26 / Issue #30）。
+ * 中身は GET /api/stamps から入る（data/api.ts の fetchStamps が registerStamps を呼ぶ）。
  * ここは入れ物だけ。絵柄は public/images/stamps/<id>.png（透過 PNG）で、
  * 本文中の表示は components/BubbleBody.tsx の StampGlyph が出す。
  *

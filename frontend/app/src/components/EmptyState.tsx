@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 
 import { cx } from "../lib/cx";
+import { REPLY_WORDING } from "../lib/replyWording";
+import type { ReplyKind } from "../lib/replyWording";
 import { Illustration } from "./Illustration";
 import type { IllustrationName } from "./Illustration";
 import "./EmptyState.css";
@@ -24,17 +26,18 @@ type EmptyStateProps = {
 };
 
 /**
- * あやすが1件も無いときの空状態。
+ * 返ってきたものが1件も無いときの空状態。
  *
  * ★ バブル詳細（S4）と あやす詳細（S4b）で同じものを出す。
  *   別々に書くと、片方だけ言い回しが変わる。
+ * ★ ことばは返信先で変わる（人間の決定 2026-08-28）。お母さんのあやすへ返るのは
+ *   赤ちゃんのバブルなので「まだ だれも バブっていません。」になる。
+ *   文は lib/replyWording.ts が持っていて、ここは引くだけ。
  * ★ イラストは渡さない。どちらの画面でも入れ子の空状態なので、
  *   1画面に主役のイラストを2つ置かないため（上の ★ 参照）。
  */
-export function NoSootheState() {
-  return (
-    <EmptyState lines={["まだ だれも あやしていません。", "さいしょの ひとりに なってみる？"]} />
-  );
+export function NoSootheState({ kind = "soothe" }: { readonly kind?: ReplyKind } = {}) {
+  return <EmptyState lines={REPLY_WORDING[kind].emptyLines} />;
 }
 
 export function EmptyState({ lines, action, illustration }: EmptyStateProps) {

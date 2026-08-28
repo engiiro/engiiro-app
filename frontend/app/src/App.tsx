@@ -706,7 +706,14 @@ export function App() {
 
   const openReply = useCallback(
     (target: SootheTarget) => {
-      guard("soothe", () => setCompose({ kind: "reply", target }));
+      /*
+       * ゲストに出す文も、返信先で変える（人間の決定 2026-08-28）。
+       * お母さんのあやすへ返せるのは赤ちゃんだけで、そこでの操作は「バブる」。
+       * 「あやすには、アカウントが いります」と出すと、押したボタンと文が合わない。
+       */
+      const gateAction =
+        target.kind === "soothe" && target.authorKind === "mother" ? "bubble" : "soothe";
+      guard(gateAction, () => setCompose({ kind: "reply", target }));
     },
     [guard],
   );
@@ -714,6 +721,24 @@ export function App() {
   const startBubble = useCallback(() => {
     guard("bubble", () => setCompose({ kind: "bubble" }));
   }, [guard]);
+
+  /*
+   * ニックネームを変えたあと（人間の指示、2026-08-28）。
+   *
+   * ★ 受け取るのは**サーバが返した保存後の値**。ここで文字列を組み立て直さない。
+   * ★ 自分の名前は自分の投稿・あやす・プロフィールにも出ている。
+   *   それらはサーバから引いたものなので、me を差し替えるだけでは古い名前が残る。
+   *   いま開いている画面を引き直して、サーバ側の名前に合わせる。
+   *   引き直しは quiet（skeleton に戻さない）なので、画面は入れ替わって見えない。
+   */
+  const applyRename = useCallback(
+    async (next: Me) => {
+      setMe(next);
+      setToast("なまえを かえました");
+      await refresh();
+    },
+    [refresh],
+  );
 
   const reactToBubbleGuarded = useCallback(
     (bubbleId: string, reaction: ReactionType) => {
@@ -889,7 +914,13 @@ export function App() {
           ) : null}
 
           {here.kind === "view" && here.view === "settings" ? (
-            <SettingsScreen theme={theme} onThemeChange={setTheme} />
+            <SettingsScreen
+              theme={theme}
+              onThemeChange={setTheme}
+              me={me}
+              isGuest={isGuest}
+              onRenamed={(next) => void applyRename(next)}
+            />
           ) : null}
 
           {here.kind === "view" &&

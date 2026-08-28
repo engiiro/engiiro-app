@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { InputHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
 
 import { cx } from "../lib/cx";
 import "./TextField.css";
@@ -12,6 +12,11 @@ import "./TextField.css";
  *
  * エラーは色だけでなく文字でも出す（DESIGN.md §2.5）。
  * 入力そのものは止めない。止めるのは保存ボタンのほう（DESIGN.md §4 文字数カウンタと同じ考え）。
+ *
+ * ★ action は入力欄の**右隣**に置く小さな操作（パスワードの「みる」など）。
+ *   欄の外に並べると、エラーの一行が出た瞬間に欄が縦に伸び、外のボタンだけが
+ *   下へずれて入力欄と段が合わなくなる（2026-08-28 の確認で発生）。
+ *   入力欄と同じ行に入れておけば、下に何行足しても位置は動かない。
  */
 
 type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> & {
@@ -20,9 +25,11 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> &
   readonly hint?: string;
   /** 直せる形で出す。理由を書く。空文字は渡さない */
   readonly error?: string;
+  /** 入力欄の右隣に並べる小さな操作。欄と同じ行に固定される */
+  readonly action?: ReactNode;
 };
 
-export function TextField({ label, hint, error, id, ...rest }: TextFieldProps) {
+export function TextField({ label, hint, error, action, id, ...rest }: TextFieldProps) {
   const generated = useId();
   const fieldId = id ?? generated;
   const hintId = hint ? fieldId + "-hint" : undefined;
@@ -38,13 +45,16 @@ export function TextField({ label, hint, error, id, ...rest }: TextFieldProps) {
           {hint}
         </p>
       ) : null}
-      <input
-        {...rest}
-        id={fieldId}
-        className={cx("eg-field__input", "t-input", error && "is-error")}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={cx(hintId, errorId) || undefined}
-      />
+      <div className="eg-field__row">
+        <input
+          {...rest}
+          id={fieldId}
+          className={cx("eg-field__input", "t-input", error && "is-error")}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={cx(hintId, errorId) || undefined}
+        />
+        {action}
+      </div>
       {error ? (
         <p id={errorId} className={cx("eg-field__error", "t-caption")} role="alert">
           {error}

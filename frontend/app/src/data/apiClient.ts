@@ -46,7 +46,7 @@ export class ApiError extends Error {
 }
 
 type RequestOptions = {
-  readonly method?: "GET" | "POST" | "DELETE";
+  readonly method?: "GET" | "POST" | "PATCH" | "DELETE";
   readonly body?: unknown;
 };
 
@@ -87,5 +87,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 export const api = {
   get: <T>(path: string) => request<T>(path, { method: "GET" }),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body }),
+  /* 一部だけ差し替える更新（PATCH /api/profile/me）。backend の CORS も PATCH を許可している */
+  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body }),
   del: <T>(path: string, body?: unknown) => request<T>(path, { method: "DELETE", body }),
 };

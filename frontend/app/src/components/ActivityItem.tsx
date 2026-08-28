@@ -1,6 +1,7 @@
 import type { ActivityEntry } from "../data/types";
 import { cx } from "../lib/cx";
 import { relativeTimeText } from "../lib/relativeTime";
+import { replyKindOfSoothe } from "../lib/replyWording";
 import { sootheCountText } from "../lib/sootheCountText";
 import { BubbleBody } from "./BubbleBody";
 import { PersonaAvatar } from "./PersonaAvatar";
@@ -36,9 +37,17 @@ type ActivityItemProps = {
 
 const KIND_LABEL = { bubble: "バブル", soothe: "あやす" } as const;
 
-/** 何件ついているか。バブルは直接のあやす、あやすはそれへのあやす */
+/**
+ * 何件ついているか。バブルは直接のあやす、あやすはそれへ返ってきたもの。
+ *
+ * ★ あやすへ返るものの呼び名は、そのあやすの発信ペルソナで変わる
+ *   （人間の決定 2026-08-28）。お母さんのあやすへ返せるのは赤ちゃんだけなので「バブル 3」。
+ */
 function countTextOf(item: ActivityEntry): string {
-  return sootheCountText(item.kind === "bubble" ? item.bubble.sootheCount : item.soothe.replyCount);
+  if (item.kind === "bubble") {
+    return sootheCountText(item.bubble.sootheCount);
+  }
+  return sootheCountText(item.soothe.replyCount, replyKindOfSoothe(item.soothe.author.kind));
 }
 
 export function ActivityItem({

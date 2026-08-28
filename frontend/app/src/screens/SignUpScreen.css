@@ -72,18 +72,11 @@
   color: var(--ink);
 }
 
-/* パスワード欄と「みる」を横に並べる。ボタンは入力欄の高さに合わせる */
-.eg-signup__password {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-xs);
-}
-
-.eg-signup__password > .eg-field {
-  flex: 1;
-  min-width: 0;
-}
-
+/*
+ * 「みる」は TextField の action スロット（入力欄と同じ行）に入っている。
+ * 以前はここに .eg-signup__password という横並びの箱を置いていたが、
+ * 入力欄の下にエラーの一行が出るとボタンだけが下へずれた（2026-08-28）。
+ */
 .eg-signup__peek {
   flex: none;
   min-height: var(--control-min-height);

@@ -15,8 +15,18 @@
   color: var(--muted);
 }
 
+/* 入力欄と、その右隣の小さな操作。ここが1行ぶんの高さを持つ */
+.eg-field__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
 .eg-field__input {
   width: 100%;
+  /* 右隣に操作があるときは、余りを入力欄が取る */
+  flex: 1;
+  min-width: 0;
   min-height: var(--control-min-height);
   padding: var(--input-padding);
   border: var(--border-width) var(--input-border-style) var(--hairline);
@@ -39,6 +49,20 @@
 
 .eg-field__input::placeholder {
   color: var(--muted);
+}
+
+/*
+ * 送信中などで一時的に書けない状態。
+ * 面を沈めて、枠のホバーも殺す（触れる場所に見せない。DESIGN.md §4 Disabled）。
+ */
+.eg-field__input:disabled {
+  background: var(--card);
+  color: var(--muted);
+  cursor: default;
+}
+
+.eg-field__input:disabled:hover {
+  border-color: var(--hairline);
 }
 
 /* 誤りは 枠の色だけでなく、下の文字でも伝える（DESIGN.md §2.5） */

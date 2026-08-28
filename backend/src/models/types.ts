@@ -29,6 +29,10 @@ export interface StampRow {
   id: string;
   name: string;
   image_url: string;
+  /** スタンプの棚。frontendの一覧タブがこれで分かれる（weak / glad / soothe / reply） */
+  shelf: string;
+  /** 棚の中の並び。created_atはseedで同値になるため並び順の根拠にできない */
+  sort_order: number;
   created_at: string;
 }
 

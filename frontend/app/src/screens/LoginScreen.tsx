@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { ACCOUNT_ID_RULE_TEXT, PASSWORD_MIN_LENGTH, login } from "../data/api";
+import { ACCOUNT_ID_RULE_TEXT, login } from "../data/api";
 import type { Me } from "../data/types";
 import { cx } from "../lib/cx";
 import { BrandMark } from "../components/BrandMark";
@@ -16,8 +16,13 @@ import "./SignUpScreen.css";
  *   「ID がありません」と「パスワードが違います」を区別すると、
  *   どの ID が存在するかを外から数えられる。ここは1つの文にまとめる。
  *
- * ★ 認証の仕様は未確定（Issue #7、status:needs-human）。
- *   通す条件は data/api.ts の仮置きで、正しさの根拠ではない。
+ * ★ ここでは パスワードの形を検査しない（人間の決定 2026-08-28）。
+ *   登録側の規則（8文字以上・半角の英数字と記号）は 2026-08-28 に決まったもので、
+ *   それ以前に作られたアカウントの パスワードは その形に従っていない。
+ *   ログインで形を検査すると、既存の利用者が自分のアカウントから締め出される。
+ *   規則の補足文もここには出さない（出すと「いまの自分のパスワードは違う」と読める）。
+ *
+ * ★ ID の形（ACCOUNT_ID_RULE_TEXT）は未確定のまま（Issue #7、status:needs-human）。
  *
  * ログインしなくても読むことはできる（人間の指示、2026-08-26）。
  * だから「もどる」は行き止まりではなく、読むのに戻る道として出す。
@@ -80,24 +85,23 @@ export function LoginScreen({
           onChange={(event) => setAccountId(event.target.value)}
         />
 
-        <div className="eg-signup__password">
-          <TextField
-            label="パスワード"
-            hint={String(PASSWORD_MIN_LENGTH) + " 文字以上"}
-            type={showPassword ? "text" : "password"}
-            value={password}
-            autoComplete="current-password"
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <button
-            type="button"
-            className={cx("eg-signup__peek", "t-label")}
-            aria-pressed={showPassword}
-            onClick={() => setShowPassword(!showPassword)}
-          >
-            {showPassword ? "かくす" : "みる"}
-          </button>
-        </div>
+        <TextField
+          label="パスワード"
+          type={showPassword ? "text" : "password"}
+          value={password}
+          autoComplete="current-password"
+          onChange={(event) => setPassword(event.target.value)}
+          action={
+            <button
+              type="button"
+              className={cx("eg-signup__peek", "t-label")}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? "かくす" : "みる"}
+            </button>
+          }
+        />
 
         {error ? (
           <NoteBox variant="reject" role="alert">

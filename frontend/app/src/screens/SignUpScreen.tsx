@@ -5,7 +5,10 @@ import {
   BIRTHDAY_MIN,
   NICKNAME_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  PASSWORD_RULE_TEXT,
   createAccount,
+  isValidPassword,
+  passwordProblem,
   todayIsoDate,
 } from "../data/api";
 import type { CreateAccountResult, Me } from "../data/types";
@@ -31,9 +34,10 @@ import "./SignUpScreen.css";
  *   （FR-PRIV-003/004）。そのことを、入力欄のすぐ下に書いておく。
  *   ここで隠すと「なぜ要るのか」が分からないまま個人の情報を書かせることになる。
  *
- * ★ 認証の仕様は未確定（Issue #7、status:needs-human）。
- *   ここに書いてある規則（ID の形・パスワードの長さ）は画面を動かすための仮置きで、
- *   決まったら data/api.ts の定数といっしょに直す。
+ * ★ パスワードの規則は決まっている（人間の決定 2026-08-28）。
+ *   8文字以上・半角の英数字と記号・全角とスペースは不可。判定は data/api.ts の
+ *   passwordProblem 1本で、backend/src/routes/accounts.ts も同じ規則を持つ。
+ *   ID の形（ACCOUNT_ID_RULE_TEXT）はまだ仮置き（Issue #7、status:needs-human）。
  *
  * ★ 2つのニックネームを並べて入力させる画面だが、これは登録の場面だけ。
  *   ここで決めた名前が同じ画面に並ぶのは、この先は S8 だけになる（DESIGN.md §0.1-1）。
@@ -46,7 +50,7 @@ const ERROR_TEXT: Readonly<Record<Extract<CreateAccountResult, { ok: false }>["r
   {
     account_id_invalid: "ID は " + ACCOUNT_ID_RULE_TEXT + " で つけてください。",
     account_id_taken: "その ID は すでに つかわれています。べつの ID に してください。",
-    password_weak: "パスワードは " + String(PASSWORD_MIN_LENGTH) + " 文字以上に してください。",
+    password_weak: "パスワードは " + PASSWORD_RULE_TEXT + "。",
     birthday_invalid: "生年月日を たしかめてください。きょうより あとの日は えらべません。",
     nickname_empty: "ふたつとも ニックネームを 入れてください。",
     nickname_too_long:
@@ -57,6 +61,20 @@ const ERROR_TEXT: Readonly<Record<Extract<CreateAccountResult, { ok: false }>["r
     nickname_moderation:
       "えんじいろでは、あなたと 他の利用者の 匿名性を まもるため、個人が特定できる情報・外部連絡先・実際に会うための内容は ニックネームにも つかえません。",
   };
+
+/*
+ * パスワードが規則から外れている理由（人間の決定 2026-08-28）。
+ *
+ * ★ 押せないボタンの理由は、押す前に読める場所に出す（DESIGN.md §0.3）。
+ *   規則そのものは補足文（PASSWORD_RULE_TEXT）に出しているので、ここでは
+ *   「いま入っているものの、どこが規則から外れているか」だけを書く。
+ * ★ 判定は data/api.ts の passwordProblem 1本。backend も同じ規則を持っている。
+ */
+const PASSWORD_PROBLEM_TEXT = {
+  too_short: "パスワードは " + String(PASSWORD_MIN_LENGTH) + " 文字以上に してください。",
+  charset:
+    "パスワードに つかえるのは 半角の 英字・数字・記号だけです。全角の文字と スペースは つかえません。",
+} as const;
 
 type SignUpScreenProps = {
   /** 登録できたら、決まった両ペルソナの情報を渡して本編へ */
@@ -77,9 +95,12 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
+  /* 規則から外れているところ。空欄のあいだは出さない（まだ入れていないだけなので） */
+  const passwordIssue = passwordProblem(password);
+
   const filled =
     accountId.trim() !== "" &&
-    password !== "" &&
+    isValidPassword(password) &&
     birthday !== "" &&
     babyNickname.trim() !== "" &&
     motherNickname.trim() !== "";
@@ -136,24 +157,26 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
           onChange={(event) => setAccountId(event.target.value)}
         />
 
-        <div className="eg-signup__password">
-          <TextField
-            label="パスワード"
-            hint={String(PASSWORD_MIN_LENGTH) + " 文字以上"}
-            type={showPassword ? "text" : "password"}
-            value={password}
-            autoComplete="new-password"
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <button
-            type="button"
-            className={cx("eg-signup__peek", "t-label")}
-            aria-pressed={showPassword}
-            onClick={() => setShowPassword(!showPassword)}
-          >
-            {showPassword ? "かくす" : "みる"}
-          </button>
-        </div>
+        <TextField
+          label="パスワード"
+          hint={PASSWORD_RULE_TEXT}
+          error={passwordIssue ? PASSWORD_PROBLEM_TEXT[passwordIssue] : undefined}
+          type={showPassword ? "text" : "password"}
+          value={password}
+          autoComplete="new-password"
+          onChange={(event) => setPassword(event.target.value)}
+          /* 入力欄と同じ行に置く。下にエラーが出てもボタンの位置が動かない */
+          action={
+            <button
+              type="button"
+              className={cx("eg-signup__peek", "t-label")}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? "かくす" : "みる"}
+            </button>
+          }
+        />
 
         <TextField
           label="生年月日"
@@ -177,7 +200,7 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
             <PersonaAvatar kind="baby" size="md" />
             <TextField
               label="赤ちゃんの ニックネーム"
-              hint="よわねを 吐き出すときの 名前"
+              hint={"よわねを 吐き出すときの 名前。" + String(NICKNAME_MAX_LENGTH) + " 文字まで"}
               value={babyNickname}
               maxLength={NICKNAME_MAX_LENGTH}
               onChange={(event) => setBabyNickname(event.target.value)}
@@ -188,7 +211,7 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
             <PersonaAvatar kind="mother" size="md" />
             <TextField
               label="お母さんの ニックネーム"
-              hint="だれかを あやすときの 名前"
+              hint={"だれかを あやすときの 名前。" + String(NICKNAME_MAX_LENGTH) + " 文字まで"}
               value={motherNickname}
               maxLength={NICKNAME_MAX_LENGTH}
               onChange={(event) => setMotherNickname(event.target.value)}
