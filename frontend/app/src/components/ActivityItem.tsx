@@ -75,7 +75,7 @@ export function ActivityItem({
             type="button"
             className={cx("eg-activity__delete", "eg-touch")}
             onClick={() => onDelete(item.bubble.id)}
-            aria-label="このバブルを けす"
+            aria-label="このバブるを けす"
           >
             <IconTrash />
           </button>

@@ -9,12 +9,31 @@
  * 認証が必要なリクエストには Authorization: Bearer <token> を必ず付与する。
  */
 
+import { safeJson } from "../lib/safeText";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 const TOKEN_STORAGE_KEY = "engiiro.token";
 
+/*
+ * JWT の形（base64url の3節。docs/design_doc.md 6.4章）。
+ * localStorage は利用者にも拡張にも書ける場所なので、入っているものが
+ * トークンである保証は無い。形が違うものは送らずに捨てる（2026-09-05）。
+ * ★ 中身の検証ではない。署名を確かめるのは backend の仕事。
+ *   ここは「壊れた値を握って 401 を出し続ける状態」を作らないためだけのもの。
+ */
+const JWT_SHAPE = /^[\w-]+\.[\w-]+\.[\w-]+$/;
+
 export function getToken(): string | null {
   try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY);
+    const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (stored === null) {
+      return null;
+    }
+    if (!JWT_SHAPE.test(stored)) {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      return null;
+    }
+    return stored;
   } catch {
     return null;
   }
@@ -73,7 +92,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     return undefined as T;
   }
 
-  const data = await res.json().catch(() => null);
+  /*
+   * 受け取った文字列は、画面に混ぜる前にここで一度だけ無害化する（lib/safeText.ts）。
+   * 画面ごとに掛けると、新しい画面を足したときに掛け忘れる。
+   */
+  const data = safeJson(await res.json().catch(() => null));
 
   if (!res.ok) {
     const message = data && typeof data.error === "string" ? data.error : `HTTP ${res.status}`;

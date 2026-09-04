@@ -100,7 +100,7 @@ export function BubbleDetailScreen({
                 onClick={() => setConfirming(true)}
               >
                 <IconTrash />
-                このバブルを けす
+                このバブるを けす
               </button>
             </div>
           ) : null}
@@ -133,6 +133,7 @@ export function BubbleDetailScreen({
                       sootheId: target.id,
                       authorKind: target.author.kind,
                       authorNickname: target.author.nickname,
+                      body: target.body,
                       bubbleIsMine: bubble.isMine,
                     })
                   }
@@ -152,6 +153,7 @@ export function BubbleDetailScreen({
               kind: "bubble",
               bubbleId: bubble.id,
               authorNickname: bubble.author.nickname,
+              body: bubble.body,
               bubbleIsMine: bubble.isMine,
             })
           }

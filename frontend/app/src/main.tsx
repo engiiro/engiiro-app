@@ -6,6 +6,7 @@ import "./tokens/typography.css";
 import "./tokens/motion.css";
 import "./tokens/base.css";
 import { App } from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const container = document.getElementById("root");
 if (!container) {
@@ -14,6 +15,9 @@ if (!container) {
 
 createRoot(container).render(
   <StrictMode>
-    <App />
+    {/* 描画中の例外で真っ白にしない（components/ErrorBoundary.tsx） */}
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

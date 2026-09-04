@@ -56,7 +56,7 @@ const TABS: readonly SegmentedTab<ActivityTab>[] = [
 ];
 
 const EMPTY_LINES: Readonly<Record<ActivityTab, readonly string[]>> = {
-  babyBubbles: ["まだ バブルを かいていません。", "はじめの ひとことを だしてみる？"],
+  babyBubbles: ["まだ バブるを かいていません。", "はじめの ひとことを だしてみる？"],
   babyAll: ["赤ちゃんとしての 記録は まだ ありません。"],
   motherSoothes: ["お母さんとして あやした ことばは まだ ありません。"],
 };
@@ -111,7 +111,7 @@ export function MyProfileScreen({
                 caption={personaStatusCaption(
                   profile.baby.status,
                   "baby",
-                  "バブルを かくと はかれます",
+                  "バブるを かくと はかれます",
                 )}
                 note={axisNote(profile.baby)}
               />
@@ -177,7 +177,7 @@ export function MyProfileScreen({
           /* お母さんの一覧に「バブルを かく」は出さない。お母さんは投稿できない（FR-POST-003） */
           emptyAction={
             tab === "motherSoothes" ? undefined : (
-              <Button onClick={onCompose}>バブルを かく</Button>
+              <Button onClick={onCompose}>バブるを かく</Button>
             )
           }
           onOpenBubble={onOpenBubble}

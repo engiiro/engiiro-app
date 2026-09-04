@@ -89,6 +89,8 @@
 
 .eg-intro__brand {
   color: var(--accent-line);
+  /* 園児UI では手書きの画像に変わる。文字と同じ高さに置く（BrandWordmark.css） */
+  --wordmark-height: 76px;
 }
 
 .eg-intro__tagline {
@@ -333,6 +335,7 @@
   /* 名乗りは画面の主役。display スケールより一段大きくする */
   .eg-intro__brand {
     font-size: clamp(30px, 3.2vw, 42px);
+    --wordmark-height: clamp(92px, 8vw, 120px);
   }
 
   .eg-intro__mark {

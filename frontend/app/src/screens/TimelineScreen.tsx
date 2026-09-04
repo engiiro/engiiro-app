@@ -106,7 +106,7 @@ export function TimelineScreen({
                 "ここから先はまだ、だれも吐き出していません。",
                 "いちばん最初に なってみる？",
               ]}
-              action={<Button onClick={onCompose}>バブルを かく</Button>}
+              action={<Button onClick={onCompose}>バブるを かく</Button>}
             />
           </div>
         ) : null}

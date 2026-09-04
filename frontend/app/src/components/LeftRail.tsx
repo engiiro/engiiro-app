@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 
 import { cx } from "../lib/cx";
 import { BrandMark } from "./BrandMark";
+import { BrandWordmark } from "./BrandWordmark";
 import { IconBell, IconGear, IconHeart, IconHome, IconPerson, IconSearch } from "./icons";
 import "./LeftRail.css";
 
@@ -64,10 +65,14 @@ export function LeftRail({
       {/*
         名乗り。細い列（1199px 以下）では印だけが残り、文字は消える。
         印そのものは全利用者で同じ絵柄なので、誰かを識別する手がかりにはならない。
+
+        ★ 園児UI では、文字の部分が手書きの画像に変わる（BrandWordmark.tsx）。
+          消す条件（.eg-rail__logo の display:none）は文字と画像で同じなので、
+          細い列での振る舞いはテーマによって変わらない。
       */}
       <div className="eg-rail__brand">
         <BrandMark className="eg-rail__mark" />
-        <span className={cx("eg-rail__logo", "t-display")}>えんじいろ</span>
+        <BrandWordmark className="eg-rail__logo" />
       </div>
       <ul className="eg-rail__list">
         {RAIL_ITEMS.map((item) => {
