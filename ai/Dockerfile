@@ -1,5 +1,6 @@
-# このDockerfileはローカル開発だけでなく、Hugging Face Spaces（Docker SDK）への
-# 本番デプロイにもそのまま使える想定（docs/design_doc.md 5章参照）。
+# このDockerfileはローカル開発だけでなく、本番のGoogle Cloud Runへの
+# デプロイにもそのまま使っている（docs/design_doc.md 5章参照）。
+# 当初はHugging Face Spaces（Docker SDK）を想定していたが、Cloud Runへ変更した。
 FROM python:3.11-slim
 
 WORKDIR /app
