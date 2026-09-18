@@ -36,6 +36,13 @@ import "./SettingsScreen.css";
  *
  * ★ 通報・DM・フォロワー数の項目は作らない。0 を返すのではなく存在させない（16章 非スコープ）。
  *
+ * ★ ログイン／ログアウトを置いた（人間の指摘、2026-09-05）。
+ *   出入り口は右サイド（RightRail）にしか無く、その列は 1199px 以下で消える
+ *   （App.css）。スマホでゲストのまま来た人には、ログインする道が画面のどこにも
+ *   残っていなかった。ここは幅によって消えない画面なので、同じ操作をもう1か所置く。
+ *   ★★ 出しわけを幅でしない。狭いときだけ出す形にすると、
+ *      「さっき見た場所に無い」が起きる。どの幅でも同じ場所にある。
+ *
  * テーマの見本は、その色そのもので見せる。
  * 見本の枠に data-theme を置くと、tokens/theme.css の入れ子側のブロックが効いて、
  * 選んでいないテーマの色でも描ける（theme.css の ★ 参照）。
@@ -83,6 +90,8 @@ export function SettingsScreen({
   me,
   isGuest,
   onRenamed,
+  onLogin,
+  onLogout,
 }: {
   readonly theme: ThemeChoice;
   readonly onThemeChange: (next: ThemeChoice) => void;
@@ -91,6 +100,8 @@ export function SettingsScreen({
   readonly isGuest: boolean;
   /** 保存できたとき。App が自分の情報と、いま開いている画面を引き直す */
   readonly onRenamed: (next: Me) => void;
+  readonly onLogin: () => void;
+  readonly onLogout: () => void;
 }) {
   /*
    * 「OSに従う」の見本だけは、選択そのものでは色が決まらない。
@@ -173,6 +184,13 @@ export function SettingsScreen({
 
         <NicknameSection me={me} isGuest={isGuest} onRenamed={onRenamed} />
 
+        <AccountSection
+          me={me}
+          isGuest={isGuest}
+          onLogin={onLogin}
+          onLogout={onLogout}
+        />
+
         <section className="eg-settings__section">
           <h2 className={cx("eg-settings__title", "t-heading")}>このアプリの こと</h2>
           {ABOUT.map((item) => (
@@ -193,6 +211,64 @@ export function SettingsScreen({
         </section>
       </div>
     </>
+  );
+}
+
+/*
+ * アカウントの出入り口（人間の指摘、2026-09-05。上の ★）。
+ *
+ * ★ 出すことばと形は RightRail と揃える。ゲストは「ログイン」、
+ *   ログイン中は「ログアウト」。同じ操作が画面によって別の名前で出ないようにする。
+ * ★ ログイン中でも、ここに両方のニックネームを並べない（DESIGN.md §0.1-1）。
+ *   出すのは赤ちゃんの顔だけ。両方まとめて見られるのは S8 だけ（FR-PERSONA-005）。
+ * ★ ログアウトに確認は出さない。押し直せば元に戻せる（DESIGN.md §4：
+ *   確認は不可逆な操作にだけ）。書きかけを道連れにしないことは App 側の leave() が見る。
+ * ★ アカウントの削除は置かない。仕様に無いものを、この画面で作らない。
+ */
+function AccountSection({
+  me,
+  isGuest,
+  onLogin,
+  onLogout,
+}: {
+  readonly me: Me | null;
+  readonly isGuest: boolean;
+  readonly onLogin: () => void;
+  readonly onLogout: () => void;
+}) {
+  return (
+    <section className="eg-settings__section">
+      <h2 className={cx("eg-settings__title", "t-heading")}>アカウント</h2>
+
+      {isGuest ? (
+        <>
+          <p className={cx("eg-settings__lead", "t-caption")}>
+            いまは よむ だけの じょうたいです。ログインすると、バブるを かいたり、
+            あやしたり できます。
+          </p>
+          <div className="eg-settings__account-actions">
+            <Button onClick={onLogin}>ログイン</Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="eg-settings__account-who">
+            <PersonaAvatar kind="baby" size="md" />
+            <span className={cx("eg-settings__account-name", "t-card-title")}>
+              {me ? me.baby.nickname : ""}
+            </span>
+          </div>
+          <p className={cx("eg-settings__lead", "t-caption")}>
+            ログアウトしても、よむのは つづけられます。
+          </p>
+          <div className="eg-settings__account-actions">
+            <Button variant="ghost" onClick={onLogout}>
+              ログアウト
+            </Button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -329,19 +405,27 @@ function NicknameSection({
     setSaving(true);
     setError(null);
     setSaved(false);
-    const result = await updateNicknames(
-      kind === "baby" ? { baby: draft } : { mother: draft },
-    );
-    savingRef.current = false;
-    setSaving(false);
-    if (!result.ok) {
-      setError(RENAME_ERROR_TEXT[result.reason]);
-      return;
+    /*
+     * ★ finally で必ず印を下ろす（2026-09-05）。通信が落ちると updateNicknames は
+     *   例外で抜ける。以前はそこで savingRef を戻せず、名前を変える操作が
+     *   開き直すまで二度と通らなくなっていた（入口を閉じたまま鍵を落とす形）。
+     */
+    try {
+      const result = await updateNicknames(
+        kind === "baby" ? { baby: draft } : { mother: draft },
+      );
+      if (!result.ok) {
+        setError(RENAME_ERROR_TEXT[result.reason]);
+        return;
+      }
+      /* 読むだけの状態に戻す。出す名前はサーバが返したほう */
+      setDraft(null);
+      setSaved(true);
+      onRenamed(result.me);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    /* 読むだけの状態に戻す。出す名前はサーバが返したほう */
-    setDraft(null);
-    setSaved(true);
-    onRenamed(result.me);
   }
 
   return (

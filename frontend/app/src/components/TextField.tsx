@@ -2,6 +2,7 @@ import { useId } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
 
 import { cx } from "../lib/cx";
+import { FIELD_HARD_MAX } from "../lib/floodGuard";
 import "./TextField.css";
 
 /*
@@ -29,7 +30,7 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> &
   readonly action?: ReactNode;
 };
 
-export function TextField({ label, hint, error, action, id, ...rest }: TextFieldProps) {
+export function TextField({ label, hint, error, action, id, maxLength, ...rest }: TextFieldProps) {
   const generated = useId();
   const fieldId = id ?? generated;
   const hintId = hint ? fieldId + "-hint" : undefined;
@@ -49,6 +50,12 @@ export function TextField({ label, hint, error, action, id, ...rest }: TextField
         <input
           {...rest}
           id={fieldId}
+          /*
+           * 貼り付け事故の天井（lib/floodGuard.ts）。欄ごとの上限（ニックネーム 20 など）を
+           * 渡していれば、そちらが勝つ。ここは何も指定していない欄が
+           * 数十万文字を抱えないための最後の受け皿。
+           */
+          maxLength={maxLength ?? FIELD_HARD_MAX}
           className={cx("eg-field__input", "t-input", error && "is-error")}
           aria-invalid={error ? true : undefined}
           aria-describedby={cx(hintId, errorId) || undefined}

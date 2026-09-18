@@ -10,11 +10,24 @@ import type { PersonaKind } from "../data/types";
  *         「お母さんが選択肢に現れず、赤ちゃんのみが選択できる」なので、disabled では足りない
  */
 
+/*
+ * 返信先。ペルソナ選択の規則を決めるのに使うほか、
+ * 書いている画面の上部にそのまま出す（人間の指示、2026-09-05）。
+ *
+ * ★ body を持たせたのはそのため。以前は id と発信者の名前しか持っておらず、
+ *   「○○ の バブルへ」という一行しか出せなかった。何に返しているのかを
+ *   確かめるには、書くのをやめて画面を戻るしかなかった。
+ * ★ 抜粋ではなく本文そのものを渡す。短くするのは出す側（ComposePanel）の仕事で、
+ *   どこで切るかは置き場所によって変わる。
+ * ★ 発信ペルソナの種類は、返信先がバブルなら常に赤ちゃん（FR-POST-003）。
+ *   そのため kind: "bubble" 側は authorKind を持たない。
+ */
 export type SootheTarget =
   | {
       readonly kind: "bubble";
       readonly bubbleId: string;
       readonly authorNickname: string;
+      readonly body: string;
       readonly bubbleIsMine: boolean;
     }
   | {
@@ -23,6 +36,7 @@ export type SootheTarget =
       readonly sootheId: string;
       readonly authorKind: PersonaKind;
       readonly authorNickname: string;
+      readonly body: string;
       readonly bubbleIsMine: boolean;
     };
 

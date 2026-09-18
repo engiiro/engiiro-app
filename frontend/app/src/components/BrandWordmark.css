@@ -1,0 +1,18 @@
+/*
+ * 名乗りの文字。ノーマル・ダークは文字、園児UI は手書きの画像（BrandWordmark.tsx）。
+ *
+ * 置きたい大きさは呼び出し側が --wordmark-height で渡す。
+ * 文字と画像で高さが揃うので、テーマを切り替えても周りの余白が動かない。
+ */
+
+.eg-wordmark--kid {
+  display: block;
+  flex: none;
+  width: auto;
+  height: var(--wordmark-height, 28px);
+  /*
+   * クレヨンの線なので、拡大しても輪郭を立てない。
+   * 縮小側は既定の補間で足りる（元画像のほうが常に大きい）。
+   */
+  object-fit: contain;
+}

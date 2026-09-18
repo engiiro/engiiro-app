@@ -12,6 +12,8 @@ import { BUBBLE_MAX_LENGTH, containsStamp, countChars, isOverLimit } from "../da
 import { stampGroups } from "../data/stampCatalog";
 import type { Me, PersonaKind } from "../data/types";
 import { cx } from "../lib/cx";
+import { INPUT_HARD_MAX, capInput, useSingleFlight } from "../lib/floodGuard";
+import { safeText } from "../lib/safeText";
 import { MAX_MONTHS } from "../lib/mockAiEvaluate";
 import { REPLY_WORDING, replyKindOfSoothe } from "../lib/replyWording";
 import { soothePersonaRule } from "../lib/soothePersonaRule";
@@ -21,11 +23,13 @@ import type { AiPanelState } from "../components/AiTransformPanel";
 import { Button } from "../components/Button";
 import { CharCounter } from "../components/CharCounter";
 import { Illustration } from "../components/Illustration";
+import { PersonaAvatar } from "../components/PersonaAvatar";
 import { SegmentedTabs } from "../components/SegmentedTabs";
 import { BubbleBody, StampGlyph } from "../components/BubbleBody";
 import {
   IconClose,
   IconGauge,
+  IconSoothe,
   IconStamp,
   IconSwap,
   IconWand,
@@ -124,6 +128,15 @@ export function ComposePanel({
   const [rejected, setRejected] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /*
+   * 連打・多重送信のガード（lib/floodGuard.ts）。往復中に届いた2回目は捨てる。
+   * ボタンの disabled（submitting / evaluating）はこれの代わりにならない。
+   * state の反映を待つあいだに、同じフレームの2回目が通ってしまうため。
+   */
+  const sendFlight = useSingleFlight();
+  const transformFlight = useSingleFlight();
+  const evaluateFlight = useSingleFlight();
   const pendingRef = useRef<(() => void) | null>(null);
 
   const isBubble = mode.kind === "bubble";
@@ -163,6 +176,41 @@ export function ComposePanel({
     wasSendableRef.current = canSend;
   }, [canSend]);
 
+  /*
+   * 道具（はかる・変換）の誘い（人間の指摘 2026-09-05
+   * 「変換ボタンなどを押しやすくなるよう誘導できているか」）。
+   *
+   * 送信ボタンにだけ入れていた案2（＝「もう出せる」の合図）を、本文が要る道具にも広げる。
+   *
+   * ★ 型は同じものを使い回す。誘い方を2つに増やさない
+   *   （docs/color_and_ui_findings.md §5「採るなら1つに絞るのが安全」）。
+   * ★ 誘うのは「本文が入って、その道具が意味を持つようになった瞬間」だけ。
+   *   一度でも開いた道具は二度と誘わない。使い方を知っている人に動きを見せ続けない。
+   * ★ 送信ボタンと同じ瞬間に立ち上がるので、CSS 側で1拍ずらしてある
+   *   （ComposePanel.css の animation-delay）。同時に2か所が跳ねると、
+   *   どちらを見ればいいのか分からない。
+   *
+   * 動きが無くても分かることは変えていない（本文を入れれば、押した先に中身が出る）。
+   * reduced motion では --pop-scale が 1 に潰れるので、この誘いは自動的に無害になる。
+   */
+  const hasBody = body.trim().length > 0;
+  const wasUsefulRef = useRef(false);
+  const [usedDrawers, setUsedDrawers] = useState<readonly DrawerKind[]>([]);
+  const [justUseful, setJustUseful] = useState(false);
+
+  useEffect(() => {
+    if (hasBody && !wasUsefulRef.current) {
+      // oxlint-disable-next-line react/set-state-in-effect
+      setJustUseful(true);
+    }
+    wasUsefulRef.current = hasBody;
+  }, [hasBody]);
+
+  /** その道具が、いま誘ってよい状態か。本文があって、まだ一度も開いていないもの */
+  function inviting(kind: DrawerKind): boolean {
+    return hasBody && !usedDrawers.includes(kind);
+  }
+
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
@@ -191,7 +239,12 @@ export function ComposePanel({
    *   直した本文で押し直せる。
    */
   function changeBody(next: string) {
-    setBody(next);
+    /*
+     * 貼り付け事故への手当て。桁を落とす（lib/floodGuard.ts）のと、
+     * 混ざった制御文字・双方向の上書き・幅ゼロを落とす（lib/safeText.ts）。
+     * 150 文字の上限はここで止めず、カウンタで知らせる（DESIGN.md §4）。
+     */
+    setBody(capInput(safeText(next)));
     setEvaluation(null);
     setEvaluateFailed(false);
     setGateRejected(false);
@@ -226,6 +279,8 @@ export function ComposePanel({
 
   function toggleDrawer(next: DrawerKind) {
     setDrawer((current) => (current === next ? "none" : next));
+    /* 一度開いた道具は、もう誘わない（上の ★） */
+    setUsedDrawers((current) => (current.includes(next) ? current : [...current, next]));
   }
 
   async function runTransform() {
@@ -244,6 +299,12 @@ export function ComposePanel({
         setAi({ kind: "unavailable" });
         return;
       }
+      /*
+       * 想定外の失敗（通信断・応答の形が違う 等）。引き出しを working のまま置くと
+       * 「ことばを 変換しています…」が永久に残り、押し直す道も消える。
+       * 戻れる形にしてから投げ直す（原因は console に残す。握りつぶさない）。
+       */
+      setAi({ kind: "unavailable" });
       throw error;
     }
   }
@@ -262,6 +323,9 @@ export function ComposePanel({
         setEvaluateFailed(true);
         setEvaluation(null);
       } else {
+        // 想定外の失敗でも、引き出しは戻れる形にしてから投げ直す（runTransform と同じ）
+        setEvaluateFailed(true);
+        setEvaluation(null);
         throw error;
       }
     } finally {
@@ -273,33 +337,42 @@ export function ComposePanel({
     setSubmitting(true);
     setRejected(false);
     setGateRejected(false);
-    const result = isBubble
-      ? await createBubble({ body })
-      : await createSoothe({
-          bubbleId: mode.kind === "reply" ? mode.target.bubbleId : "",
-          personaKind: persona,
-          body,
-          replyToSootheId:
-            mode.kind === "reply" && mode.target.kind === "soothe" ? mode.target.sootheId : undefined,
-        });
-    setSubmitting(false);
-    if (result.ok) {
-      close(() => onPosted(wording.done));
-      return;
-    }
-    if (result.reason === "moderation") {
-      // 入力内容は消さない。書き直せる状態で残す（DESIGN.md §4 拒否バナー）
-      setRejected(true);
-    }
-    if (result.reason === "evaluation") {
-      // 閾値に届かなかった。いまの指標を引き出しで見せる（閾値そのものは見せない）
-      setGateRejected(true);
-      setDrawer("evaluate");
-      void runEvaluate();
-    }
-    if (result.reason === "ai_unavailable") {
-      setEvaluateFailed(true);
-      setDrawer("evaluate");
+    /*
+     * ★ finally で必ず submitting を下ろす（2026-09-05）。
+     *   通信が落ちると createBubble / createSoothe は例外で抜ける。以前はそこで
+     *   setSubmitting(false) に届かず、ボタンが「おくっています…」のまま
+     *   永久に押せなくなっていた（書いた本文を道連れにする閉じ方しか残らない）。
+     */
+    try {
+      const result = isBubble
+        ? await createBubble({ body })
+        : await createSoothe({
+            bubbleId: mode.kind === "reply" ? mode.target.bubbleId : "",
+            personaKind: persona,
+            body,
+            replyToSootheId:
+              mode.kind === "reply" && mode.target.kind === "soothe" ? mode.target.sootheId : undefined,
+          });
+      if (result.ok) {
+        close(() => onPosted(wording.done));
+        return;
+      }
+      if (result.reason === "moderation") {
+        // 入力内容は消さない。書き直せる状態で残す（DESIGN.md §4 拒否バナー）
+        setRejected(true);
+      }
+      if (result.reason === "evaluation") {
+        // 閾値に届かなかった。いまの指標を引き出しで見せる（閾値そのものは見せない）
+        setGateRejected(true);
+        setDrawer("evaluate");
+        void evaluateFlight(runEvaluate);
+      }
+      if (result.reason === "ai_unavailable") {
+        setEvaluateFailed(true);
+        setDrawer("evaluate");
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -346,12 +419,20 @@ export function ComposePanel({
         <Button
           className={cx("eg-compose__send", justSendable && "is-just-sendable")}
           disabled={!canSend}
-          onClick={() => void submit()}
+          onClick={() => void sendFlight(submit)}
           onAnimationEnd={() => setJustSendable(false)}
         >
           {submitting ? "おくっています…" : wording.send}
         </Button>
       </header>
+
+      {/*
+        返信先（人間の指示、2026-09-05）。書いている場所の上部に、返しにきた相手の
+        バブル／あやすをそのまま置く。ペルソナ変更より前に出しているのは、
+        「誰の、どのことばに返すか」が先に決まっていて、
+        「どの顔で返すか」がそのあとに来る順序だから。
+      */}
+      {mode.kind === "reply" ? <ReplyTarget target={mode.target} /> : null}
 
       {/* そのすぐ下：ペルソナ変更 */}
       <div className="eg-compose__persona">
@@ -378,14 +459,6 @@ export function ComposePanel({
         )}
       </div>
 
-      {mode.kind === "reply" ? (
-        <p className={cx("eg-compose__target", "t-caption")}>
-          {mode.target.kind === "bubble"
-            ? mode.target.authorNickname + " の バブルへ"
-            : mode.target.authorNickname + " の あやすへ"}
-        </p>
-      ) : null}
-
       <div className="eg-compose__body">
         {/*
           入力欄は、この画面でいちばん大きい面にする（UI刷新 2026-08-26）。
@@ -399,6 +472,7 @@ export function ComposePanel({
           <textarea
             ref={textareaRef}
             className={cx("eg-textarea", "t-input", over && "is-over")}
+            maxLength={INPUT_HARD_MAX}
             value={body}
             placeholder="なにがあった？ ぜんぶ そのままで いいよ。"
             onChange={(event) => changeBody(event.target.value)}
@@ -453,6 +527,10 @@ export function ComposePanel({
 
       {/* 入力欄の下：3つ横並び */}
       <div className="eg-compose__tools">
+        {/*
+          スタンプは本文が無くても使える（押せば必ず棚が出る）ので誘わない。
+          はかる・変換は本文が要るので、本文が入った瞬間だけ誘う（上の ★）。
+        */}
         <ToolButton
           active={drawer === "stamp"}
           onClick={() => toggleDrawer("stamp")}
@@ -461,10 +539,13 @@ export function ComposePanel({
         />
         <ToolButton
           active={drawer === "evaluate"}
+          inviting={inviting("evaluate")}
+          justInviting={justUseful}
+          onInviteEnd={() => setJustUseful(false)}
           onClick={() => {
             toggleDrawer("evaluate");
-            if (drawer !== "evaluate" && body.trim().length > 0) {
-              void runEvaluate();
+            if (drawer !== "evaluate" && hasBody) {
+              void evaluateFlight(runEvaluate);
             }
           }}
           icon={<IconGauge />}
@@ -472,9 +553,13 @@ export function ComposePanel({
         />
         <ToolButton
           active={drawer === "transform"}
+          /* 生成が落ちているときは誘わない。押しても「いま つかえません」しか出ない（NFR-001） */
+          inviting={aiTransformAvailable && inviting("transform")}
+          justInviting={justUseful}
+          onInviteEnd={() => setJustUseful(false)}
           onClick={() => {
             toggleDrawer("transform");
-            if (drawer !== "transform" && body.trim().length > 0) {
+            if (drawer !== "transform" && hasBody) {
               void runTransform();
             }
           }}
@@ -530,7 +615,7 @@ export function ComposePanel({
                 state={aiTransformAvailable ? ai : { kind: "unavailable" }}
                 personaKind={persona}
                 canRun={body.trim().length > 0}
-                onRun={() => void runTransform()}
+                onRun={() => void transformFlight(runTransform)}
                 onUseTransformed={(text) => {
                   // 本文欄に入るだけ。保存はしない（FR-AI-TRANS-006/007）
                   changeBody(text);
@@ -620,13 +705,28 @@ function StampPicker({
   );
 }
 
+/**
+ * 引き出しを開く道具ボタン。
+ *
+ *   inviting     … いま押しどき（本文が入っていて、まだ一度も開いていない）。輪郭で示す
+ *   justInviting … 押しどきに「なった」瞬間。一度だけ pop する
+ *
+ * 2つに分けてあるのは、前者が続く状態で、後者が一度きりの出来事だから。
+ * 1つにまとめると、状態が続くあいだ動き続けることになる（§7.2 と衝突する）。
+ */
 function ToolButton({
   active,
+  inviting = false,
+  justInviting = false,
+  onInviteEnd,
   onClick,
   icon,
   label,
 }: {
   readonly active: boolean;
+  readonly inviting?: boolean;
+  readonly justInviting?: boolean;
+  readonly onInviteEnd?: () => void;
   readonly onClick: () => void;
   readonly icon: React.ReactNode;
   readonly label: string;
@@ -635,12 +735,58 @@ function ToolButton({
     <button
       type="button"
       aria-pressed={active}
-      className={cx("eg-tool", "eg-touch", active && "is-active")}
+      className={cx(
+        "eg-tool",
+        "eg-touch",
+        active && "is-active",
+        !active && inviting && "is-inviting",
+        !active && inviting && justInviting && "is-just-inviting",
+      )}
       onClick={onClick}
+      onAnimationEnd={onInviteEnd}
     >
       {icon}
       <span className="t-label">{label}</span>
     </button>
+  );
+}
+
+/*
+ * 返信先（人間の指示、2026-09-05）。
+ *
+ * ── 直した症状 ────────────────────────────────────────────────────
+ * 書いている画面に出ていたのは「○○ の バブルへ」の一行だけだった。
+ * 何に返しているのかを確かめるには、書くのをやめて画面を戻るしかなく、
+ * 戻れば書きかけは消えた。
+ *
+ * ── 置き方 ────────────────────────────────────────────────────────
+ * ★ 相手のことばを、こちらの入力欄と見た目で分ける。入力欄は吹き出しの形
+ *   （--radius-balloon）なので、こちらは沈めた面（--card）に左の縦線を1本にする。
+ *   引用であることを、色ではなく形で示す（DESIGN.md §2.5）。
+ * ★ 長いものは畳まずスクロールさせる。切ると、返す相手のことばを
+ *   こちらの都合で削ったことになる。高さの上限は CSS 側が持つ。
+ * ★ ここから相手のプロフィールへは飛ばさない。飛べば書きかけが消える。
+ *   出すのは顔と名前と本文だけで、押せる場所を作らない。
+ */
+function ReplyTarget({ target }: { readonly target: SootheTarget }) {
+  /* 返信先がバブルなら、発信者は必ず赤ちゃん（FR-POST-003） */
+  const authorKind: PersonaKind = target.kind === "bubble" ? "baby" : target.authorKind;
+  const label =
+    target.kind === "bubble"
+      ? target.authorNickname + " の バブルへ"
+      : target.authorNickname + " の あやすへ";
+
+  return (
+    <section className="eg-compose__target" aria-label="返信先">
+      <p className={cx("eg-compose__target-label", "t-label")}>
+        <IconSoothe className="eg-compose__target-icon" />
+        {label}
+      </p>
+      <div className="eg-compose__target-quote">
+        <PersonaAvatar kind={authorKind} size="sm" />
+        <BubbleBody body={target.body} className="eg-compose__target-body" />
+      </div>
+    </section>
   );
 }
 

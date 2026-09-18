@@ -42,7 +42,7 @@ export function RightRail({
               いまは よむ だけの じょうたい
             </p>
             <p className={cx("eg-right-rail__note", "t-caption")}>
-              ログインすると、バブルを かいたり、あやしたり できます。
+              ログインすると、バブるを かいたり、あやしたり できます。
             </p>
             <Button fullWidth onClick={onLogin}>
               ログイン

@@ -151,9 +151,50 @@
   color: var(--accent-line);
 }
 
+/*
+ * 返信先（ComposePanel.tsx の ReplyTarget）。
+ *
+ * 入力欄は吹き出しの形（--radius-balloon）。こちらは沈めた面に左の縦線で、
+ * 「自分が書くもの」と「返す相手のことば」を形で分ける（DESIGN.md §2.5）。
+ */
 .eg-compose__target {
-  margin-top: var(--space-xxs);
+  margin-top: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rounded-md);
+  /* 引用の印は左の縦線1本。枠で全周を囲むと、入力欄と同じ強さの箱が2つ並ぶ */
+  border-left: calc(var(--border-width) * 2) solid var(--accent-line);
+  background: var(--card);
+}
+
+.eg-compose__target-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
   color: var(--muted);
+}
+
+.eg-compose__target-icon {
+  flex: none;
+  color: var(--accent-line);
+}
+
+.eg-compose__target-quote {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  margin-top: var(--space-xxs);
+  /*
+   * 長い返信先は畳まずスクロールさせる（ReplyTarget の ★）。
+   * 上限は「入力欄より低い」ことだけを条件にする。返信先が主役になってはいけない。
+   */
+  max-height: calc(var(--space-xxl) * 2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.eg-compose__target-body {
+  min-width: 0;
+  color: var(--body);
 }
 
 /* 本文まわり（DESIGN.md §4 Inputs。園児UI では枠が 2px 破線になる） */
@@ -276,8 +317,39 @@
     border-color var(--duration-quick) var(--ease-smooth-out);
 }
 
+/* 触れる大きさを、送信ボタンと同じ下限まで上げる（DESIGN.md §4 Touch target） */
+.eg-tool {
+  min-height: var(--touch-target-min);
+}
+
 .eg-tool:hover {
   color: var(--body);
+}
+
+/*
+ * 押しどきの誘い（ComposePanel.tsx の ★）。
+ *
+ * ★ 動かさない側の合図は輪郭だけ。地は塗らない。
+ *   塗ると is-active（開いている）と見分けがつかなくなる。
+ * ★ 「押せる／押せない」ではなく「いま押しどき」を示すものなので、
+ *   誘っていないあいだも押せる状態は変わらない（disabled にしない）。
+ */
+.eg-tool.is-inviting {
+  border-color: var(--accent-line);
+  color: var(--accent-line);
+}
+
+/*
+ * 押しどきに「なった」瞬間だけ一度 pop する。
+ * 型は既存の eg-like-pop を使い回す（DESIGN.md §7.3「MVP で入れる動きは5つだけ」）。
+ *
+ * ★ 送信ボタンの pop（.eg-compose__send.is-just-sendable）と同じ瞬間に立ち上がるので、
+ *   1拍ずらす。同時に2か所が跳ねると、どちらを見ればいいのか分からない。
+ * ★ 幅は送信ボタン（1.06）より弱くする。主役の序列を崩さない。
+ */
+.eg-tool.is-just-inviting {
+  --pop-scale: 1.04;
+  animation: eg-like-pop var(--duration-medium) var(--ease-smooth-out) var(--duration-fast) both;
 }
 
 .eg-tool.is-active {
