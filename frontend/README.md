@@ -31,6 +31,7 @@ npm run dev
 ```
 
 詳細と確認手順は [`app/README.md`](app/README.md)。
+SNSフロントエンドの責務分担・自動テスト・手動確認手順は [`app/REFACTORING.md`](app/REFACTORING.md) を参照してください。
 
 ## backend との接続
 
