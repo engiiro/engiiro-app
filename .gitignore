@@ -12,6 +12,7 @@ ai/*.egg-info/
 ai/models/*.bin
 ai/models/*.pt
 ai/models/*.safetensors
+ai/models/*.json
 
 # OS
 .DS_Store
