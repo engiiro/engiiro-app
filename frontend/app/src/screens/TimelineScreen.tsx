@@ -1,7 +1,7 @@
 import type { FeedResult } from "../data/api";
 import type { ReactionType } from "../data/types";
 import { cx } from "../lib/cx";
-import { BubbleCard } from "../components/BubbleCard";
+import { BubbleList } from "../components/BubbleList";
 import { Button } from "../components/Button";
 import { EmptyState } from "../components/EmptyState";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -30,13 +30,6 @@ import "./TimelineScreen.css";
  * ★ カードごとの「よんだ／まだ」は持たない（人間の指示、2026-08-27 で廃止）。
  * 置いていないもの：既読、フォロワー数、通報、DM、絶対時刻、本文の自動リンク化。
  */
-
-/*
- * 出てくるときのずらしの頭打ち。
- * 40ms × 6 = 240ms で、合計 300ms 未満に収まる（DESIGN.md §7.2）。
- * これを超えると、下のほうのカードだけ遅れて出てきて「重い」画面になる。
- */
-const MAX_STAGGER_STEPS = 6;
 
 type TimelineScreenProps = {
   readonly feed: FeedResult | null;
@@ -123,18 +116,12 @@ export function TimelineScreen({
                     あたらしい順ではなく、いまの あなたに 近いバブルから 出しています。
                   </p>
                 </div>
-                <div className="eg-feed-list">
-                  {feed.recommended.map((bubble, index) => (
-                    <BubbleCard
-                      key={bubble.id}
-                      bubble={bubble}
-                      index={Math.min(index, MAX_STAGGER_STEPS)}
-                      onOpen={onOpenBubble}
-                      onOpenProfile={onOpenProfile}
-                      onReact={onReact}
-                    />
-                  ))}
-                </div>
+                <BubbleList
+                  bubbles={feed.recommended}
+                  onOpen={onOpenBubble}
+                  onOpenProfile={onOpenProfile}
+                  onReact={onReact}
+                />
               </section>
             ) : null}
 
@@ -143,18 +130,12 @@ export function TimelineScreen({
                 <h2 id="eg-rest-title" className={cx("eg-timeline__rest-title", "t-heading")}>
                   そのほかの バブル
                 </h2>
-                <div className="eg-feed-list">
-                  {feed.rest.map((bubble, index) => (
-                    <BubbleCard
-                      key={bubble.id}
-                      bubble={bubble}
-                      index={Math.min(index, MAX_STAGGER_STEPS)}
-                      onOpen={onOpenBubble}
-                      onOpenProfile={onOpenProfile}
-                      onReact={onReact}
-                    />
-                  ))}
-                </div>
+                <BubbleList
+                  bubbles={feed.rest}
+                  onOpen={onOpenBubble}
+                  onOpenProfile={onOpenProfile}
+                  onReact={onReact}
+                />
               </section>
             ) : null}
           </div>
