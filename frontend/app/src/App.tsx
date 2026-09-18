@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFeed } from "./lib/useFeed";
+import { useNavigationHistory } from "./lib/useNavigationHistory";
+import type { SnsLocation } from "./lib/useNavigationHistory";
 
 import {
   addReaction,
   deleteBubble,
   fetchBubbleDetail,
-  fetchEmptyFeed,
-  fetchFeed,
   fetchLikedPersonas,
   fetchMe,
   fetchMyActivity,
@@ -18,7 +19,7 @@ import {
   setLiked,
   setSessionGuest,
 } from "./data/api";
-import type { AddReactionInput, FeedResult } from "./data/api";
+import type { AddReactionInput } from "./data/api";
 import { REACTION_MAX_PER_USER } from "./data/constants";
 import { reactionTargetOfSoothe } from "./data/reactions";
 import type {
@@ -78,38 +79,10 @@ import "./App.css";
  * データの読み書きは必ず data/api.ts を通す。ここで直接ダミーデータを書き換えない。
  */
 
-/**
- * 中央に出せる場所ひとつぶん。中身ではなく「どこに居るか」だけを持つ。
- *
- *   view   … 左サイドで選ぶ画面（ホーム／おきにいり／プロフィール…）
- *   public … S6 他人の公開プロフィール
- *   bubble … バブルの詳細
- *   soothe … あやすの詳細
- */
-type Location =
-  | { readonly kind: "view"; readonly view: CenterView }
-  | { readonly kind: "public"; readonly personaId: string }
-  | { readonly kind: "bubble"; readonly id: string }
-  | { readonly kind: "soothe"; readonly id: string };
-
 /** 引き直した詳細の中身。画面の出しわけは kind だけで決める */
 type OpenDetail =
   | { readonly kind: "bubble"; readonly value: BubbleDetail }
   | { readonly kind: "soothe"; readonly value: SootheDetail };
-
-/** 履歴の底。ここより前には戻れない */
-const HOME: Location = { kind: "view", view: "timeline" };
-
-/** 左サイドの選択の見た目に使う「いまの画面」。潜っていても、来た列が光ったままになる */
-function currentView(history: readonly Location[]): CenterView {
-  for (let i = history.length - 1; i >= 0; i -= 1) {
-    const entry = history[i];
-    if (entry.kind === "view") {
-      return entry.view;
-    }
-  }
-  return "timeline";
-}
 
 export function App() {
   const { theme, setTheme } = useTheme();
@@ -211,33 +184,14 @@ export function App() {
 
   const [gate, setGate] = useState<GuestAction | null>(null);
 
-  /*
-   * 通ってきた道（人間の指摘、2026-08-27）。
-   *
-   * 以前は「左サイドの選択（view）」「詳細の積み重ね（detailStack）」
-   * 「S6 を閉じたときの戻り先（publicBackTo）」の3つを別々に持っていた。
-   * そのため おきにいり → 公開プロフィール → バブル と潜ったあと、
-   * 「もどる」が **ホームに着地する** ことになっていた。
-   * 途中で view を timeline に書き換えていて、来た道がどこにも残っていなかったため。
-   *
-   * ★ 3つを1本の配列にまとめる。中央に出せるものは、左サイドの画面も
-   *   公開プロフィールも詳細も、すべて等しく「場所」として1段積む。
-   *   「もどる」は種類を問わず1段外すだけ。戻り先を覚える変数はもう要らない。
-   *
-   * 底は常にホーム。左サイドを押したときだけ、積み上げを捨てて底から始め直す
-   * （タブを押したのに前の道が残っていると、そのほうが驚く）。
-   *
-   * 入るのは種別と id だけ。中身は着くたびに引き直す
-   * （潜っているあいだにリアクションや返信で数が変わるので、積んだ中身は当てにしない）。
-   */
-  const [history, setHistory] = useState<readonly Location[]>([HOME]);
-  const here = history[history.length - 1];
-  const view = currentView(history);
-
-  const [feed, setFeed] = useState<FeedResult | null>(null);
-  const [feedLoading, setFeedLoading] = useState(true);
-  /** フィードの読み込みそのものが失敗したか。0件（空フィード）とは別の状態 */
-  const [feedError, setFeedError] = useState(false);
+  const { here, view, pushLocation, popLocation, resetHistory } = useNavigationHistory();
+  const {
+    feed,
+    loading: showFeedSkeleton,
+    error: feedError,
+    refresh: loadFeed,
+    reload: reloadFeed,
+  } = useFeed(feedMode);
 
   const [detail, setDetail] = useState<OpenDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -279,28 +233,6 @@ export function App() {
   const [likedLoading, setLikedLoading] = useState(true);
   const [unlikingId, setUnlikingId] = useState<string | null>(null);
 
-  const loadFeed = useCallback(async () => {
-    try {
-      const result = feedMode === "empty" ? await fetchEmptyFeed() : await fetchFeed();
-      setFeed(result);
-      setFeedError(false);
-    } catch {
-      setFeedError(true);
-    } finally {
-      setFeedLoading(false);
-    }
-  }, [feedMode]);
-
-  useEffect(() => {
-    if (feedMode === "loading") {
-      return;
-    }
-    // oxlint-disable-next-line react/set-state-in-effect
-    void loadFeed();
-  }, [feedMode, loadFeed]);
-
-  const showFeedSkeleton = feedLoading || feedMode === "loading";
-
   /*
    * 詳細読み込みの世代カウンタ（人間の指摘、素早く連続で開き直すと古い応答が
    * あとから勝って表示が入れ替わる競合があった）。
@@ -321,7 +253,7 @@ export function App() {
    */
   const loadDetail = useCallback(
     async (
-      ref: Extract<Location, { kind: "bubble" | "soothe" }>,
+      ref: Extract<SnsLocation, { kind: "bubble" | "soothe" }>,
       options?: { readonly quiet?: boolean },
     ) => {
       const requestId = (detailRequestRef.current += 1);
@@ -386,13 +318,12 @@ export function App() {
     setLikedBaby([]);
     setLikedMother([]);
     // 通ってきた道ごと捨てる。本人専用の画面へ「もどる」で帰れてはいけない
-    setHistory([HOME]);
+    resetHistory();
     setDetail(null);
     setPublicProfile(null);
     // 「自分のバブル」の印が残らないよう、閲覧者が変わったら読み直す
-    setFeedLoading(true);
-    await loadFeed();
-  }, [applySession, loadFeed]);
+    await reloadFeed();
+  }, [applySession, reloadFeed, resetHistory]);
 
   /**
    * ゲストなら止めて、理由を出す。ログイン中ならそのまま通す。
@@ -493,11 +424,10 @@ export function App() {
    *   リアクションやあやすが消えたように見える。着くたびに引き直す。
    */
   const enter = useCallback(
-    (location: Location) => {
+    (location: SnsLocation) => {
       if (location.kind === "view") {
         if (location.view === "timeline" && feedMode !== "loading") {
-          setFeedLoading(true);
-          void loadFeed();
+          void reloadFeed();
         }
         if (location.view === "profile") {
           // 評価が落ちている／戻った直後でもその時点の状態を出したいので、開くたびに引き直す
@@ -520,7 +450,7 @@ export function App() {
       feedMode,
       loadActivity,
       loadDetail,
-      loadFeed,
+      reloadFeed,
       loadLiked,
       loadProfile,
       loadPublicProfile,
@@ -529,11 +459,11 @@ export function App() {
 
   /** 1段 潜る。どこから来たかは配列が覚えるので、呼ぶ側は行き先だけを渡す */
   const push = useCallback(
-    (location: Location) => {
-      setHistory((current) => [...current, location]);
+    (location: SnsLocation) => {
+      pushLocation(location);
       enter(location);
     },
-    [enter],
+    [enter, pushLocation],
   );
 
   /**
@@ -543,14 +473,13 @@ export function App() {
    * 底（ホーム）に居るときは何もしない。
    */
   const back = useCallback(() => {
-    if (history.length <= 1) {
+    const previous = popLocation();
+    if (previous === null) {
       return;
     }
-    const rest = history.slice(0, -1);
-    setHistory(rest);
     setDetail(null);
-    enter(rest[rest.length - 1]);
-  }, [enter, history]);
+    enter(previous);
+  }, [enter, popLocation]);
 
   /** 左サイド。押されたら、通ってきた道は捨てて底から始め直す */
   const navigate = useCallback(
@@ -560,13 +489,12 @@ export function App() {
         setGate(next);
         return;
       }
-      const location: Location = { kind: "view", view: next };
-      setHistory(next === "timeline" ? [HOME] : [HOME, location]);
+      const location = resetHistory(next);
       setDetail(null);
       setPublicProfile(null);
       enter(location);
     },
-    [enter, isGuest],
+    [enter, isGuest, resetHistory],
   );
 
   /**
@@ -960,12 +888,7 @@ export function App() {
                   <EmptyState
                     lines={["よみこめませんでした。", "つうしんが ふあんていかも しれません。"]}
                     action={
-                      <Button
-                        onClick={() => {
-                          setFeedLoading(true);
-                          void loadFeed();
-                        }}
-                      >
+                      <Button onClick={() => void reloadFeed()}>
                         もう一度 よみこむ
                       </Button>
                     }
@@ -978,10 +901,7 @@ export function App() {
                 loading={showFeedSkeleton}
                 onOpenBubble={openBubble}
                 onOpenProfile={openProfile}
-                onRefresh={() => {
-                  setFeedLoading(true);
-                  void loadFeed();
-                }}
+                onRefresh={() => void reloadFeed()}
                 onReact={(bubbleId, reaction) => reactToBubbleGuarded(bubbleId, reaction)}
                 onCompose={() => startBubble()}
               />
