@@ -1,7 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StampPicker } from "../components/compose/StampPicker";
-import { ComposeToolButton } from "../components/compose/ComposeToolButton";
-import { EvaluationResult } from "../components/compose/EvaluationResult";
 
 import {
   AiUnavailableError,
@@ -22,6 +19,7 @@ import type { AiPanelState } from "../components/AiTransformPanel";
 import { Button } from "../components/Button";
 import { CharCounter } from "../components/CharCounter";
 import { Illustration } from "../components/Illustration";
+import { StampPicker } from "../components/compose/StampPicker";
 import { BubbleBody } from "../components/BubbleBody";
 import {
   IconClose,
@@ -31,6 +29,8 @@ import {
   IconWand,
 } from "../components/icons";
 import { MODERATION_REJECT_TEXT, NoteBox } from "../components/NoteBox";
+import { ComposeToolButton } from "../components/compose/ComposeToolButton";
+import { EvaluationResult } from "../components/compose/EvaluationResult";
 import "./ComposePanel.css";
 
 /*

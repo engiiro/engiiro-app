@@ -11,7 +11,7 @@ import { StampGlyph } from "../BubbleBody";
  * ★ タブは SegmentedTabs の横に流す変種。ここ用のタブを新しく作らない
  *   （DESIGN.md §4：画面ごとに似て非なるタブを作らない）。
  * ★ 押すと本文には目印の文字が入る。絵になるのは出したあとなので、
- *   入力欄の下に「こう 出ます」を出している（上の ★ 参照）。
+ *   呼び出し側の ComposePanel が入力欄の下に「こう 出ます」を出している。
  */
 export function StampPicker({
   emotion,
@@ -76,4 +76,3 @@ export function StampPicker({
     </div>
   );
 }
-
