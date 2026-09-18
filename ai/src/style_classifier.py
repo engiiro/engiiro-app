@@ -50,6 +50,10 @@ def _load_texts_from_directory(directory: Path) -> list[str]:
     if not directory.exists():
         return texts
     for json_path in sorted(directory.glob("*.json")):
+        # 文脈付きモデレーション評価用データは、文体分類の学習へ混ぜない。
+        # style_classifier 配下に置いたまま、別用途の評価フィクスチャとして管理する。
+        if json_path.name.startswith("grammar_filter_"):
+            continue
         with json_path.open(encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, list):
