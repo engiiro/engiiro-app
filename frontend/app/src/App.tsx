@@ -34,6 +34,7 @@ import type {
   ReactionType,
   SootheDetail,
 } from "./data/types";
+import { useBurstLimit, useSingleFlight } from "./lib/floodGuard";
 import { Button } from "./components/Button";
 import { EmptyState } from "./components/EmptyState";
 import { LeftRail } from "./components/LeftRail";
@@ -291,8 +292,12 @@ export function App() {
     if (!options?.quiet) {
       setProfileLoading(true);
     }
-    setProfile(await fetchMyProfile());
-    setProfileLoading(false);
+    try {
+      setProfile(await fetchMyProfile());
+    } finally {
+      /* 落ちても skeleton のまま固めない（2026-09-05。以下の読み込みも同じ） */
+      setProfileLoading(false);
+    }
   }, []);
 
   /*
@@ -349,17 +354,24 @@ export function App() {
     if (!options?.quiet) {
       setLikedLoading(true);
     }
-    const result = await fetchLikedPersonas();
-    setLikedBaby(result.baby);
-    setLikedMother(result.mother);
-    setLikedLoading(false);
+    try {
+      const result = await fetchLikedPersonas();
+      setLikedBaby(result.baby);
+      setLikedMother(result.mother);
+    } finally {
+      setLikedLoading(false);
+    }
   }, []);
 
   const unlike = useCallback(
     async (personaId: string) => {
       setUnlikingId(personaId);
-      await setLiked(personaId, false);
-      setUnlikingId(null);
+      try {
+        await setLiked(personaId, false);
+      } finally {
+        /* 落ちても「はずしています…」のまま残さない */
+        setUnlikingId(null);
+      }
       /* 1行 外しただけで一覧ごと skeleton に戻さない */
       await loadLiked({ quiet: true });
     },
@@ -371,8 +383,11 @@ export function App() {
       if (!options?.quiet) {
         setActivityLoading(true);
       }
-      setActivity(await fetchMyActivity(tab));
-      setActivityLoading(false);
+      try {
+        setActivity(await fetchMyActivity(tab));
+      } finally {
+        setActivityLoading(false);
+      }
     },
     [],
   );
@@ -389,18 +404,25 @@ export function App() {
       setPublicLoading(true);
       setPublicActivityLoading(true);
 
-      const found = await fetchPublicProfile(personaId);
-      setPublicProfile(found);
-      setPublicLoading(false);
-      if (!found) {
-        setPublicActivity([]);
+      try {
+        const found = await fetchPublicProfile(personaId);
+        setPublicProfile(found);
+        /* ★ ここで先に下ろす。人の見出しは、活動一覧を待たずに出す */
+        setPublicLoading(false);
+        if (!found) {
+          setPublicActivity([]);
+          setPublicActivityLoading(false);
+          return;
+        }
+        const first: ActivityTab = found.persona.kind === "mother" ? "motherSoothes" : "babyBubbles";
+        setPublicTab(first);
+        setPublicActivity(await fetchPublicActivity(personaId, first));
         setPublicActivityLoading(false);
-        return;
+      } finally {
+        /* 途中で落ちたときの受け皿。すでに下ろしたものは変わらない */
+        setPublicLoading(false);
+        setPublicActivityLoading(false);
       }
-      const first: ActivityTab = found.persona.kind === "mother" ? "motherSoothes" : "babyBubbles";
-      setPublicTab(first);
-      setPublicActivity(await fetchPublicActivity(personaId, first));
-      setPublicActivityLoading(false);
     },
     [],
   );
@@ -410,8 +432,11 @@ export function App() {
       if (!options?.quiet) {
         setPublicActivityLoading(true);
       }
-      setPublicActivity(await fetchPublicActivity(personaId, tab));
-      setPublicActivityLoading(false);
+      try {
+        setPublicActivity(await fetchPublicActivity(personaId, tab));
+      } finally {
+        setPublicActivityLoading(false);
+      }
     },
     [],
   );
@@ -573,33 +598,75 @@ export function App() {
    * サーバ側では正しく弾かれているのに画面には何も出ない状態になっていた
    * （人間の指摘）。ここで理由を拾って一言だけ出す。
    */
+  /*
+   * 連打の間引き（lib/floodGuard.ts、2026-08-28）。
+   *
+   * リアクションは1回ごとに addReaction → refresh（一覧か詳細の引き直し）を呼ぶ。
+   * 押しっぱなしにされると往復が積み上がり、画面が引き直しで埋まって固まる。
+   * ここでは 2 秒に 10 回までを通し、あふれた分は一言出して捨てる。
+   * ★ 上限 5 回（REACTION_MAX_PER_USER）とは別の話。あちらは1種類あたりの回数、
+   *   こちらは画面ぜんぶを合わせた「短時間に何回まで往復するか」。
+   * ★ frontend で捨てるだけなので、これは保護ではなく画面を守るための間引き。
+   *   本当の制限は backend にある（Issue #19 で共有した max_reached の区分）。
+   */
+  const allowReaction = useBurstLimit(10, 2000);
+
   const react = useCallback(
     async (input: AddReactionInput) => {
-      const result = await addReaction(input);
-      if (!result.ok && result.reason === "max_reached") {
-        setToast("もう " + String(REACTION_MAX_PER_USER) + "回 おくったよ");
+      if (!allowReaction()) {
+        setToast("ちょっと ゆっくり おしてね");
+        return;
+      }
+      try {
+        const result = await addReaction(input);
+        if (!result.ok && result.reason === "max_reached") {
+          setToast("もう " + String(REACTION_MAX_PER_USER) + "回 おくったよ");
+        }
+      } catch (error) {
+        /*
+         * 通信が落ちたとき（addReaction は ApiError 以外を投げ返す）。
+         * 黙って捨てると、押したのに何も起きない画面になる。
+         * 数は下の refresh がサーバの値に戻すので、ここでは理由だけ出す。
+         */
+        console.error("リアクションを おくれませんでした", error);
+        setToast("いま おくれませんでした");
       }
       await refresh();
     },
-    [refresh],
+    [allowReaction, refresh],
   );
+
+  /* 消す・大好きは、往復中の2回目を捨てる（二重に消す／付け外しが入れ違うのを防ぐ） */
+  const removeFlight = useSingleFlight();
+  const likeFlight = useSingleFlight();
 
   const removeBubble = useCallback(
     async (bubbleId: string) => {
-      await deleteBubble(bubbleId);
-      setToast("バブルを けしました");
-      /*
-       * 詳細を開いたまま消したときだけ、来た道を1段戻る。
-       * 一覧（S8 など）から消したときは画面を移さない。
-       * 消えたことがその場で分かるように、いまの場所を引き直すだけにする。
-       */
-      if (here.kind === "bubble") {
-        back();
-        return;
-      }
-      await refresh();
+      await removeFlight(async () => {
+        /*
+         * ★ 返ってきた ok を見る（2026-09-05）。deleteBubble は失敗を例外にせず
+         *   { ok: false } で返す。以前はそれを見ずに「けしました」と出して1段戻っており、
+         *   消えていないのに消えたことになっていた。
+         */
+        const result = await deleteBubble(bubbleId);
+        if (!result.ok) {
+          setToast("いま けせませんでした");
+          return;
+        }
+        setToast("バブるを けしました");
+        /*
+         * 詳細を開いたまま消したときだけ、来た道を1段戻る。
+         * 一覧（S8 など）から消したときは画面を移さない。
+         * 消えたことがその場で分かるように、いまの場所を引き直すだけにする。
+         */
+        if (here.kind === "bubble") {
+          back();
+          return;
+        }
+        await refresh();
+      });
     },
-    [back, here, refresh],
+    [back, here, refresh, removeFlight],
   );
 
   /**
@@ -611,17 +678,24 @@ export function App() {
       if (!publicPersonaId) {
         return;
       }
-      setLikePending(true);
-      const result = await setLiked(publicPersonaId, next);
-      setLikePending(false);
-      if (!result.ok) {
-        return;
-      }
-      setPublicProfile((current) => (current ? { ...current, liked: result.liked } : current));
-      // おきにいりの一覧を開いたときに古いままにならないよう、ここで合わせておく
-      await loadLiked();
+      await likeFlight(async () => {
+        setLikePending(true);
+        let result;
+        try {
+          result = await setLiked(publicPersonaId, next);
+        } finally {
+          /* 落ちてもボタンを押せないままにしない */
+          setLikePending(false);
+        }
+        if (!result.ok) {
+          return;
+        }
+        setPublicProfile((current) => (current ? { ...current, liked: result.liked } : current));
+        // おきにいりの一覧を開いたときに古いままにならないよう、ここで合わせておく
+        await loadLiked();
+      });
     },
-    [loadLiked, publicPersonaId],
+    [likeFlight, loadLiked, publicPersonaId],
   );
 
   /*
@@ -848,6 +922,13 @@ export function App() {
               me={me}
               isGuest={isGuest}
               onRenamed={(next) => void applyRename(next)}
+              /*
+                右サイドと同じ出入り口をもう1か所（人間の指摘、2026-09-05）。
+                右サイドは 1199px 以下で消えるので、スマホではここが唯一の道になる。
+                呼ぶ先は RightRail と同じものにする（画面ごとに別の道を作らない）。
+              */
+              onLogin={() => setEntry("login")}
+              onLogout={() => void leave()}
             />
           ) : null}
 

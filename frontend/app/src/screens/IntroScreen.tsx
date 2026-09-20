@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 
 import { cx } from "../lib/cx";
 import { BrandMark } from "../components/BrandMark";
+import { BrandWordmark } from "../components/BrandWordmark";
 import { Button } from "../components/Button";
 import { Illustration } from "../components/Illustration";
 import { PersonaAvatar } from "../components/PersonaAvatar";
@@ -160,7 +161,7 @@ export function IntroScreen({
           <div className="eg-intro__cover-text">
             <div className="eg-intro__brandline">
               <BrandMark className="eg-intro__mark" />
-              <span className={cx("eg-intro__brand", "t-display")}>えんじいろ</span>
+              <BrandWordmark className="eg-intro__brand" />
             </div>
             <p className={cx("eg-intro__tagline", "t-body")}>
               よわねを 吐き出すと、

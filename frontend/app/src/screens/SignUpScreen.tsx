@@ -13,6 +13,7 @@ import {
 } from "../data/api";
 import type { CreateAccountResult, Me } from "../data/types";
 import { cx } from "../lib/cx";
+import { useSingleFlight } from "../lib/floodGuard";
 import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/Button";
 import { NoteBox } from "../components/NoteBox";
@@ -94,6 +95,11 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
   const [motherNickname, setMotherNickname] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  /*
+   * 送信の二重発火を止める（lib/floodGuard.ts）。sending の disabled だけでは、
+   * Enter を押しっぱなしにされたときの2回目が state の反映前に通ってしまう。
+   */
+  const sendFlight = useSingleFlight();
 
   /* 規則から外れているところ。空欄のあいだは出さない（まだ入れていないだけなので） */
   const passwordIssue = passwordProblem(password);
@@ -131,7 +137,7 @@ export function SignUpScreen({ onDone, onBack, onLogin, onGuest }: SignUpScreenP
         className="eg-signup__sheet"
         onSubmit={(event) => {
           event.preventDefault();
-          void submit();
+          void sendFlight(submit);
         }}
       >
         <header className="eg-signup__head">

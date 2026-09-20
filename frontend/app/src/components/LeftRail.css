@@ -34,6 +34,8 @@
 
 .eg-rail__logo {
   color: var(--accent-line);
+  /* 園児UI では手書きの画像に変わる。文字と同じ高さに置く（BrandWordmark.css） */
+  --wordmark-height: 64px;
 }
 
 .eg-rail__list {

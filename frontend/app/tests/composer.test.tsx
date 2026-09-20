@@ -33,6 +33,20 @@ beforeEach(() => {
 });
 
 describe("composer behavior after component extraction", () => {
+  it("invites unused tools after typing and stops inviting a tool once opened", async () => {
+    renderComposer();
+    const evaluate = screen.getByRole("button", { name: "赤ちゃん度" });
+    const transform = screen.getByRole("button", { name: "変換" });
+    expect(evaluate.classList.contains("is-inviting")).toBe(false);
+    typeBody("ねむい");
+    expect(evaluate.classList.contains("is-inviting")).toBe(true);
+    expect(transform.classList.contains("is-inviting")).toBe(true);
+    fireEvent.click(evaluate);
+    await screen.findByText("1歳2か月");
+    fireEvent.click(evaluate);
+    expect(evaluate.classList.contains("is-inviting")).toBe(false);
+    expect(transform.classList.contains("is-inviting")).toBe(true);
+  });
   it("allows typing beyond 150 characters but prevents submission", () => {
     renderComposer();
     const send = screen.getByRole<HTMLButtonElement>("button", { name: "バブる" });
@@ -98,9 +112,10 @@ describe("composer behavior after component extraction", () => {
   it("replies to a mother's soothe only as a baby and preserves the reply target", async () => {
     renderComposer({ kind: "reply", target: {
       kind: "soothe", bubbleId: "bubble-1", sootheId: "soothe-1",
-      authorKind: "mother", authorNickname: "返信先", bubbleIsMine: false,
+      authorKind: "mother", authorNickname: "返信先", body: "ゆっくり休んでね", bubbleIsMine: false,
     } });
     expect(screen.queryByRole("button", { name: /お母さんに変更/ })).toBeNull();
+    expect(screen.getByRole("region", { name: "返信先" }).textContent).toContain("ゆっくり休んでね");
     typeBody("おへんじ");
     fireEvent.click(screen.getByRole("button", { name: "バブる" }));
     await waitFor(() => expect(createSoothe).toHaveBeenCalledWith({

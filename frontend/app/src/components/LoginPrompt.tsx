@@ -26,7 +26,7 @@ export type GuestAction = "react" | "bubble" | "soothe" | "like" | "profile" | "
 
 const ACTION_TITLE: Readonly<Record<GuestAction, string>> = {
   react: "リアクションは、アカウントが いります",
-  bubble: "バブルを かくには、アカウントが いります",
+  bubble: "バブるを かくには、アカウントが いります",
   soothe: "あやすには、アカウントが いります",
   like: "大好きに するには、アカウントが いります",
   profile: "マイプロフィールは、あなただけの 画面です",

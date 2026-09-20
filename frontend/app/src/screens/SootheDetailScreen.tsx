@@ -77,6 +77,7 @@ export function SootheDetailScreen({
       sootheId: item.id,
       authorKind: item.author.kind,
       authorNickname: item.author.nickname,
+      body: item.body,
       bubbleIsMine,
     };
   }
