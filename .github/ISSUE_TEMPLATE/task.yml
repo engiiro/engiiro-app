@@ -1,0 +1,39 @@
+name: "タスク"
+description: "具体的な変更内容と完了条件をまとめる"
+title: "[タスク] "
+body:
+  - type: textarea
+    id: purpose
+    attributes:
+      label: "目的・背景"
+      description: "何を改善したいか、なぜ必要かを書いてください。"
+    validations:
+      required: true
+  - type: textarea
+    id: changes
+    attributes:
+      label: "変更内容"
+      description: "何をどう更新するか。1件の PR で完了できる範囲にしてください。"
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: "完了条件・確認方法"
+      description: "完了と判断できる条件と、確認する方法を書いてください。"
+    validations:
+      required: true
+  - type: textarea
+    id: daily
+    attributes:
+      label: "関連日報"
+      description: "日報の Issue 番号。複数ある場合は追記できます。日報がなければ後から関連付けて構いません。"
+    validations:
+      required: false
+  - type: input
+    id: pr
+    attributes:
+      label: "対応 PR"
+      description: "作成後に PR 番号を記載。1タスクと1 PR を対応させます。"
+    validations:
+      required: false

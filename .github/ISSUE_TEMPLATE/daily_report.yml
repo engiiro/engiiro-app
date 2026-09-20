@@ -1,0 +1,32 @@
+name: "日報"
+description: "今日の予定や実績と関連するタスクをまとめる"
+title: "[日報] "
+body:
+  - type: input
+    id: date
+    attributes:
+      label: "日付"
+      description: "例：2026-09-20"
+    validations:
+      required: true
+  - type: textarea
+    id: activities
+    attributes:
+      label: "今日の予定・実績"
+      description: "やりたいこと・やること・やったことのいずれかを書いてください。後から追記できます。"
+    validations:
+      required: true
+  - type: textarea
+    id: related
+    attributes:
+      label: "関連タスク・バグ"
+      description: "Issue 番号を列挙してください（例：#123）。まだなければ後から追記できます。"
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: "困ったこと・共有事項"
+      description: "必要に応じて記載してください。"
+    validations:
+      required: false
