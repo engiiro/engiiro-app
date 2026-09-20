@@ -1,0 +1,25 @@
+name: "その他"
+description: "質問・相談・提案・共有など"
+title: "[その他] "
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: "相談・共有したいこと"
+      description: "求める回答や判断があれば、合わせて記載してください。"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: "背景・補足"
+      description: "分かっていること、検討案などを必要に応じて記載してください。"
+    validations:
+      required: false
+  - type: textarea
+    id: related
+    attributes:
+      label: "関連 Issue・PR"
+      description: "実装が決まった場合はタスクまたはバグを作り、ここに関連付けます。"
+    validations:
+      required: false

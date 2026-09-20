@@ -4,6 +4,8 @@
 
 ## 構成
 
+開発時の Issue（日報・タスク・バグ報告・その他）と PR の使い方は [開発の進め方](docs/DEVELOPMENT_WORKFLOW.md)、AI の作業ルールは [AGENTS.md](AGENTS.md) を参照してください。インターン期間中の AI 台帳・会話プロトコルは過去の記録として残していますが、現在は適用しません。
+
 ```
 .
 ├── backend/    TypeScript / Deno（Deno Deployにデプロイ）
