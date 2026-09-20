@@ -1,25 +1,12 @@
 name: "その他"
-description: "質問・相談・提案・共有など"
+description: "意気込み・雑談・メモなど何でも。一言でもどうぞ！"
 title: "[その他] "
 body:
   - type: textarea
-    id: summary
+    id: content
     attributes:
-      label: "相談・共有したいこと"
-      description: "求める回答や判断があれば、合わせて記載してください。"
+      label: "自由にどうぞ"
+      description: "「頑張るぞ！」の一言でもOK。背景説明や相談の形にする必要はありません。"
+      placeholder: "今日も頑張るぞ！"
     validations:
       required: true
-  - type: textarea
-    id: context
-    attributes:
-      label: "背景・補足"
-      description: "分かっていること、検討案などを必要に応じて記載してください。"
-    validations:
-      required: false
-  - type: textarea
-    id: related
-    attributes:
-      label: "関連 Issue・PR"
-      description: "実装が決まった場合はタスクまたはバグを作り、ここに関連付けます。"
-    validations:
-      required: false

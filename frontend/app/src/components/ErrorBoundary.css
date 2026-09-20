@@ -1,0 +1,72 @@
+/*
+ * 描画が落ちたときの受け皿（components/ErrorBoundary.tsx）。
+ * ここは他の部品に頼らない面なので、寸法もこの1枚で完結させる。
+ */
+
+.eg-crash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: var(--space-lg);
+  background: var(--canvas);
+}
+
+.eg-crash__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: min(420px, 100%);
+  padding: var(--space-lg);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-blob);
+  background: var(--surface);
+  box-shadow: var(--elevation-offset);
+  text-align: center;
+}
+
+.eg-crash__title {
+  color: var(--ink);
+}
+
+.eg-crash__text {
+  color: var(--body);
+}
+
+.eg-crash__note {
+  color: var(--muted);
+}
+
+.eg-crash__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.eg-crash__button {
+  min-height: var(--control-min-height);
+  padding: var(--control-padding-y) var(--control-padding-x);
+  border: var(--border-width) solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--body);
+  font: inherit;
+}
+
+.eg-crash__button--primary {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+/* 原因の1行。読み物ではないので、面の中で小さく畳んでおく */
+.eg-crash__detail {
+  margin: 0;
+  overflow-x: auto;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

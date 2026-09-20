@@ -36,7 +36,7 @@ export function BubbleDeleteConfirm({
 }) {
   return (
     <ConfirmDialog
-      title="このバブル、消しちゃう？"
+      title="このバブる、消しちゃう？"
       body="元には戻せないよ。あやしてくれた ことばも いっしょに 消えます。"
       confirmLabel="けす"
       cancelLabel="やめる"

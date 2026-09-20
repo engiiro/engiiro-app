@@ -315,3 +315,24 @@
     transition: none;
   }
 }
+
+/*
+ * アカウントの出入り口（SettingsScreen.tsx の AccountSection）。
+ * 作りは RightRail のセッション欄と同じ。同じ操作を、画面ごとに違う形で出さない。
+ */
+
+.eg-settings__account-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.eg-settings__account-name {
+  color: var(--ink);
+}
+
+.eg-settings__account-actions {
+  display: flex;
+  margin-top: var(--space-sm);
+}
