@@ -9,10 +9,8 @@ import {
 } from "../data/api";
 import type { AiEvaluateResult } from "../data/api";
 import { BUBBLE_MAX_LENGTH, containsStamp, countChars, isOverLimit } from "../data/constants";
-import { stampGroups } from "../data/stampCatalog";
 import type { Me, PersonaKind } from "../data/types";
 import { cx } from "../lib/cx";
-import { MAX_MONTHS } from "../lib/mockAiEvaluate";
 import { REPLY_WORDING, replyKindOfSoothe } from "../lib/replyWording";
 import { soothePersonaRule } from "../lib/soothePersonaRule";
 import type { SootheTarget } from "../lib/soothePersonaRule";
@@ -21,8 +19,8 @@ import type { AiPanelState } from "../components/AiTransformPanel";
 import { Button } from "../components/Button";
 import { CharCounter } from "../components/CharCounter";
 import { Illustration } from "../components/Illustration";
-import { SegmentedTabs } from "../components/SegmentedTabs";
-import { BubbleBody, StampGlyph } from "../components/BubbleBody";
+import { StampPicker } from "../components/compose/StampPicker";
+import { BubbleBody } from "../components/BubbleBody";
 import {
   IconClose,
   IconGauge,
@@ -31,6 +29,8 @@ import {
   IconWand,
 } from "../components/icons";
 import { MODERATION_REJECT_TEXT, NoteBox } from "../components/NoteBox";
+import { ComposeToolButton } from "../components/compose/ComposeToolButton";
+import { EvaluationResult } from "../components/compose/EvaluationResult";
 import "./ComposePanel.css";
 
 /*
@@ -453,13 +453,13 @@ export function ComposePanel({
 
       {/* 入力欄の下：3つ横並び */}
       <div className="eg-compose__tools">
-        <ToolButton
+        <ComposeToolButton
           active={drawer === "stamp"}
           onClick={() => toggleDrawer("stamp")}
           icon={<IconStamp />}
           label="スタンプ"
         />
-        <ToolButton
+        <ComposeToolButton
           active={drawer === "evaluate"}
           onClick={() => {
             toggleDrawer("evaluate");
@@ -470,7 +470,7 @@ export function ComposePanel({
           icon={<IconGauge />}
           label={persona === "baby" ? "赤ちゃん度" : "お母さん度"}
         />
-        <ToolButton
+        <ComposeToolButton
           active={drawer === "transform"}
           onClick={() => {
             toggleDrawer("transform");
@@ -516,7 +516,7 @@ export function ComposePanel({
             ) : null}
 
             {drawer === "evaluate" ? (
-              <EvaluateView
+              <EvaluationResult
                 busy={evaluating}
                 failed={evaluateFailed}
                 result={evaluation}
@@ -542,162 +542,6 @@ export function ComposePanel({
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-/*
- * スタンプ一覧（FR-STAMP-001）。棚に分けたのは人間の指示（2026-08-27）、
- * 絵を入れたのも人間の指示（2026-08-28）。
- *
- * ★ 棚の並びとラベルは data/stampCatalog.ts が持つ。ここで並べ直さない。
- * ★ タブは SegmentedTabs の横に流す変種。ここ用のタブを新しく作らない
- *   （DESIGN.md §4：画面ごとに似て非なるタブを作らない）。
- * ★ 押すと本文には目印の文字が入る。絵になるのは出したあとなので、
- *   入力欄の下に「こう 出ます」を出している（上の ★ 参照）。
- */
-function StampPicker({
-  emotion,
-  onEmotionChange,
-  full,
-  onPick,
-}: {
-  readonly emotion: string;
-  readonly onEmotionChange: (next: string) => void;
-  readonly full: boolean;
-  readonly onPick: (id: string) => void;
-}) {
-  const groups = stampGroups();
-  if (groups.length === 0) {
-    return <p className={cx("t-body", "eg-drawer__note")}>スタンプを 読み込めませんでした。</p>;
-  }
-  /* 読み込みより先に選ばれていることがある。無い棚なら先頭に落とす */
-  const current = groups.find((group) => group.key === emotion) ?? groups[0];
-
-  return (
-    <div className="eg-stamps">
-      <SegmentedTabs
-        tabs={groups.map((group) => ({ value: group.key, label: group.label }))}
-        current={current.key}
-        onChange={onEmotionChange}
-        panelId="eg-stamp-panel"
-        label="スタンプの たな"
-        variant="scroll"
-      />
-
-      <div
-        id="eg-stamp-panel"
-        role="tabpanel"
-        aria-labelledby={"eg-stamp-panel-tab-" + current.key}
-        className="eg-stamp-grid"
-      >
-        {current.stamps.map((stamp) => (
-          <button
-            key={stamp.id}
-            type="button"
-            disabled={full}
-            /*
-              図と名前は見るためのもの。読み上げには「入れる」という操作を渡す。
-              aria-label を置くと中の文字は読み上げの名前に使われないので、
-              「ねむいのスタンプ ねむい」と二重に読まれない。
-            */
-            aria-label={stamp.name + " を 本文に 入れる"}
-            className={cx("eg-stamp-pick", "eg-touch")}
-            onClick={() => onPick(stamp.id)}
-          >
-            <StampGlyph id={stamp.id} picker />
-            <span className={cx("eg-stamp-pick__name", "t-caption")}>{stamp.name}</span>
-          </button>
-        ))}
-      </div>
-
-      <p className={cx("eg-stamps__hint", "t-caption")}>
-        {full
-          ? "150文字に なったので、これ以上 入れられません。"
-          : "カーソルの ある ところに 入ります。絵1つで 1文字ぶん。"}
-      </p>
-    </div>
-  );
-}
-
-function ToolButton({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  readonly active: boolean;
-  readonly onClick: () => void;
-  readonly icon: React.ReactNode;
-  readonly label: string;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      className={cx("eg-tool", "eg-touch", active && "is-active")}
-      onClick={onClick}
-    >
-      {icon}
-      <span className="t-label">{label}</span>
-    </button>
-  );
-}
-
-/**
- * 赤ちゃん度・お母さん度（FR-AI-EVAL-001〜004）。
- * バーだけで伝えず、数値を添える（DESIGN.md §4 Meter）。
- *
- * ここは「自分がいまどれくらいか」を見るための場所で、合否は出さない
- * （PO 説明 2026-08-25、Issue #19）。保存してよいかを決めるのは backend で、
- * その閾値は frontend に無い。
- */
-function EvaluateView({
-  busy,
-  failed,
-  result,
-  personaKind,
-  hasBody,
-}: {
-  readonly busy: boolean;
-  readonly failed: boolean;
-  readonly result: AiEvaluateResult | null;
-  readonly personaKind: PersonaKind;
-  readonly hasBody: boolean;
-}) {
-  if (!hasBody) {
-    return <p className={cx("t-body", "eg-drawer__note")}>なにか 書いてから ためしてね。</p>;
-  }
-  if (busy) {
-    return <p className={cx("t-body", "eg-drawer__note")} role="status">はかっています…</p>;
-  }
-  if (failed) {
-    return (
-      <NoteBox title="ことばのお手伝い" icon={<IconGauge />}>
-        いま はかれません。はかれないあいだは 投稿できません。
-      </NoteBox>
-    );
-  }
-  if (!result) {
-    return null;
-  }
-  return (
-    <div className="eg-evaluate">
-      <p className={cx("eg-evaluate__axis", "t-label")}>{result.axis}</p>
-      <p className={cx("eg-evaluate__value", "t-metric")}>{result.label}</p>
-      <div
-        className="eg-meter"
-        role="img"
-        aria-label={result.axis + " " + result.label}
-      >
-        <span
-          className={cx("eg-meter__fill", "is-" + personaKind)}
-          style={{ width: String(Math.round((result.months / MAX_MONTHS) * 100)) + "%" }}
-        />
-      </div>
-      <p className={cx("eg-evaluate__note", "t-caption")}>
-        書きかえたら、もう一度 はかってね。
-      </p>
     </div>
   );
 }
