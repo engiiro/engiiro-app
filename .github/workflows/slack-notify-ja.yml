@@ -1,0 +1,84 @@
+name: Slack通知（日本語）
+
+on:
+  issues:
+    types: [opened, closed, reopened]
+  pull_request:
+    types: [opened, closed, reopened, ready_for_review, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slackへ通知
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_USER: ${{ github.event.sender.login }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_USER: ${{ github.event.sender.login }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          REQUESTED_REVIEWER: ${{ github.event.requested_reviewer.login }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          REVIEW_USER: ${{ github.event.review.user.login }}
+        run: |
+          set -e
+          TEXT=""
+          URL=""
+
+          if [ "$EVENT_NAME" = "issues" ]; then
+            URL="$ISSUE_URL"
+            case "$EVENT_ACTION" in
+              opened) TEXT="🆕 新しいIssueが作成されました: *${ISSUE_TITLE}* (#${ISSUE_NUMBER}) by ${ISSUE_USER}" ;;
+              closed) TEXT="✅ Issueがクローズされました: *${ISSUE_TITLE}* (#${ISSUE_NUMBER})" ;;
+              reopened) TEXT="♻️ Issueが再オープンされました: *${ISSUE_TITLE}* (#${ISSUE_NUMBER})" ;;
+            esac
+
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            URL="$PR_URL"
+            case "$EVENT_ACTION" in
+              opened) TEXT="🔀 新しいプルリクエストが作成されました: *${PR_TITLE}* (#${PR_NUMBER}) by ${PR_USER}" ;;
+              reopened) TEXT="♻️ プルリクエストが再オープンされました: *${PR_TITLE}* (#${PR_NUMBER})" ;;
+              ready_for_review) TEXT="📢 プルリクエストがレビュー可能になりました: *${PR_TITLE}* (#${PR_NUMBER})" ;;
+              review_requested)
+                if [ -n "$REQUESTED_REVIEWER" ]; then
+                  TEXT="👀 レビュー依頼が届きました: *${PR_TITLE}* (#${PR_NUMBER}) → @${REQUESTED_REVIEWER}"
+                fi
+                ;;
+              closed)
+                if [ "$PR_MERGED" = "true" ]; then
+                  TEXT="🎉 プルリクエストがマージされました: *${PR_TITLE}* (#${PR_NUMBER})"
+                else
+                  TEXT="🚫 プルリクエストがクローズされました（未マージ）: *${PR_TITLE}* (#${PR_NUMBER})"
+                fi
+                ;;
+            esac
+
+          elif [ "$EVENT_NAME" = "pull_request_review" ]; then
+            URL="$PR_URL"
+            case "$REVIEW_STATE" in
+              approved) TEXT="✅ ${REVIEW_USER} さんが承認しました: *${PR_TITLE}* (#${PR_NUMBER})" ;;
+              changes_requested) TEXT="🔧 ${REVIEW_USER} さんが変更を要求しました: *${PR_TITLE}* (#${PR_NUMBER})" ;;
+              commented) TEXT="💬 ${REVIEW_USER} さんがコメントしました: *${PR_TITLE}* (#${PR_NUMBER})" ;;
+            esac
+          fi
+
+          if [ -z "$TEXT" ]; then
+            echo "対象外のイベント/アクションのためスキップします: ${EVENT_NAME}/${EVENT_ACTION}"
+            exit 0
+          fi
+
+          PAYLOAD=$(jq -n --arg text "${TEXT}
+${URL}" '{text: $text}')
+
+          curl -sf -X POST -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
