@@ -76,8 +76,7 @@ jobs:
             exit 0
           fi
 
-          PAYLOAD=$(jq -n --arg text "${TEXT}
-${URL}" '{text: $text}')
+          PAYLOAD=$(jq -n --arg text "$TEXT" --arg url "$URL" '{text: ($text + "\n" + $url)}')
 
           curl -sf -X POST -H 'Content-type: application/json' \
             --data "$PAYLOAD" \
