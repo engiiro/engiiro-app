@@ -2,6 +2,7 @@
 
 設計書の「NG辞書・正規化・判定は Python のみ」に対応する部分。
 マサカリのような文脈依存の判定はここでは行わず、LLM側（transform_api.moderate）が担当する。
+身体語は単語だけで弾かず、明確な性的文脈との組み合わせだけを検出する。
 
 検査用文字列と表示用文字列を分けている。正規化した文字列は判定にだけ使い、
 利用者へ返す本文には使わない（Issue #4 で合意した「検査用文字列の分離」）。
@@ -22,6 +23,7 @@ import unicodedata
 # やわらげても投稿させないもの
 NG_WORDS_BLOCK = [
     "死ね", "しね", "殺す", "ころす", "消えろ", "きえろ",
+    "殺してやる", "ころしてやる", "くたばれ", "クタバレ",
     "キチガイ", "きちがい", "ガイジ", "がいじ",
 ]
 
@@ -32,7 +34,7 @@ NG_WORDS_BLOCK = [
 # 「ばかり」「くずれる」「貸す」「申し込み」に一致してしまうため入れない。
 # この種の語は文脈を見ないと判定できないので、LLM側のマサカリ判定に任せる。
 NG_WORDS_REWRITE = [
-    "無能", "役立たず",
+    "無能", "むのう", "役立たず", "やくたたず",
 ]
 
 # 自傷・他害の疑い。TBD-9（専用応答の設計）が未確定のため、
@@ -45,6 +47,23 @@ SELF_HARM_WORDS = [
 
 # TBD-9 が決まるまでの暫定。人間監督の決定で変更すること。
 SELF_HARM_ACTION = "block"
+
+# ============================================================
+# 1.5 文脈付きの性的表現
+# ============================================================
+# 「おっぱい」「おしっこ」などは赤ちゃんの生活・身体表現として許可する。
+# 下記は身体語と、性的な行為・意図が同一文中に現れる場合だけを対象にする。
+_SEXUAL_CONTEXT_PATTERNS = (
+    re.compile(r"(?:おっぱい|ちんちん|おちんちん|性器|陰部).{0,24}(?:吸う|舐める|触る|揉む|性的|エッチ|快感|いやらしい|性行為|アダルト)"),
+    re.compile(r"(?:吸う|舐める|触る|揉む|性的|エッチ|快感|いやらしい|性行為|アダルト).{0,24}(?:おっぱい|ちんちん|おちんちん|性器|陰部)"),
+    re.compile(r"(?:裸|裸体|全裸).{0,24}(?:性的|エッチ|快感|触る|舐める|挿入|いやらしい|性行為|アダルト)"),
+    re.compile(r"(?:赤ちゃんプレイ|成人.*赤ちゃん|大人.*赤ちゃん).{0,24}(?:性的|エッチ|快感|行為|アダルト)"),
+)
+
+
+def has_contextual_sexual_content(checked_text: str) -> bool:
+    """身体語単体を除外し、明確な性的組み合わせだけを検出する。"""
+    return any(pattern.search(checked_text) for pattern in _SEXUAL_CONTEXT_PATTERNS)
 
 
 # ============================================================
@@ -183,11 +202,14 @@ def check_rules(text: str) -> dict:
     hit_block = [w for w in NG_WORDS_BLOCK if normalize_for_check(w) in checked]
     hit_rewrite = [w for w in NG_WORDS_REWRITE if normalize_for_check(w) in checked]
     hit_self_harm = [w for w in SELF_HARM_WORDS if normalize_for_check(w) in checked]
+    hit_contextual_sexual = has_contextual_sexual_content(checked)
     hit_personal = find_personal_data(text)
 
     reason_codes = []
     if hit_block:
         reason_codes.append("ng_word")
+    if hit_contextual_sexual:
+        reason_codes.append("sexual_context")
     if hit_self_harm:
         reason_codes.append("self_harm")
     if hit_personal:
@@ -195,7 +217,7 @@ def check_rules(text: str) -> dict:
     if hit_rewrite:
         reason_codes.append("harsh_criticism")
 
-    if hit_block or hit_personal:
+    if hit_block or hit_personal or hit_contextual_sexual:
         action = "block"
     elif hit_self_harm:
         action = SELF_HARM_ACTION
@@ -212,6 +234,7 @@ def check_rules(text: str) -> dict:
             "harsh_criticism": hit_rewrite,
             "self_harm": hit_self_harm,
             "personal_data": hit_personal,
+            "sexual_context": hit_contextual_sexual,
         },
     }
 
