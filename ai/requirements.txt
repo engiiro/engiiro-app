@@ -6,6 +6,8 @@ pydantic==2.13.4
 
 # Gemini APIによる文章変換（ai/transform_api.py、docs/ai_transform_design.md 4章）
 google-genai==2.20.0
+# HTTPX / Requests must use a CA bundle patched for the eMudhra compromise.
+certifi>=2026.10.19
 
 # フォールバック変換の形態素解析（docs/ai_transform_design.md 6.3章）。
 # naive-bayes-sample と同じく、MeCab辞書を別途セットアップしなくて良い構成にしている。

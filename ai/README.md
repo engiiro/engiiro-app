@@ -173,6 +173,13 @@ ai/
 
 Python 3.11以上を想定しています（`Dockerfile`が`python:3.11-slim`を使うため）。
 
+HTTPS 通信の CA バンドルは `certifi>=2026.10.19` を必須としています
+（[eMudhra 証明書問題](https://render.com/docs/advisory-emudhra)への対応）。
+Cloud Run 用イメージの更新時は `docker build --pull --no-cache -t engiiro-ai ./ai`
+をリポジトリルートで実行し、ベースイメージ・OS の CA ストア・Python 依存を更新します。
+ビルドだけでは稼働中のサービスは更新されません。レビュー後のデプロイと、稼働環境の
+HTTPX / Requests による証明書拒否の確認が必要です。
+
 ```sh
 cd ai
 
