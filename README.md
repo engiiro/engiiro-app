@@ -35,6 +35,9 @@ docker compose up --build
 
 ## Denoのローカル実行（Dockerを使わない場合）
 
+Deno 2.9.8 以降を使用してください（[eMudhra の修正を含むリリース](https://github.com/denoland/deno/releases/tag/v2.9.8)）。
+本番の Deno Deploy はローカル用 Docker と別の環境なので、稼働ランタイムにも修正が適用されていることを確認します。
+
 ```bash
 cd backend
 deno task dev
@@ -50,6 +53,9 @@ uvicorn app:app --reload --port 8001
 ```
 
 ## フロントエンドのローカル実行
+
+Node.js 24.22.1 以降の 24.x を使用してください（`frontend/app/.node-version`）。
+eMudhra 証明書問題への対応はビルド時の Node.js にも必要なため、Vercel のビルドログでも実際のバージョンを確認します。
 
 ```bash
 cd frontend/app

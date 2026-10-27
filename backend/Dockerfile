@@ -1,6 +1,12 @@
 # ローカル開発環境を揃えるためのDockerfile。
 # 本番はDeno Deployへソースコードを直接デプロイするため、このイメージ自体は本番運用には使わない。
-FROM denoland/deno:2.1.4
+FROM denoland/deno:2.9.8
+
+# Keep both Deno's bundled roots and the Debian trust store patched.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

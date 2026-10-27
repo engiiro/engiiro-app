@@ -3,6 +3,12 @@
 # 当初はHugging Face Spaces（Docker SDK）を想定していたが、Cloud Runへ変更した。
 FROM python:3.11-slim
 
+# Refresh the image's system trust store as well as Python's certifi bundle.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt .
